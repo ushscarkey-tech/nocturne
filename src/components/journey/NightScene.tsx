@@ -1,10 +1,52 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import dynamic from "next/dynamic";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import type { CarriageId } from "@/core/types";
 import { usePrefersReducedMotion } from "@/lib/hooks";
 
 export type SceneMode = "platform" | "night" | "tunnel" | "still";
+
+interface NightSceneProps {
+  mode: SceneMode;
+  carriage: CarriageId;
+  stationName?: string;
+  /** The end of the line: a longer platform with more lamps. */
+  terminal?: boolean;
+}
+
+// three.js is fetched only when the carriage is actually shown.
+const CabinScene3D = dynamic(() => import("@/components/scene/CabinScene3D"), { ssr: false, loading: () => null });
+
+let webgl2: boolean | null = null;
+function hasWebGL2() {
+  if (webgl2 === null) {
+    try {
+      webgl2 = !!document.createElement("canvas").getContext("webgl2");
+    } catch {
+      webgl2 = false;
+    }
+  }
+  return webgl2;
+}
+const noSubscribe = () => () => {};
+
+/**
+ * The window beside your seat. In 3D where the device can draw it; the
+ * hand-drawn 2D window otherwise, or if the 3D one fails.
+ */
+export function NightScene(props: NightSceneProps) {
+  const canDraw3D = useSyncExternalStore(noSubscribe, hasWebGL2, () => false);
+  const [failed, setFailed] = useState(false);
+  if (!canDraw3D || failed) return <NightScene2D {...props} />;
+  return (
+    <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden bg-night-950" aria-hidden>
+      <CabinScene3D {...props} className="absolute inset-0 animate-[fade_1600ms_ease-out_both]" onFail={() => setFailed(true)} />
+      {/* A soft scrim keeps the centre readable. */}
+      <div className="absolute inset-0 bg-[radial-gradient(62%_40%_at_50%_46%,rgba(4,6,10,0.5),transparent_78%)]" />
+    </div>
+  );
+}
 
 type RGB = readonly [number, number, number];
 
@@ -291,18 +333,7 @@ function reflectionPaths(w: number, h: number) {
  * (blocks of flats, a river, a mountain road, signals) so the window changes
  * every minute or two without ever asking to be watched.
  */
-export function NightScene({
-  mode,
-  carriage,
-  stationName,
-  terminal = false,
-}: {
-  mode: SceneMode;
-  carriage: CarriageId;
-  stationName?: string;
-  /** The end of the line: a longer platform with more lamps. */
-  terminal?: boolean;
-}) {
+function NightScene2D({ mode, carriage, stationName, terminal = false }: NightSceneProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const target = useRef({ mode, carriage, stationName, terminal });
   const reduced = usePrefersReducedMotion();

@@ -557,18 +557,19 @@ export default function PlatformScene3D({ mood = "waiting", rain = true, station
         scene.add(obj);
         return m;
       };
-      const roofBox = new THREE.Vector4(ROOF_EDGE, ROOF_FROM, ROOF_TO, ROOF_Y);
+      const coverMin = new THREE.Vector3(ROOF_EDGE, -10, ROOF_TO);
+      const coverMax = new THREE.Vector3(100, ROOF_Y, ROOF_FROM);
       const rr = tx.seeded(131);
       const RAIN_OPACITY = 0.45;
       const rainMat = rainMesh(
         2000,
-        { lights: rainLights, colors: rainColors, min: new THREE.Vector3(-7, BED_Y, -50), size: new THREE.Vector3(12.2, 10, 62), roof: roofBox, cover: true, speed: 8.5, opacity: RAIN_OPACITY, fogDensity: FOG },
+        { lights: rainLights, colors: rainColors, min: new THREE.Vector3(-7, BED_Y, -50), size: new THREE.Vector3(12.2, 10, 62), coverMin, coverMax, speed: 8.5, opacity: RAIN_OPACITY, fogDensity: FOG },
         () => [rr(), rr(), rr(), rr()],
       );
       const drips = (ROOF_FROM - ROOF_TO) / 0.35;
       const dripMat = rainMesh(
         150,
-        { lights: rainLights, colors: rainColors, min: new THREE.Vector3(ROOF_EDGE - 0.1, 0, ROOF_TO), size: new THREE.Vector3(0.06, ROOF_Y, ROOF_FROM - ROOF_TO), roof: roofBox, cover: false, speed: 6, opacity: 0.8, fogDensity: FOG },
+        { lights: rainLights, colors: rainColors, min: new THREE.Vector3(ROOF_EDGE - 0.1, 0, ROOF_TO), size: new THREE.Vector3(0.06, ROOF_Y, ROOF_FROM - ROOF_TO), speed: 6, opacity: 0.8, fogDensity: FOG },
         () => [rr(), rr(), Math.floor(rr() * drips) / drips, rr()],
       );
 

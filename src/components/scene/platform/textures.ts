@@ -226,7 +226,7 @@ export function vendingFace(body: string, seed: number) {
 }
 
 /** Lightbox station sign: name, the line band, neighbouring stops. */
-export function stationSign(name: string, font: { sans: string; mono: string }) {
+export function stationSign(name: string, font: { sans: string; mono: string }, band = "NOCTURNE LINE") {
   return canvas(1024, 256, (g, w, h) => {
     const bg = g.createLinearGradient(0, 0, 0, h);
     bg.addColorStop(0, "#f6f3ea");
@@ -250,7 +250,7 @@ export function stationSign(name: string, font: { sans: string; mono: string }) 
     g.fillStyle = "#f6f3ea";
     g.font = `500 20px ${font.mono}`;
     (g as CanvasRenderingContext2D & { letterSpacing: string }).letterSpacing = "6px";
-    g.fillText("NOCTURNE LINE", w / 2, 186);
+    g.fillText(band, w / 2, 186);
     g.fillStyle = "#56605b";
     g.font = `400 22px ${font.mono}`;
     g.textAlign = "left";

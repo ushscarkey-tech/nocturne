@@ -130,7 +130,20 @@ export interface RainUniforms {
  * shader and borrows colour from the nearby lamps, so it shows mostly where
  * light catches it. Nothing moves on the CPU.
  */
-export function rainMaterial(opts: { lights: THREE.Vector4[]; colors: THREE.Color[]; min: THREE.Vector3; size: THREE.Vector3; roof: THREE.Vector4; cover: boolean; speed: number; opacity: number; fogDensity: number }) {
+export interface RainOptions {
+  lights: THREE.Vector4[];
+  colors: THREE.Color[];
+  min: THREE.Vector3;
+  size: THREE.Vector3;
+  /** Drops inside this box (a canopy and the dry air under it) are hidden. */
+  coverMin?: THREE.Vector3;
+  coverMax?: THREE.Vector3;
+  speed: number;
+  opacity: number;
+  fogDensity: number;
+}
+
+export function rainMaterial(opts: RainOptions) {
   return new THREE.ShaderMaterial({
     transparent: true,
     depthWrite: false,
@@ -141,8 +154,12 @@ export function rainMaterial(opts: { lights: THREE.Vector4[]; colors: THREE.Colo
       uSpeed: { value: opts.speed },
       uMin: { value: opts.min },
       uSize: { value: opts.size },
-      uRoof: { value: opts.roof },
-      uCover: { value: opts.cover ? 1 : 0 },
+      uCoverMin: { value: opts.coverMin ?? new THREE.Vector3(1, 1, 1) },
+      uCoverMax: { value: opts.coverMax ?? new THREE.Vector3(-1, -1, -1) },
+      // Sideways drift: wind, or the air a moving train pushes back.
+      uWind: { value: 0.05 },
+      // Distance travelled: the rain field slides past a moving camera.
+      uTravel: { value: 0 },
       uFog: { value: opts.fogDensity },
       uLights: { value: opts.lights },
       uColors: { value: opts.colors },
@@ -150,9 +167,8 @@ export function rainMaterial(opts: { lights: THREE.Vector4[]; colors: THREE.Colo
     defines: { NL: MAX_LIGHTS },
     vertexShader: /* glsl */ `
 attribute vec4 aSeed;
-uniform float uTime, uOpacity, uSpeed, uCover, uFog;
-uniform vec3 uMin, uSize;
-uniform vec4 uRoof;
+uniform float uTime, uOpacity, uSpeed, uFog, uWind, uTravel;
+uniform vec3 uMin, uSize, uCoverMin, uCoverMax;
 uniform vec4 uLights[NL];
 uniform vec3 uColors[NL];
 varying vec3 vCol;
@@ -161,9 +177,10 @@ varying float vV;
 void main() {
   float spd = uSpeed * (0.85 + 0.3 * aSeed.w);
   float y = uMin.y + mod(aSeed.y * uSize.y - uTime * spd, uSize.y);
-  vec3 p = vec3(uMin.x + aSeed.x * uSize.x, y, uMin.z + aSeed.z * uSize.z);
-  p.x += (y - uMin.y) * 0.05;
-  vec3 dir = normalize(vec3(0.05, -1.0, 0.0));
+  float x = mod(aSeed.x * uSize.x - uTravel, uSize.x);
+  vec3 p = vec3(uMin.x + x, y, uMin.z + aSeed.z * uSize.z);
+  p.x += (y - uMin.y) * uWind;
+  vec3 dir = normalize(vec3(uWind, -1.0, 0.0));
   vec3 toCam = cameraPosition - p;
   float dist = length(toCam);
   vec3 side = normalize(cross(dir, toCam));
@@ -178,7 +195,8 @@ void main() {
     lit += uColors[i] * uLights[i].w / (1.0 + dot(d, d) * 1.1);
   }
   vCol = lit;
-  float hidden = uCover * step(uRoof.x, p.x) * step(p.z, uRoof.y) * step(uRoof.z, p.z) * step(p.y, uRoof.w);
+  vec3 inside = step(uCoverMin, p) * step(p, uCoverMax);
+  float hidden = inside.x * inside.y * inside.z;
   float fog = exp(-dist * dist * uFog * uFog);
   vA = uOpacity * (1.0 - hidden) * fog * min(1.0, 0.006 / w) * smoothstep(1.5, 4.5, dist);
   vV = position.y + 0.5;
