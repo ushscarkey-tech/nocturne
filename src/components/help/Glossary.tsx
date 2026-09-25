@@ -5,8 +5,8 @@ import { create } from "zustand";
 import { useI18n, type MessageKey } from "@/i18n";
 import { Sheet } from "@/components/ui/Sheet";
 
-export type Term = "station" | "route" | "service" | "stop" | "tunnel" | "signal" | "carriage" | "line" | "final";
-const TERMS: Term[] = ["station", "route", "service", "stop", "tunnel", "signal", "carriage", "line", "final"];
+export type Term = "station" | "route" | "transfer" | "service" | "stop" | "tunnel" | "signal" | "carriage" | "line" | "final";
+const TERMS: Term[] = ["station", "route", "transfer", "service", "stop", "tunnel", "signal", "carriage", "line", "final"];
 
 export const useGlossary = create<{ open: boolean; term: Term | null; show: (term?: Term) => void; hide: () => void }>((set) => ({
   open: false,

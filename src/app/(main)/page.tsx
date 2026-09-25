@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useState, type ReactNode } from "react";
 import { availabilityForDate } from "@/core/availability";
 import { awaitingConfirmation, journeyFor } from "@/core/journey";
-import { elapsedSeconds, remainingSeconds, routeOf } from "@/core/sessions";
+import { remainingSeconds, routeOf } from "@/core/sessions";
 import { clock, formatHM, serviceDate, serviceMinutes } from "@/core/time";
 import { Button, ButtonLink, buttonClass } from "@/components/ui/Button";
 import { useQuickAdd } from "@/components/quickadd/QuickAdd";
@@ -15,9 +15,9 @@ import { RouteLine } from "@/components/route/RouteLine";
 import { FlipText } from "@/components/scene/FlipText";
 import { PlatformClock } from "@/components/scene/PlatformClock";
 import { PlatformScene } from "@/components/scene/PlatformScene";
-import { RouteStrip } from "@/components/scene/RouteStrip";
 import { ConflictNotice } from "@/components/tonight/ConflictNotice";
-import { StationName, useGlossary, useStationHint } from "@/components/help/Glossary";
+import { DepartureBoard, RecentChangeDetail } from "@/components/tonight/DepartureBoard";
+import { useGlossary, useStationHint } from "@/components/help/Glossary";
 import { useNow } from "@/lib/hooks";
 import { taskHref, ticketHref } from "@/lib/paths";
 import { routeItems, routeSummary } from "@/lib/route-view";
@@ -41,7 +41,7 @@ export default function TonightPage() {
   const summary = routeSummary(data, today);
   const route = routeOf(data.sessions, today);
   const windows = availabilityForDate(data.windows, today);
-  const { conflict } = useConflict(data, now);
+  const { conflict, forecast } = useConflict(data, now);
   const [panel, setPanel] = useState<Panel>(null);
   const [showHint, dismissHint] = useStationHint();
   const ticket = journey ? data.tickets.find((x) => x.journeyId === journey.id) : undefined;
@@ -62,7 +62,6 @@ export default function TonightPage() {
     (task) => task.status === "active" && !task.recurrence && task.deadline && task.deadline < today && task.remainingMinutes > 0,
   );
   const waiting = data.tasks.filter(awaitingConfirmation);
-  const fraction = active ? Math.min(1, elapsedSeconds(active, now) / Math.max(1, active.plannedMinutes * 60)) : 0;
 
   return (
     <div className="relative flex h-full flex-col">
@@ -97,6 +96,13 @@ export default function TonightPage() {
           </p>
         )}
       </div>
+
+      {/* The departure board hanging over the platform. */}
+      {route.length > 0 && (
+        <div className="mt-7 w-full px-6 md:max-w-2xl md:px-10">
+          <DepartureBoard data={data} now={now} forecast={forecast} onOpen={() => setPanel("route")} className="animate-enter" style={{ animationDelay: "550ms" }} />
+        </div>
+      )}
 
       {/* The platform breathes here. */}
       <div className="min-h-0 flex-1" />
@@ -138,11 +144,6 @@ export default function TonightPage() {
                 </>
               )}
             </p>
-            <p className="mt-1.5 animate-enter truncate text-sm text-mist" style={{ animationDelay: "1300ms" }}>
-              <StationName name={summary.next.stationName} className="font-mono text-[0.6875rem] tracking-[0.14em] text-haze" />
-              <span className="px-2 text-haze">·</span>
-              <span className="text-paper-dim">{nextTask.title}</span>
-            </p>
             {showHint && (
               <div className="mt-3 max-w-md animate-enter border-l border-lamp/40 pl-3 text-xs leading-relaxed text-mist" style={{ animationDelay: "2300ms" }}>
                 <p>{t("scene.stationHint", { station: summary.next.stationName })}</p>
@@ -178,24 +179,6 @@ export default function TonightPage() {
           </div>
         )}
 
-        {route.length > 0 && (
-          <button
-            type="button"
-            onClick={() => setPanel("route")}
-            className="group mt-6 block w-full animate-enter py-2 text-left" style={{ animationDelay: "1550ms" }}
-            aria-label={t("scene.openRoute")}
-          >
-            <RouteStrip route={route} activeId={active?.id} fraction={fraction} label={t("tonight.route")} />
-            <span className="mt-1.5 flex justify-between font-mono text-[0.625rem] tracking-[0.14em] text-haze transition-colors group-hover:text-mist">
-              <span>{summary.departure ? clock(summary.departure) : ""}</span>
-              <span className="inline-flex items-center gap-1">
-                {t("tonight.viewRoute")} <Icon name="chevron" size={11} />
-              </span>
-              <span>{summary.arrival ? clock(summary.arrival) : ""}</span>
-            </span>
-          </button>
-        )}
-
         <div className="mt-5 animate-enter" style={{ animationDelay: "1750ms" }}>
           {riding ? (
             <ButtonLink href="/journey" variant="primary" size="lg" className="w-full">
@@ -214,11 +197,17 @@ export default function TonightPage() {
       </section>
 
       <Sheet open={panel === "route"} onClose={() => setPanel(null)} title={t("scene.routeSheet")} eyebrow={fmt.longDate(today)}>
+        <RecentChangeDetail data={data} now={now} forecast={forecast} />
         <RouteLine items={routeItems(data, today)} compact />
         <div className="mt-6 flex justify-between gap-3">
-          <ButtonLink href="/service" variant="ghost" size="sm">
-            {t("tonight.serviceTime")}
-          </ButtonLink>
+          <span className="flex gap-1">
+            <ButtonLink href="/service" variant="ghost" size="sm">
+              {t("tonight.serviceTime")}
+            </ButtonLink>
+            <Button variant="ghost" size="sm" onClick={() => useGlossary.getState().show("route")}>
+              {t("scene.seeTerms")}
+            </Button>
+          </span>
           <ButtonLink href="/route" variant="secondary" size="sm">
             {t("scene.editRoute")}
           </ButtonLink>

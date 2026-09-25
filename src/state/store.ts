@@ -1,7 +1,9 @@
 "use client";
 
 import { create } from "zustand";
-import type { Message, NocturneData, RouteChange } from "@/core/types";
+import { routeOf } from "@/core/sessions";
+import { serviceDate } from "@/core/time";
+import type { DateKey, Message, NocturneData, RouteChange, StudySession } from "@/core/types";
 import { diffData, isEmptyChange, type Repository } from "@/data/repository";
 
 export type SessionMode = "demo" | "cloud";
@@ -16,6 +18,15 @@ export interface Notice {
   tone: "route" | "info" | "error";
 }
 
+/** Tonight's route just before the last adjustment, so the board can show what moved. */
+export interface RouteMemo {
+  at: string;
+  date: DateKey;
+  before: StudySession[];
+  messages?: Message[];
+  lines: string[];
+}
+
 interface StoreState {
   status: "idle" | "loading" | "ready" | "error";
   error: string | null;
@@ -23,6 +34,7 @@ interface StoreState {
   repo: Repository | null;
   data: NocturneData | null;
   notice: Notice | null;
+  routeMemo: RouteMemo | null;
   syncError: string | null;
   saving: boolean;
 }
@@ -49,6 +61,7 @@ export const useStore = create<StoreState & StoreActions>()((set, get) => ({
   repo: null,
   data: null,
   notice: null,
+  routeMemo: null,
   syncError: null,
   saving: false,
 
@@ -68,6 +81,11 @@ export const useStore = create<StoreState & StoreActions>()((set, get) => ({
     const { data: prev, repo } = get();
     if (!prev || prev === next) return;
     set({ data: next });
+    if (change) {
+      const date = serviceDate(new Date(change.at));
+      const before = routeOf(prev.sessions, date).filter((x) => x.status === "planned" || x.status === "active");
+      set({ routeMemo: { at: change.at, date, before, messages: change.messages, lines: change.lines } });
+    }
     if (change)
       get().notify({
         headline: change.headline,
@@ -102,7 +120,7 @@ export const useStore = create<StoreState & StoreActions>()((set, get) => ({
   },
 
   reset() {
-    set({ status: "idle", error: null, mode: null, repo: null, data: null, notice: null, syncError: null });
+    set({ status: "idle", error: null, mode: null, repo: null, data: null, notice: null, routeMemo: null, syncError: null });
   },
 }));
 
