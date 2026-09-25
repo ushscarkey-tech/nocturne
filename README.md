@@ -1,36 +1,95 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Nocturne
 
-## Getting Started
+**A planner that doesn't break when your plan does.**
 
-First, run the development server:
+Nocturne is an adaptive Todo and study planner. It spreads long tasks across the days before their
+deadlines, builds tonight's route inside your available study time, and quietly re-plans the rest of
+the evening when you start late, finish early, need more time or lose focus. The whole experience
+lives inside a late-night train journey: Route, Stations, Boarding, the Tunnel, Station Stops and a
+Ticket at the Final Station.
+
+## Running it
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+npm run dev          # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+With no configuration, Nocturne runs in **demo mode**: a sample traveller with tasks, two Lines,
+weekday Service Time and a week of past journeys, saved in your browser's local storage.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Cloud accounts (Supabase)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+1. Create a Supabase project and run `supabase/migrations/20260925000000_init.sql`
+   (via `supabase db push` or the SQL editor). It creates the tables, row level security policies
+   and a trigger that creates a profile on sign-up.
+2. Copy `.env.example` to `.env.local` and fill in the project URL and publishable (anon) key.
+3. Restart the dev server. `/login` now offers email/password sign-up and sign-in; "Explore the
+   demo" remains available.
 
-## Learn More
+### Checks
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+npm run test         # planner + journey engine (vitest)
+npm run typecheck
+npm run lint
+npm run build
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Architecture
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```
+src/core/        Framework-free domain logic (reusable by a future React Native / Expo app)
+  types.ts         Task, StudyWindow, StudySession, Line, Journey, Ticket
+  availability.ts  Service Time: weekly windows, one-off additions, blocked exceptions
+  allocate.ts      Long-term allocation across days + feasibility (Route conflict)
+  route.ts         Focus-aware ordering and packing of stations into windows
+  planner.ts       planToday(): rebuild or retime tonight; explains every Route change
+  journey.ts       Journey engine: board, arrive, low focus, finish early, more time,
+                   stops, service pause, end, ticket
+  stats.ts         Journey summaries, ticket faces, archive statistics
+  seed.ts          Demo data relative to "now"
+src/data/        Repository interface, local-storage and Supabase implementations
+src/state/       Zustand store (persists entity diffs), user actions, auth/bootstrap
+src/audio/       Procedural Web Audio ambience (no audio files) with crossfading presets
+src/components/  UI: route line and editor, journey scenes, tickets, forms
+src/app/         Next.js App Router pages
+supabase/        SQL migrations
+```
 
-## Deploy on Vercel
+### How planning works
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- **Allocation** – tasks are processed earliest-deadline-first and water-filled across the days
+  before their deadline, preferring the least loaded day with a slight bias toward earlier days.
+  The deadline day is kept as a buffer and used only when needed. Recurring tasks reserve their
+  occurrences first; Someday tasks only use spare capacity in the coming week.
+- **Feasibility** – an EDF cumulative check compares required work with available focus time up to
+  each deadline. A shortfall surfaces as a *Route conflict* with concrete options instead of an
+  impossible plan.
+- **Tonight's route** – the day's allocation is split into stations (respecting min/max session
+  length) and ordered greedily by urgency, importance and how well the task's demand (difficulty,
+  reluctance) matches the traveller's focus, avoiding back-to-back long hard stations. Stops are
+  inserted between stations.
+- **Adaptation** – every change rebuilds or retimes **only future, unlocked stations**. Completed
+  and partial stations, the active station and locked stations never move. Each adjustment
+  produces a plain-language "Route updated" explanation.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+### Terminology
+
+| Product concept | Nocturne |
+|---|---|
+| Today's schedule | Route |
+| Task session | Station |
+| Available study time | Service Time |
+| Deep focus | Tunnel |
+| Break | Station Stop |
+| Rescheduling | Route Adjustment |
+| End of day | Final Station |
+| Daily record | Ticket |
+| Long-term project | Line |
+
+## Known limits of v1
+
+- Service windows can't cross midnight.
+- Reminders are browser notifications while Nocturne is open (no push service yet).
+- Natural-language quick add, calendar sync and learned focus patterns are planned for later.
