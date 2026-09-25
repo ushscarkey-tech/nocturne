@@ -11,7 +11,7 @@ import { planToday, type PlanTodayOptions } from "./planner";
 import { availabilityForDate, breakAfter } from "./availability";
 import { activeSession, elapsedSeconds, routeOf, sessionsOn, upcomingOn } from "./sessions";
 import { boardingDetails } from "./stations";
-import { atMinutes, minutesOfDay, toDateKey } from "./time";
+import { serviceDate, serviceMinutes } from "./time";
 import type {
   AmbienceId,
   CarriageId,
@@ -77,20 +77,35 @@ function replan(
   return { data: { ...data, sessions: result.sessions }, change: result.change };
 }
 
-/** Apply credited work to a task and close it when nothing is left. */
+/**
+ * Apply credited work to a task. Only an explicit "whole task complete"
+ * closes it: when the estimate simply runs out, the task waits at zero for
+ * the traveller to confirm it is finished (estimates are often optimistic).
+ */
 function creditTask(tasks: Task[], taskId: string, minutes: number, now: Date, completeAll = false): Task[] {
   const t = tasks.find((x) => x.id === taskId);
   if (!t) return tasks;
   if (t.recurrence) return replaceTask(tasks, { ...t, updatedAt: iso(now) });
   const remaining = completeAll ? 0 : Math.max(0, Math.round(t.remainingMinutes - minutes));
-  const done = remaining <= 0;
   return replaceTask(tasks, {
     ...t,
     remainingMinutes: remaining,
-    status: done ? "done" : t.status,
-    completedAt: done ? iso(now) : t.completedAt,
+    status: completeAll ? "done" : t.status,
+    completedAt: completeAll ? iso(now) : t.completedAt,
     updatedAt: iso(now),
   });
+}
+
+/** Tasks whose planned time is used up but which the traveller hasn't closed. */
+export function awaitingConfirmation(t: Task): boolean {
+  return t.status === "active" && !t.recurrence && t.estimatedMinutes > 0 && t.remainingMinutes <= 0;
+}
+
+/** The Service window containing `now`, in service-day minutes. */
+function windowAt(data: NocturneData, now: Date): { start: number; end: number } | undefined {
+  const date = serviceDate(now);
+  const nowMin = serviceMinutes(now, date);
+  return availabilityForDate(data.windows, date).find((w) => w.start <= nowMin + 0.5 && nowMin < w.end);
 }
 
 function routeTotals(sessions: StudySession[], date: string) {
@@ -106,7 +121,7 @@ function routeTotals(sessions: StudySession[], date: string) {
 
 /** Create (or return) tonight's journey record in the boarding phase. */
 export function ensureJourney(data: NocturneData, now: Date, carriage: CarriageId): { data: NocturneData; journey: Journey } {
-  const date = toDateKey(now);
+  const date = serviceDate(now);
   const existing = journeyFor(data, date);
   if (existing) return { data, journey: existing };
   const totals = routeTotals(data.sessions, date);
@@ -136,10 +151,27 @@ export function ensureJourney(data: NocturneData, now: Date, carriage: CarriageI
   return { data: replaceJourney(data, journey), journey };
 }
 
-function startStation(sessions: StudySession[], s: StudySession, now: Date, focus: FocusLevel): StudySession[] {
-  const end = new Date(now.getTime() + s.plannedMinutes * 60_000);
-  return replaceSession(sessions, {
+/**
+ * Start a station now. Inside Service Time it never runs past the end of the
+ * window: a station that would overrun is shortened and the rest of its work
+ * returns to the planner.
+ */
+function startStation(data: NocturneData, s: StudySession, now: Date, focus: FocusLevel): StudySession[] {
+  let planned = s.plannedMinutes;
+  let work = s.workMinutes;
+  const w = windowAt(data, now);
+  if (w) {
+    const room = Math.floor(w.end - serviceMinutes(now, serviceDate(now)));
+    if (room >= 5 && room < planned) {
+      work = Math.max(1, Math.round((work * room) / planned));
+      planned = room;
+    }
+  }
+  const end = new Date(now.getTime() + planned * 60_000);
+  return replaceSession(data.sessions, {
     ...s,
+    plannedMinutes: planned,
+    workMinutes: work,
     status: "active",
     actualStart: s.actualStart ?? iso(now),
     resumedAt: iso(now),
@@ -158,7 +190,7 @@ export function board(
   args: { focus: FocusLevel; carriage: CarriageId },
   now: Date,
 ): EngineResult {
-  const date = toDateKey(now);
+  const date = serviceDate(now);
   const ensured = ensureJourney(data, now, args.carriage);
   let next = ensured.data;
   let journey = ensured.journey;
@@ -170,23 +202,23 @@ export function board(
   // a Low or Sharp signal re-sorts the stations that have not started.
   const hasRoute = upcomingOn(next.sessions, date).length > 0;
   const mode = hasRoute && args.focus === "steady" ? "retime" : "reoptimize";
-  // Depart now: the first station may start outside Service Time if the
-  // traveller chooses to begin early; the rest follow inside it.
-  const planned = replan(next, { now, mode, reason, focus: args.focus }, args.focus);
+  const planned = replan(next, { now, mode, reason, focus: args.focus, scope: hasRoute ? "tonight" : "all" }, args.focus);
   next = planned.data;
   const first = upcomingOn(next.sessions, date)[0];
-  let change = planned.change;
-  if (first) {
-    next = { ...next, sessions: startStation(next.sessions, first, now, args.focus) };
-    const retimed = replan(next, { now, mode: "retime", reason: "depart" }, args.focus);
-    next = retimed.data;
-    change = change ?? retimed.change;
+  const change = planned.change;
+  // Inside Service Time the train leaves at once. Before it opens, the
+  // traveller waits on the platform until departure (or leaves early).
+  const departNow = !!first && (!!windowAt(next, now) || new Date(first.plannedStart).getTime() - now.getTime() <= 60_000);
+  if (first && departNow) {
+    next = { ...next, sessions: startStation(next, first, now, args.focus) };
+    next = replan(next, { now, mode: "retime", reason: "depart" }, args.focus).data;
   }
+  const wait = first && !departNow ? (new Date(first.plannedStart).getTime() - now.getTime()) / 60_000 : 0;
 
   const totals = routeTotals(next.sessions, date);
   journey = {
     ...journey,
-    phase: first ? "cabin" : "final",
+    phase: !first ? "final" : departNow ? "cabin" : wait > 30 ? "paused" : "stop",
     selectedCarriage: args.carriage,
     selectedAmbience: CARRIAGE_AMBIENCE[args.carriage],
     focus: args.focus,
@@ -197,10 +229,10 @@ export function board(
     stationsPlanned: journey.startedAt ? journey.stationsPlanned : totals.stations,
     plannedDeparture: journey.startedAt ? journey.plannedDeparture : (journey.plannedDeparture ?? totals.departure),
     plannedArrival: journey.startedAt ? journey.plannedArrival : (journey.plannedArrival ?? totals.arrival),
-    stopEndsAt: null,
+    stopEndsAt: first && !departNow ? first.plannedStart : null,
   };
-  journey = withChange(journey, late || reason === "late-start" ? change : null);
-  return { data: replaceJourney(next, journey), change: late ? change : null };
+  journey = withChange(journey, change);
+  return { data: replaceJourney(next, journey), change };
 }
 
 /** Where the traveller goes after a station closes. */
@@ -288,7 +320,7 @@ export function arrive(data: NocturneData, now: Date): EngineResult {
  * running stations are banked as partial, journeys move to Final Station.
  */
 export function settleStale(data: NocturneData, now: Date): NocturneData {
-  const today = toDateKey(now);
+  const today = serviceDate(now);
   let next = data;
   const stale = data.sessions.filter((s) => s.status === "active" && s.date < today);
   for (const s of stale) {
@@ -366,6 +398,7 @@ export function lowFocus(data: NocturneData, now: Date): EngineResult {
       mode: "reoptimize",
       reason: "low-focus",
       focus: "low",
+      scope: "tonight",
       startFrom: stopEnd,
       returnedWork: returned >= 5 ? { taskId: active.taskId, minutes: returned } : undefined,
     },
@@ -404,18 +437,18 @@ export function resume(data: NocturneData, now: Date): EngineResult {
 
 /** Leave the platform: start the next station now and retime the rest. */
 export function depart(data: NocturneData, now: Date): EngineResult {
-  const date = toDateKey(now);
+  const date = serviceDate(now);
   const journey = journeyFor(data, date);
   if (!journey) return { data, change: null };
   const next = upcomingOn(data.sessions, date)[0];
   if (!next) return { data: replaceJourney(data, { ...journey, phase: "final", stopEndsAt: null }), change: null };
-  const started: NocturneData = { ...data, sessions: startStation(data.sessions, next, now, journey.focus) };
+  const started: NocturneData = { ...data, sessions: startStation(data, next, now, journey.focus) };
   const planned = replan(started, { now, mode: "retime", reason: "depart" }, journey.focus);
   return { data: replaceJourney(planned.data, { ...journey, phase: "cabin", stopEndsAt: null }), change: null };
 }
 
 export function extendStop(data: NocturneData, now: Date, minutes: number): EngineResult {
-  const journey = journeyFor(data, toDateKey(now));
+  const journey = journeyFor(data, serviceDate(now));
   if (!journey?.stopEndsAt) return { data, change: null };
   const end = new Date(Math.max(now.getTime(), new Date(journey.stopEndsAt).getTime()) + minutes * 60_000);
   const planned = replan(data, { now, mode: "retime", reason: "edit", startFrom: end }, journey.focus);
@@ -424,10 +457,10 @@ export function extendStop(data: NocturneData, now: Date, minutes: number): Engi
 
 /** Signal change at a Station Stop or before resuming service. */
 export function reassessFocus(data: NocturneData, now: Date, level: FocusLevel): EngineResult {
-  const journey = journeyFor(data, toDateKey(now));
+  const journey = journeyFor(data, serviceDate(now));
   if (!journey || journey.focus === level) return { data, change: null };
   const startFrom = journey.stopEndsAt ? new Date(journey.stopEndsAt) : now;
-  const planned = replan(data, { now, mode: "reoptimize", reason: "signal-change", focus: level, startFrom }, level);
+  const planned = replan(data, { now, mode: "reoptimize", reason: "signal-change", focus: level, startFrom, scope: "tonight" }, level);
   const updated = withChange(
     { ...journey, focus: level, focusLog: [...journey.focusLog, { at: iso(now), level }] },
     planned.change,
@@ -437,9 +470,9 @@ export function reassessFocus(data: NocturneData, now: Date, level: FocusLevel):
 
 /** Resume after "Service paused": rebuild with actual progress, then depart. */
 export function resumeService(data: NocturneData, now: Date, focus: FocusLevel): EngineResult {
-  const journey = journeyFor(data, toDateKey(now));
+  const journey = journeyFor(data, serviceDate(now));
   if (!journey) return { data, change: null };
-  const planned = replan(data, { now, mode: "reoptimize", reason: "service-resume", focus }, focus);
+  const planned = replan(data, { now, mode: "reoptimize", reason: "service-resume", focus, scope: "tonight" }, focus);
   const updated = withChange(
     { ...journey, focus, focusLog: [...journey.focusLog, { at: iso(now), level: focus }] },
     planned.change,
@@ -453,7 +486,7 @@ export function resumeService(data: NocturneData, now: Date, focus: FocusLevel):
  * not reached back to the planner so its work flows to later days.
  */
 export function endJourney(data: NocturneData, now: Date): EngineResult {
-  const date = toDateKey(now);
+  const date = serviceDate(now);
   let next = data;
   const active = activeSession(data.sessions);
   if (active && elapsedSeconds(active, now) >= 60) next = closeActive(data, now, "partial").data;
@@ -481,15 +514,59 @@ export function issueTicket(data: NocturneData, journeyId: string, now: Date): {
   return { data: { ...replaceJourney(data, completed), tickets: [...data.tickets, ticket] }, ticket };
 }
 
-/** Where the next departure is, for "Service paused" and Tonight. */
-export function nextDeparture(data: NocturneData, now: Date): Date | null {
-  const next = upcomingOn(data.sessions, toDateKey(now))[0];
-  return next ? new Date(next.plannedStart) : null;
+/**
+ * Remove a task from the line. A running station for it is banked first;
+ * tasks with history are archived (so past tickets keep their stations),
+ * others are deleted outright. Tonight's remaining route is rebuilt.
+ */
+export function removeTask(data: NocturneData, taskId: string, now: Date): EngineResult {
+  const date = serviceDate(now);
+  let next = data;
+  const active = activeSession(next.sessions);
+  let journey = journeyFor(next, date);
+  if (active?.taskId === taskId) {
+    if (elapsedSeconds(active, now) >= 60) next = closeActive(next, now, "partial").data;
+    else next = { ...next, sessions: next.sessions.filter((s) => s.id !== active.id) };
+  }
+  const hasHistory = next.sessions.some((s) => s.taskId === taskId && (s.status === "done" || s.status === "partial"));
+  const sessions = next.sessions.filter((s) => !(s.taskId === taskId && (s.status === "planned" || s.status === "skipped")));
+  const tasks = hasHistory
+    ? next.tasks.map((t) => (t.id === taskId ? { ...t, status: "archived" as const, updatedAt: iso(now) } : t))
+    : next.tasks.filter((t) => t.id !== taskId);
+  next = { ...next, tasks, sessions: hasHistory ? sessions : sessions.filter((s) => s.taskId !== taskId) };
+
+  journey = journeyFor(next, date);
+  if (journey?.phase === "final") return { data: next, change: null };
+  const startFrom = journey?.phase === "stop" && journey.stopEndsAt ? new Date(journey.stopEndsAt) : undefined;
+  const planned = replan(next, { now, mode: "reoptimize", reason: "task-change", startFrom }, journey?.focus ?? "steady");
+  next = planned.data;
+  if (journey?.startedAt && active?.taskId === taskId) {
+    next = replaceJourney(next, afterStation(next, withChange(journeyFor(next, date)!, planned.change), now));
+  } else if (journey?.startedAt) {
+    next = replaceJourney(next, withChange(journeyFor(next, date)!, planned.change));
+  }
+  return { data: next, change: planned.change };
 }
 
-export function windowStartAfter(data: NocturneData, now: Date): Date | null {
-  const date = toDateKey(now);
-  const nowMin = minutesOfDay(now);
-  const w = availabilityForDate(data.windows, date).find((i) => i.start > nowMin);
-  return w ? atMinutes(date, w.start) : null;
+/**
+ * Everything planned is done but Service Time remains: pull upcoming work
+ * forward into tonight and keep riding.
+ */
+export function continueService(data: NocturneData, now: Date): EngineResult & { added: boolean } {
+  const date = serviceDate(now);
+  const journey = journeyFor(data, date);
+  if (!journey) return { data, change: null, added: false };
+  const planned = replan(data, { now, mode: "reoptimize", reason: "optimize" }, journey.focus);
+  const added = upcomingOn(planned.data.sessions, date).length > 0;
+  if (!added) return { data, change: null, added: false };
+  const reopened: Journey = { ...journey, phase: "stop", completedAt: null, stopEndsAt: null };
+  const departed = depart(replaceJourney(planned.data, reopened), now);
+  return { data: departed.data, change: null, added: true };
+}
+
+/** Minutes of Service Time left tonight after `now`. */
+export function serviceLeft(data: NocturneData, now: Date): number {
+  const date = serviceDate(now);
+  const nowMin = serviceMinutes(now, date);
+  return availabilityForDate(data.windows, date).reduce((sum, w) => sum + Math.max(0, w.end - Math.max(w.start, nowMin)), 0);
 }

@@ -13,10 +13,11 @@ import {
 } from "@dnd-kit/core";
 import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { useFlip } from "@/lib/hooks";
 import type { RouteItem } from "@/lib/route-view";
 import { Icon } from "@/components/ui/Icon";
-import { RouteRow } from "./RouteLine";
+import { RouteRow, routeSignature } from "./RouteLine";
 
 type StationItem = Extract<RouteItem, { kind: "station" }>;
 
@@ -34,6 +35,8 @@ export function RouteEditor({
   onOpen: (item: StationItem) => void;
 }) {
   const [dragging, setDragging] = useState<string | null>(null);
+  // The frame after a drop is already in place; don't animate it again.
+  const [settling, setSettling] = useState(false);
   const movable = items
     .filter((i): i is StationItem => i.kind === "station" && i.session.status === "planned" && !i.session.locked)
     .map((i) => i.session.id);
@@ -50,6 +53,8 @@ export function RouteEditor({
 
   function onDragEnd(e: DragEndEvent) {
     setDragging(null);
+    setSettling(true);
+    requestAnimationFrame(() => requestAnimationFrame(() => setSettling(false)));
     const { active, over } = e;
     if (!over || active.id === over.id) return;
     const from = movable.indexOf(String(active.id));
@@ -60,6 +65,8 @@ export function RouteEditor({
 
   // While dragging, stops collapse so stations line up cleanly.
   const visible = dragging ? items.filter((i) => i.kind === "station") : items;
+  const listRef = useRef<HTMLOListElement>(null);
+  useFlip(listRef, routeSignature(visible), !!dragging || settling);
 
   return (
     <DndContext
@@ -75,7 +82,7 @@ export function RouteEditor({
       }}
     >
       <SortableContext items={movable} strategy={verticalListSortingStrategy}>
-        <ol className="relative" aria-label="Tonight's route">
+        <ol ref={listRef} className="relative" aria-label="Tonight's route">
           {visible.map((item, i) => {
             const first = i === 0;
             const last = i === visible.length - 1;
@@ -135,7 +142,7 @@ function SortableStation({
             {...attributes}
             {...listeners}
             aria-label={`Reorder ${item.task?.title ?? "station"}`}
-            className="cursor-grab touch-none rounded-lg p-2 text-haze transition-colors hover:text-paper active:cursor-grabbing"
+            className="flex h-11 w-10 cursor-grab touch-none items-center justify-center rounded-lg text-haze transition-colors hover:text-paper active:cursor-grabbing"
           >
             <Icon name="grip" size={18} />
           </button>
@@ -151,7 +158,7 @@ function MoreButton({ item, onOpen }: { item: StationItem; onOpen: (item: Statio
       type="button"
       onClick={() => onOpen(item)}
       aria-label={`Options for ${item.task?.title ?? "station"}`}
-      className="rounded-lg p-2 text-haze transition-colors hover:text-paper"
+      className="flex h-11 w-10 items-center justify-center rounded-lg text-haze transition-colors hover:text-paper"
     >
       <Icon name="dots" size={18} />
     </button>

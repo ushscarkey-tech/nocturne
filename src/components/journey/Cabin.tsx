@@ -35,6 +35,7 @@ export function Cabin({
   onTunnel: (on: boolean) => void;
 }) {
   const [revealed, setRevealed] = useState(false);
+  const [hintVisible, setHintVisible] = useState(true);
   const [sheet, setSheet] = useState<null | "early" | "more" | "end">(null);
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastInteraction = useRef(0);
@@ -57,6 +58,11 @@ export function Cabin({
     hideTimer.current = setTimeout(() => setRevealed(false), REVEAL_MS);
   }, [tunnel, onTunnel]);
 
+  useEffect(() => {
+    const t = setTimeout(() => setHintVisible(false), 8000);
+    return () => clearTimeout(t);
+  }, []);
+
   // Any key or swipe reveals controls.
   useEffect(() => {
     lastInteraction.current = Date.now();
@@ -78,22 +84,7 @@ export function Cabin({
     if (tunnel && remaining < 120) onTunnel(false);
   }, [now, data.profile.autoTunnel, paused, sheet, tunnel, remaining, revealed, onTunnel]);
 
-  const showControls = revealed || paused || !!sheet;
-
-  if (tunnel) {
-    return (
-      <button
-        type="button"
-        onClick={reveal}
-        className="flex min-h-dvh w-full animate-fade flex-col items-center justify-end pb-[max(3rem,env(safe-area-inset-bottom))]"
-        aria-label={`Tunnel mode. ${formatCountdown(remaining)} remaining. Tap to show controls.`}
-      >
-        <span className="font-mono text-sm tracking-[0.2em] text-paper-dim/70 tabular" aria-live="off">
-          {formatCountdown(remaining)}
-        </span>
-      </button>
-    );
-  }
+  const showControls = (revealed || paused || !!sheet) && !tunnel;
 
   return (
     <div
@@ -102,11 +93,24 @@ export function Cabin({
         if ((e.target as HTMLElement).closest("button,a,input,dialog")) return;
         reveal();
       }}
-      onTouchEnd={() => reveal()}
+      onTouchEnd={(e) => {
+        if ((e.target as HTMLElement).closest("button,a,input,dialog")) return;
+        reveal();
+      }}
     >
-      <header className="flex items-center justify-between">
+      {/* Tunnel: the cabin dims and only a small remaining time stays. */}
+      <div
+        aria-hidden={!tunnel}
+        className={`pointer-events-none fixed inset-x-0 bottom-[max(3rem,env(safe-area-inset-bottom))] z-10 text-center transition-opacity delay-[1500ms] duration-[2500ms] ${tunnel ? "opacity-100" : "opacity-0 delay-0 duration-700"}`}
+      >
+        <span className="font-mono text-sm tracking-[0.2em] text-paper-dim/60 tabular">{formatCountdown(remaining)}</span>
+      </div>
+
+      <header
+        className={`flex items-center justify-between transition-opacity duration-700 ${showControls && !tunnel ? "opacity-100" : "pointer-events-none opacity-0"}`}
+      >
         <time className="font-mono text-xs tracking-widest text-mist tabular">{clock(now)}</time>
-        <div className={`flex items-center gap-1 transition-opacity duration-700 ${showControls ? "opacity-100" : "pointer-events-none opacity-0"}`}>
+        <div className="flex items-center gap-1">
           <SoundControl carriage={journey.selectedCarriage} />
           <Link href="/" className="rounded-full p-2 text-mist hover:text-paper" aria-label="Back to Tonight (the journey continues)">
             <Icon name="close" size={18} />
@@ -114,9 +118,11 @@ export function Cabin({
         </div>
       </header>
 
-      <main className="flex flex-1 flex-col items-center justify-center text-center">
-        <p className="eyebrow text-lamp/90">{active.stationName}</p>
-        <h1 className="mt-4 max-w-lg font-display text-3xl leading-tight sm:text-4xl">{task?.title ?? "Station"}</h1>
+      <main
+        className={`flex flex-1 flex-col items-center justify-center text-center transition-opacity duration-[2500ms] ${tunnel ? "opacity-0" : "opacity-100"}`}
+        aria-hidden={tunnel}
+      >
+        <h1 className="line-clamp-3 max-w-lg break-words font-display text-3xl leading-tight sm:text-4xl">{task?.title ?? "Station"}</h1>
         <p
           className={`mt-8 font-mono text-[4.5rem] font-light leading-none tracking-tight tabular sm:text-[6rem] ${paused ? "text-mist" : "text-paper"}`}
           role="timer"
@@ -129,15 +135,18 @@ export function Cabin({
 
         <RouteProgress route={route} activeId={active.id} fraction={fraction} />
 
-        <div className="mt-10 space-y-1 text-sm">
+        <div className="mt-10 max-w-sm space-y-1 text-sm">
           {next ? (
-            <p className="text-mist">
-              Next stop · <span className="text-paper-dim">{nextTask?.title}</span> · {formatDuration(next.plannedMinutes)}
+            <p className="truncate text-mist">
+              Next · <span className="text-paper-dim">{nextTask?.title}</span> · {formatDuration(next.plannedMinutes)}
             </p>
           ) : (
             <p className="text-mist">Final station ahead</p>
           )}
-          {arrival && <p className="text-haze">Expected arrival {clock(arrival)}</p>}
+          <p className={`text-haze transition-opacity duration-700 ${showControls ? "opacity-100" : "opacity-0"}`}>
+            {active.stationName} · arriving {clock(active.plannedEnd)}
+            {arrival ? ` · final ${clock(arrival)}` : ""}
+          </p>
         </div>
       </main>
 
@@ -174,7 +183,13 @@ export function Cabin({
           </button>
         </div>
       </footer>
-      {!showControls && <p className="pointer-events-none absolute inset-x-0 bottom-6 text-center text-[0.6875rem] tracking-widest text-haze/60">TAP FOR CONTROLS</p>}
+      <p
+        className={`pointer-events-none absolute inset-x-0 bottom-6 text-center text-[0.6875rem] tracking-widest text-haze/60 transition-opacity duration-[1500ms] ${
+          hintVisible && !showControls && !tunnel ? "opacity-100" : "opacity-0"
+        }`}
+      >
+        TAP FOR CONTROLS
+      </p>
 
       <Sheet open={sheet === "early"} onClose={() => setSheet(null)} title="Finished early?" eyebrow={task?.title}>
         <div className="grid gap-3">

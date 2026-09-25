@@ -6,7 +6,7 @@ import { PRESET_LABELS } from "@/audio/engine";
 import { ambience } from "@/audio/useAmbience";
 import { boardingDetails } from "@/core/stations";
 import { CARRIAGE_AMBIENCE } from "@/core/journey";
-import { clock, formatDuration, toDateKey } from "@/core/time";
+import { clock, formatDuration, serviceDate } from "@/core/time";
 import type { CarriageId, FocusLevel, NocturneData } from "@/core/types";
 import { Button } from "@/components/ui/Button";
 import { FocusPicker } from "@/components/ui/controls";
@@ -35,7 +35,7 @@ export function Boarding({
   carriage: CarriageId;
   onCarriage: (c: CarriageId) => void;
 }) {
-  const today = toDateKey(now);
+  const today = serviceDate(now);
   const summary = routeSummary(data, today);
   const details = boardingDetails(today);
   const [step, setStep] = useState(0);
@@ -48,6 +48,8 @@ export function Boarding({
 
   async function doBoard() {
     setBoarding(true);
+    // A faint shudder as the doors close, where the device supports it.
+    if (typeof navigator !== "undefined" && "vibrate" in navigator) navigator.vibrate?.([10, 60, 14]);
     setCarriage(carriage);
     // Starting audio here counts as the user gesture browsers require.
     await ambience.enable(CARRIAGE_AMBIENCE[carriage]);

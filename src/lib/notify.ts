@@ -1,7 +1,7 @@
 "use client";
 
 import { upcomingOn } from "@/core/sessions";
-import { clock, diffDays, formatDuration, toDateKey } from "@/core/time";
+import { clock, diffDays, formatDuration, serviceDate } from "@/core/time";
 import { journeyFor } from "@/core/journey";
 import type { NocturneData } from "@/core/types";
 
@@ -54,7 +54,7 @@ function send(key: string, title: string, body: string) {
  */
 export function checkNotifications(data: NocturneData, now: Date) {
   if (!notificationsEnabled()) return;
-  const today = toDateKey(now);
+  const today = serviceDate(now);
   const journey = journeyFor(data, today);
   const waiting = !journey || journey.phase === "boarding" || journey.phase === "paused";
   const next = upcomingOn(data.sessions, today)[0];

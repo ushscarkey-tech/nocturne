@@ -4,6 +4,24 @@ import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import { DEFAULT_MIX, getAmbience, type MixLevels, type PresetId } from "./engine";
 
 const MIX_KEY = "nocturne:mix";
+const WANTED_KEY = "nocturne:sound";
+
+function setWanted(on: boolean) {
+  try {
+    window.localStorage.setItem(WANTED_KEY, on ? "on" : "off");
+  } catch {
+    /* ignore */
+  }
+}
+
+/** Whether the traveller left sound on last time (browsers need a tap to resume it). */
+export function soundWanted(): boolean {
+  try {
+    return window.localStorage.getItem(WANTED_KEY) === "on";
+  } catch {
+    return false;
+  }
+}
 
 type Listener = () => void;
 const listeners = new Set<Listener>();
@@ -33,11 +51,13 @@ export const ambience = {
   async enable(preset: PresetId) {
     loadMix();
     enabled = await getAmbience().start(preset);
+    if (enabled) setWanted(true);
     emit();
     return enabled;
   },
-  disable() {
+  disable(remember = true) {
     getAmbience().stop();
+    if (remember) setWanted(false);
     enabled = false;
     emit();
   },

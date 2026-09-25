@@ -7,20 +7,26 @@ import { clock, formatDuration } from "@/core/time";
 import type { Journey, NocturneData } from "@/core/types";
 import { Button, ButtonLink } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
-import { issueTicket } from "@/state/actions";
+import { continueService, issueTicket } from "@/state/actions";
+import { serviceLeft } from "@/core/journey";
+import { useState } from "react";
+import { ConfirmFinish } from "./ConfirmFinish";
 import { ticketHref } from "@/lib/paths";
 
 const FOCUS_WORD = { low: "Low", steady: "Steady", sharp: "Sharp" } as const;
 
 /** The motion has stopped. A calm summary of the night, then the ticket. */
-export function FinalStation({ data, journey }: { data: NocturneData; journey: Journey }) {
+export function FinalStation({ data, journey, now }: { data: NocturneData; journey: Journey; now: Date }) {
   const router = useRouter();
+  const [nothingDue, setNothingDue] = useState(false);
+  const left = serviceLeft(data, now);
   const s = summarizeJourney(data, journey);
   const ticket = data.tickets.find((t) => t.journeyId === journey.id);
   const unfinished = data.tasks.filter(
     (t) => s.taskIds.includes(t.id) && t.status === "active" && !t.recurrence && t.remainingMinutes > 0,
   );
   const focusPath = journey.focusLog.map((f) => FOCUS_WORD[f.level]);
+  const tonightTasks = data.tasks.filter((t) => s.taskIds.includes(t.id));
 
   return (
     <div className="flex min-h-dvh flex-col px-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-[max(1.25rem,env(safe-area-inset-top))]">
@@ -58,10 +64,16 @@ export function FinalStation({ data, journey }: { data: NocturneData; journey: J
             <span className="text-mist">Route changes</span>
             <span className="font-mono tabular text-paper-dim">{journey.routeChanges}</span>
           </li>
-          <li className="flex justify-between">
-            <span className="text-mist">{s.delayMinutes > 0 ? "Delay" : "Time gained"}</span>
-            <span className="font-mono tabular text-paper-dim">
-              {Math.abs(s.delayMinutes) < 3 ? "On time" : formatDuration(Math.abs(s.delayMinutes))}
+          <li className="flex justify-between gap-6">
+            <span className="text-mist">Timing</span>
+            <span className="text-right font-mono tabular text-paper-dim">
+              {unfinished.length > 0 && s.delayMinutes <= 2
+                ? "Ended early"
+                : Math.abs(s.delayMinutes) < 3
+                  ? "On time"
+                  : s.delayMinutes > 0
+                    ? `${formatDuration(s.delayMinutes)} later than planned`
+                    : `${formatDuration(-s.delayMinutes)} ahead`}
             </span>
           </li>
           {focusPath.length > 0 && (
@@ -71,6 +83,10 @@ export function FinalStation({ data, journey }: { data: NocturneData; journey: J
             </li>
           )}
         </ul>
+
+        <div className="mt-8">
+          <ConfirmFinish tasks={tonightTasks} />
+        </div>
 
         {unfinished.length > 0 && (
           <div className="mt-8">
@@ -87,6 +103,21 @@ export function FinalStation({ data, journey }: { data: NocturneData; journey: J
         )}
       </main>
       <div className="mx-auto w-full max-w-md">
+        {left >= 20 && !ticket && (
+          <div className="mb-4 text-center">
+            {nothingDue ? (
+              <p className="text-xs text-haze">Nothing else is due soon — the night is yours.</p>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setNothingDue(!continueService())}
+                className="min-h-11 px-3 text-sm text-mist underline decoration-rule underline-offset-4 hover:text-paper"
+              >
+                {formatDuration(left)} of Service Time left · keep going with upcoming work
+              </button>
+            )}
+          </div>
+        )}
         {ticket ? (
           <ButtonLink href={ticketHref(journey.id)} variant="primary" size="lg" className="w-full">
             View ticket

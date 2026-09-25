@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { availabilityForDate, totalMinutes } from "@/core/availability";
-import { addDays, formatDuration, formatLongDate, parseHM, toDateKey, WEEKDAY_SHORT } from "@/core/time";
+import { availabilityForDate, totalMinutes, windowProblem } from "@/core/availability";
+import { addDays, formatDuration, formatLongDate, serviceDate, WEEKDAY_SHORT } from "@/core/time";
 import type { StudyWindow, WindowKind } from "@/core/types";
 import { Button } from "@/components/ui/Button";
 import { Field, Toggle } from "@/components/ui/controls";
@@ -22,7 +22,7 @@ type Editor =
 export default function ServicePage() {
   const data = useData();
   const [editor, setEditor] = useState<Editor | null>(null);
-  const today = toDateKey(new Date());
+  const today = serviceDate(new Date());
   const weekly = data.windows.filter((w) => w.recurring);
   const exceptions = data.windows
     .filter((w) => !w.recurring && w.specificDate && w.specificDate >= today)
@@ -51,7 +51,7 @@ export default function ServicePage() {
           <button
             type="button"
             onClick={() => setEditor({ mode: "weekly", days: [1, 2, 3, 4, 5] })}
-            className="inline-flex items-center gap-1 text-sm text-mist hover:text-paper"
+            className="inline-flex min-h-11 items-center gap-1 text-sm text-mist hover:text-paper"
           >
             <Icon name="plus" size={14} /> Add window
           </button>
@@ -69,7 +69,7 @@ export default function ServicePage() {
                       key={w.id}
                       type="button"
                       onClick={() => setEditor({ mode: "weekly", window: w, days: [day] })}
-                      className={`rounded-full border px-3 py-1 font-mono text-xs tabular transition-colors ${
+                      className={`min-h-9 rounded-full border px-3 py-1.5 font-mono text-xs tabular transition-colors ${
                         w.enabled ? "border-rule text-paper hover:border-mist/50" : "border-rule-soft text-haze line-through"
                       }`}
                       aria-label={`${DAY_NAMES[day]} ${w.startTime} to ${w.endTime}${w.enabled ? "" : ", paused"}. Edit`}
@@ -81,7 +81,7 @@ export default function ServicePage() {
                 <button
                   type="button"
                   onClick={() => setEditor({ mode: "weekly", days: [day] })}
-                  className="rounded-full p-1.5 text-haze hover:text-paper"
+                  className="-mr-2 flex h-11 w-11 items-center justify-center rounded-full text-haze hover:text-paper"
                   aria-label={`Add a window on ${DAY_NAMES[day]}`}
                 >
                   <Icon name="plus" size={14} />
@@ -129,7 +129,7 @@ export default function ServicePage() {
 }
 
 function WindowEditor({ editor, onClose }: { editor: Editor; onClose: () => void }) {
-  const today = toDateKey(new Date());
+  const today = serviceDate(new Date());
   const w = editor.window;
   const [days, setDays] = useState<number[]>(editor.mode === "weekly" ? editor.days : []);
   const [date, setDate] = useState(w?.specificDate ?? today);
@@ -141,8 +141,9 @@ function WindowEditor({ editor, onClose }: { editor: Editor; onClose: () => void
   const kind: WindowKind = editor.mode === "exception" ? editor.kind : "available";
 
   function save() {
-    if (parseHM(end) <= parseHM(start)) {
-      setError("Service must end after it starts (windows can't cross midnight).");
+    const problem = windowProblem({ startTime: start, endTime: end });
+    if (problem) {
+      setError(problem);
       return;
     }
     if (isWeekly) {
@@ -199,6 +200,9 @@ function WindowEditor({ editor, onClose }: { editor: Editor; onClose: () => void
             <input type="time" className="field font-mono text-lg" value={end} onChange={(e) => setEnd(e.target.value)} step={300} />
           </Field>
         </div>
+        <p className="-mt-3 text-xs leading-relaxed text-haze">
+          Late nights count as the same evening: 22:00–01:00 stays on {isWeekly ? "that day" : "that date"}&rsquo;s route. Service can run until 04:00.
+        </p>
         {w && isWeekly && <Toggle checked={enabled} onChange={setEnabled} label="Running" description="Pause this window without deleting it." />}
         {error && (
           <p role="alert" className="text-sm text-signal">

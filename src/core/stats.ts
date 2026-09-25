@@ -1,4 +1,4 @@
-import { addDays, clock, diffDays, parseDateKey, toDateKey } from "./time";
+import { addDays, clock, diffDays, parseDateKey, serviceDate } from "./time";
 import type { DateKey, FocusLevel, Journey, NocturneData, StudySession } from "./types";
 
 const closed = (s: StudySession) => s.status === "done" || s.status === "partial";
@@ -140,6 +140,8 @@ export interface TicketFace {
   car: string;
   platform: string;
   status: "ROUTE COMPLETE" | "PARTIAL ROUTE" | "SHORT JOURNEY";
+  /** Share of planned work completed, 0..100. */
+  completion: number;
   /** 0..1 values that drive subtle per-ticket variation. */
   hueShift: number;
   stationMarks: ("done" | "partial" | "open")[];
@@ -165,11 +167,12 @@ export function ticketFace(data: NocturneData, journey: Journey): TicketFace {
     car: journey.car,
     platform: journey.platform,
     status,
+    completion: Math.round(s.completionRate * 100),
     hueShift: ((s.focusedMinutes * 7 + d.getDate() * 13) % 100) / 100,
     stationMarks: s.stations.map((x) => (x.status === "done" ? "done" : x.status === "partial" ? "partial" : "open")),
   };
 }
 
 export function isToday(date: DateKey, now: Date): boolean {
-  return date === toDateKey(now);
+  return date === serviceDate(now);
 }

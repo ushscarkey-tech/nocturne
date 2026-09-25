@@ -3,10 +3,10 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import type { PresetId } from "@/audio/engine";
-import { ambience, useScenePreset } from "@/audio/useAmbience";
+import { ambience, soundWanted, useAmbienceState, useScenePreset } from "@/audio/useAmbience";
 import { CARRIAGE_AMBIENCE, journeyFor } from "@/core/journey";
-import { activeSession, upcomingOn } from "@/core/sessions";
-import { toDateKey } from "@/core/time";
+import { activeSession, sessionsOn, upcomingOn } from "@/core/sessions";
+import { serviceDate } from "@/core/time";
 import type { CarriageId } from "@/core/types";
 import { ButtonLink } from "@/components/ui/Button";
 import { Boarding } from "@/components/journey/Boarding";
@@ -17,32 +17,71 @@ import { ServicePaused, StationStop } from "@/components/journey/Platform";
 import { useNow } from "@/lib/hooks";
 import { useData } from "@/state/store";
 
+type TunnelStage = "off" | "rumble" | "deep";
+
 export default function JourneyPage() {
   const data = useData();
   const now = useNow(1000);
-  const today = toDateKey(now);
+  const today = serviceDate(now);
   const journey = journeyFor(data, today);
   const active = activeSession(data.sessions);
   const [tunnel, setTunnel] = useState(false);
+  const [stage, setStage] = useState<TunnelStage>("off");
   const [boardingCarriage, setBoardingCarriage] = useState<CarriageId>(journey?.selectedCarriage ?? data.profile.preferredCarriage);
+  const { enabled: soundOn } = useAmbienceState();
 
   const started = !!journey?.startedAt;
   const phase = !started ? "boarding" : journey!.phase;
   const carriage = started ? journey!.selectedCarriage : boardingCarriage;
   const inTunnel = phase === "cabin" && tunnel && !!active?.resumedAt;
 
-  const scene: SceneMode =
-    phase === "cabin" ? (inTunnel ? "tunnel" : "night") : phase === "final" ? "still" : "platform";
-  const preset: PresetId =
-    phase === "cabin" ? (inTunnel ? "tunnel" : CARRIAGE_AMBIENCE[carriage]) : phase === "final" ? "silence" : "platform";
-  useScenePreset(preset, inTunnel ? 8 : 5);
+  // Tunnel sound deepens in two steps: rail → low rumble → tunnel hum.
+  useEffect(() => {
+    if (!inTunnel) {
+      const t = setTimeout(() => setStage("off"), 0);
+      return () => clearTimeout(t);
+    }
+    const a = setTimeout(() => setStage("rumble"), 0);
+    const b = setTimeout(() => setStage("deep"), 7000);
+    return () => {
+      clearTimeout(a);
+      clearTimeout(b);
+    };
+  }, [inTunnel]);
 
-  // The night ends in silence.
+  const onPlatform = phase === "stop" || phase === "paused" || phase === "boarding" || (phase === "cabin" && !active);
+  const scene: SceneMode = phase === "final" ? "still" : onPlatform ? "platform" : inTunnel ? "tunnel" : "night";
+  const preset: PresetId =
+    phase === "final"
+      ? "silence"
+      : onPlatform
+        ? carriage === "rain"
+          ? "platform-rain"
+          : "platform"
+        : stage === "deep"
+          ? "tunnel"
+          : stage === "rumble"
+            ? "rumble"
+            : CARRIAGE_AMBIENCE[carriage];
+  useScenePreset(preset, stage === "deep" ? 9 : 5);
+
+  // The name board on the platform: where we just arrived, or tonight's platform.
+  const lastStation = sessionsOn(data.sessions, today)
+    .filter((s) => s.status === "done" || s.status === "partial")
+    .pop()?.stationName;
+  const boardName = lastStation ?? (journey ? `PLATFORM ${journey.platform}` : "NOCTURNE");
+
+  // The night ends in silence (the preference to have sound is kept).
   useEffect(() => {
     if (phase !== "final") return;
-    const t = setTimeout(() => ambience.disable(), 6000);
+    const t = setTimeout(() => ambience.disable(false), 6000);
     return () => clearTimeout(t);
   }, [phase]);
+
+  // Browsers need a gesture to resume audio after a reload: the first tap does it.
+  function resumeSound() {
+    if (!soundOn && started && phase !== "final" && soundWanted()) void ambience.enable(preset);
+  }
 
   let content: React.ReactNode;
   if (phase === "boarding") {
@@ -59,13 +98,15 @@ export default function JourneyPage() {
   } else if (phase === "paused") {
     content = <ServicePaused data={data} journey={journey!} now={now} />;
   } else {
-    content = <FinalStation data={data} journey={journey!} />;
+    content = <FinalStation data={data} journey={journey!} now={now} />;
   }
 
   return (
-    <div className="relative isolate min-h-dvh overflow-hidden">
-      <NightScene mode={scene} carriage={carriage} />
-      {content}
+    <div className="relative isolate min-h-dvh overflow-hidden" onPointerDown={resumeSound}>
+      <NightScene mode={scene} carriage={carriage} stationName={boardName} />
+      <div key={phase} className={phase === "cabin" ? "animate-sway" : undefined}>
+        {content}
+      </div>
     </div>
   );
 }
@@ -83,7 +124,7 @@ function NoService() {
           Service Time
         </ButtonLink>
       </div>
-      <Link href="/" className="text-sm text-mist hover:text-paper">
+      <Link href="/" className="py-2 text-sm text-mist hover:text-paper">
         Back to Tonight
       </Link>
     </div>

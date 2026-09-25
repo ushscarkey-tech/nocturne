@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/Button";
 import { FocusPicker } from "@/components/ui/controls";
 import { Icon } from "@/components/ui/Icon";
 import { depart, extendStop, reassessFocus, resumeService } from "@/state/actions";
+import { ConfirmFinish } from "./ConfirmFinish";
 import { SoundControl } from "./SoundControl";
 
 function lastClosed(data: NocturneData, journey: Journey) {
@@ -49,12 +50,24 @@ export function StationStop({ data, journey, now }: { data: NocturneData; journe
     <div className="flex min-h-dvh flex-col px-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-[max(1.25rem,env(safe-area-inset-top))]">
       <TopBar now={now} journey={journey} />
       <main className="mx-auto flex w-full max-w-md flex-1 animate-fade flex-col justify-center">
-        <p className="eyebrow text-lamp/90">Arrived{closed ? ` · ${closed.stationName}` : ""}</p>
+        {closed ? (
+          <p className="eyebrow text-lamp/90">Arrived · {closed.stationName}</p>
+        ) : (
+          <>
+            <p className="eyebrow text-lamp/90">Boarded · Platform {journey.platform}</p>
+            <h1 className="mt-4 font-display text-4xl leading-tight">The train leaves shortly.</h1>
+          </>
+        )}
         {task && (
           <>
-            <h1 className="mt-4 font-display text-4xl leading-tight">{task.title}</h1>
+            <h1 className="mt-4 line-clamp-3 break-words font-display text-4xl leading-tight">{task.title}</h1>
             <p className="mt-2 font-mono text-sm text-mist tabular">
-              {formatDuration(closed!.completedMinutes)} {closed!.status === "partial" ? "focused · the rest continues later" : "completed"}
+              {formatDuration(closed!.completedMinutes)}{" "}
+              {task.status === "archived"
+                ? "focused · removed from your line"
+                : closed!.status === "partial"
+                  ? "focused · the rest continues later"
+                  : "completed"}
             </p>
           </>
         )}
@@ -71,6 +84,12 @@ export function StationStop({ data, journey, now }: { data: NocturneData; journe
           )}
         </div>
 
+        {task && (
+          <div className="mt-8">
+            <ConfirmFinish tasks={[task]} compact />
+          </div>
+        )}
+
         <div className="mt-10">
           <p className="mb-3 text-sm text-paper-dim">How&rsquo;s your energy now?</p>
           <FocusPicker value={journey.focus} onChange={(v) => reassessFocus(v)} label="Energy now" />
@@ -78,7 +97,7 @@ export function StationStop({ data, journey, now }: { data: NocturneData; journe
       </main>
       <div className="mx-auto flex w-full max-w-md gap-3">
         <Button variant="primary" size="lg" className="flex-1" onClick={() => depart()}>
-          {overdue ? "Depart" : "Depart early"}
+          {overdue ? "Depart" : closed ? "Depart early" : "Depart now"}
         </Button>
         <Button variant="secondary" size="lg" onClick={() => extendStop(5)}>
           +5 min
@@ -100,8 +119,17 @@ export function ServicePaused({ data, journey, now }: { data: NocturneData; jour
     <div className="flex min-h-dvh flex-col px-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-[max(1.25rem,env(safe-area-inset-top))]">
       <TopBar now={now} journey={journey} />
       <main className="mx-auto flex w-full max-w-md flex-1 animate-fade flex-col justify-center">
-        <p className="eyebrow">Service paused</p>
-        <h1 className="mt-4 font-display text-4xl leading-tight">Rest until the next departure.</h1>
+        {lastClosed(data, journey) ? (
+          <>
+            <p className="eyebrow">Service paused</p>
+            <h1 className="mt-4 font-display text-4xl leading-tight">Rest until the next departure.</h1>
+          </>
+        ) : (
+          <>
+            <p className="eyebrow">Boarded · Platform {journey.platform}</p>
+            <h1 className="mt-4 font-display text-4xl leading-tight">Service begins later tonight.</h1>
+          </>
+        )}
         {departure && (
           <div className="mt-10 border-t border-rule pt-8">
             <p className="eyebrow">Next departure</p>
@@ -115,15 +143,18 @@ export function ServicePaused({ data, journey, now }: { data: NocturneData; jour
           </div>
         )}
         <div className="mt-10">
-          <p className="mb-3 text-sm text-paper-dim">When you return — how are you?</p>
+          <p className="mb-3 text-sm text-paper-dim">When you&rsquo;re ready — how are you?</p>
           <FocusPicker value={focus} onChange={setFocus} label="Focus when resuming" />
           <p className="mt-3 text-xs text-haze">The route is rebuilt from your actual progress when service resumes.</p>
         </div>
       </main>
       <div className="mx-auto w-full max-w-md">
         <Button variant="primary" size="lg" className="w-full" onClick={() => resumeService(focus)} disabled={!next}>
-          Continue journey
+          {lastClosed(data, journey) ? "Continue journey" : "Depart now"}
         </Button>
+        {departure && (
+          <p className="mt-3 text-center text-xs text-haze">Or rest — the train waits until {clock(departure)}.</p>
+        )}
       </div>
     </div>
   );

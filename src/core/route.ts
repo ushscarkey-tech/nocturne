@@ -47,12 +47,21 @@ function urgencyOf(t: Task, date: DateKey): number {
   return 1 / (1 + days);
 }
 
-/** Split a task's minutes for the day into stations no longer than its max session. */
-export function chunksFor(task: Task, minutes: number, keyPrefix = task.id): Chunk[] {
+/** Longest station for a task given tonight's focus: low focus means shorter, easier-to-start stations. */
+export function sessionCap(task: Task, focus: FocusLevel = "steady"): number {
+  const max = Math.max(task.minSessionMinutes, task.maxSessionMinutes);
+  if (focus === "low") return Math.max(task.minSessionMinutes, Math.min(max, 30));
+  // Demanding work is kept to realistic blocks even when sharp.
+  if (task.difficulty >= 4) return Math.max(task.minSessionMinutes, Math.min(max, focus === "sharp" ? 60 : 50));
+  return max;
+}
+
+/** Split a task's minutes for the day into realistic stations. */
+export function chunksFor(task: Task, minutes: number, focus: FocusLevel = "steady", keyPrefix = task.id): Chunk[] {
   const total = Math.round(minutes);
   if (total <= 0) return [];
   if (!task.splittable) return [{ key: `${keyPrefix}:0`, taskId: task.id, minutes: total, work: total }];
-  const cap = Math.max(task.minSessionMinutes, task.maxSessionMinutes);
+  const cap = sessionCap(task, focus);
   let n = Math.ceil(total / cap);
   while (n > 1 && total / n < task.minSessionMinutes) n--;
   const out: Chunk[] = [];
@@ -80,8 +89,15 @@ function scoreChunk(c: Chunk, position: number, prev: Chunk | null, ctx: OrderCo
   // Reported focus applies now and drifts down gently through the evening.
   const capacity = Math.max(0.1, FOCUS_CAPACITY[ctx.focus] - 0.05 * position);
   const demand = demandOf(t);
-  let score = 1.3 * urgencyOf(t, ctx.date) + 0.6 * ((t.importance - 1) / 4) - 1.2 * Math.abs(demand - capacity);
+  const importance = (t.importance - 1) / 4;
+  let score = 1.3 * urgencyOf(t, ctx.date) + 0.6 * importance - 1.2 * Math.abs(demand - capacity);
+  // Low focus: favour a low barrier to entry — short, easy, appealing.
   if (ctx.focus === "low") score += 0.35 * (1 - Math.min(1, c.minutes / 60)) + 0.25 * ((t.interest - 1) / 4);
+  // Sharp focus is the time for hard or important work.
+  if (ctx.focus === "sharp") score += 0.35 * importance + 0.2 * ((t.difficulty - 1) / 4);
+  // Important work the traveller is avoiding goes early while they're fresh,
+  // so low interest never quietly pushes it to the end of every night.
+  if (ctx.focus !== "low" && t.interest <= 2 && t.importance >= 4 && position <= 1) score += 0.3;
   const prevTaskId = prev?.taskId ?? (position === 0 ? ctx.previousTaskId : null);
   if (prevTaskId === c.taskId) score -= 0.8;
   if (prev) {
@@ -163,6 +179,7 @@ export function packInOrder(
 ): PackResult {
   const queue = chunks.map((c) => ({ ...c }));
   const slots: Slot[] = [];
+  const overflow: Chunk[] = [];
   let splitSeq = 0;
   let ivIndex = 0;
   let cursor = intervals[0]?.start ?? 0;
@@ -179,14 +196,20 @@ export function packInOrder(
       continue;
     }
     const min = minSessionFor(c.taskId);
+    const take = Math.floor(space / 5) * 5;
     if (splittable(c.taskId) && canSplitAt(c.minutes, space, min)) {
-      const take = Math.floor(space / 5) * 5;
       const workTake = Math.round((c.work * take) / c.minutes);
       slots.push({ key: c.key, taskId: c.taskId, minutes: take, work: workTake, start: cursor, end: cursor + take });
       queue[0] = { key: `${c.key}:s${splitSeq++}`, taskId: c.taskId, minutes: c.minutes - take, work: c.work - workTake };
+    } else if (splittable(c.taskId) && take >= min && ivIndex === intervals.length - 1) {
+      // Last window of the night: shorten the station to fit; the rest returns to the planner.
+      const workTake = Math.round((c.work * take) / c.minutes);
+      slots.push({ key: c.key, taskId: c.taskId, minutes: take, work: workTake, start: cursor, end: cursor + take });
+      overflow.push({ key: `${c.key}:rest`, taskId: c.taskId, minutes: c.minutes - take, work: c.work - workTake });
+      queue.shift();
     }
     ivIndex++;
     cursor = intervals[ivIndex]?.start ?? cursor;
   }
-  return { slots, overflow: queue };
+  return { slots, overflow: [...overflow, ...queue] };
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import { addDays, dayOfWeek, formatShortDate, toDateKey, WEEKDAY_SHORT } from "@/core/time";
+import { addDays, dayOfWeek, formatShortDate, serviceDate, WEEKDAY_SHORT } from "@/core/time";
 import type { Level, Line, Recurrence, Task } from "@/core/types";
 import type { TaskDraft } from "@/state/actions";
 import { Button } from "@/components/ui/Button";
@@ -50,7 +50,7 @@ export function TaskForm({
     initial.recurrence !== null || initial.lineId !== null || initial.description.length > 0,
   );
   const [error, setError] = useState<string | null>(null);
-  const today = toDateKey(new Date());
+  const today = serviceDate(new Date());
   const set = <K extends keyof TaskDraft>(k: K, v: TaskDraft[K]) => setD((prev) => ({ ...prev, [k]: v }));
 
   const quickDates: { label: string; value: string | null }[] = [

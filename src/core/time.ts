@@ -2,8 +2,25 @@ import type { DateKey } from "./types";
 
 const pad = (n: number) => String(n).padStart(2, "0");
 
+/**
+ * A night of study belongs to the evening it started on: the service day
+ * rolls over at 04:00, not midnight, so 23:30–00:45 is still "tonight".
+ */
+export const DAY_START_HOUR = 4;
+export const DAY_START_MINUTES = DAY_START_HOUR * 60;
+
 export function toDateKey(d: Date): DateKey {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+/** The service day an instant belongs to. */
+export function serviceDate(d: Date): DateKey {
+  return toDateKey(new Date(d.getTime() - DAY_START_HOUR * 3_600_000));
+}
+
+/** Minutes since midnight of the service day (can exceed 1440 after midnight). */
+export function serviceMinutes(d: Date, date: DateKey = serviceDate(d)): number {
+  return minutesFrom(date, d);
 }
 
 export function parseDateKey(key: DateKey): Date {

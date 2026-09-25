@@ -9,7 +9,7 @@ export function lineProgress(tasks: Task[]) {
 
 export function lineTasks(line: Line, tasks: Task[]): Task[] {
   return tasks
-    .filter((t) => t.lineId === line.id)
+    .filter((t) => t.lineId === line.id && t.status !== "archived")
     .sort((a, b) => (a.deadline ?? "9999").localeCompare(b.deadline ?? "9999") || a.createdAt.localeCompare(b.createdAt));
 }
 

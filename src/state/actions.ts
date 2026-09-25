@@ -8,8 +8,8 @@ import * as engine from "@/core/journey";
 import { newId } from "@/core/ids";
 import { planToday, renumberDay } from "@/core/planner";
 import { createSeedData } from "@/core/seed";
-import { sessionsOn } from "@/core/sessions";
-import { atMinutes, parseHM, toDateKey } from "@/core/time";
+import { activeSession, sessionsOn } from "@/core/sessions";
+import { atMinutes, DAY_START_MINUTES, parseHM, serviceDate } from "@/core/time";
 import type {
   CarriageId,
   FocusLevel,
@@ -38,7 +38,7 @@ function commit(next: NocturneData, change?: RouteChange | null) {
 
 function recordChange(data: NocturneData, change: RouteChange | null): NocturneData {
   if (!change) return data;
-  const journey = engine.journeyFor(data, toDateKey(new Date(change.at)));
+  const journey = engine.journeyFor(data, serviceDate(new Date(change.at)));
   if (!journey || !journey.startedAt) return data;
   const updated = { ...journey, routeChanges: journey.routeChanges + 1, changeLog: [...journey.changeLog, change] };
   return { ...data, journeys: data.journeys.map((j) => (j.id === journey.id ? updated : j)) };
@@ -51,7 +51,7 @@ function replan(
   opts: { mode?: "reoptimize" | "retime"; order?: string[]; focus?: FocusLevel } = {},
 ): { data: NocturneData; change: RouteChange | null } {
   const now = new Date();
-  const journey = engine.journeyFor(data, toDateKey(now));
+  const journey = engine.journeyFor(data, serviceDate(now));
   if (journey?.phase === "final") return { data, change: null };
   const startFrom = journey?.phase === "stop" && journey.stopEndsAt ? new Date(journey.stopEndsAt) : undefined;
   const result = planToday(
@@ -76,7 +76,7 @@ function replan(
 /** Settle stale journeys and make sure tonight has a route. */
 export function ensureToday() {
   const now = new Date();
-  const today = toDateKey(now);
+  const today = serviceDate(now);
   let data = engine.settleStale(current(), now);
   const hasToday = data.sessions.some((s) => s.date === today) || engine.journeyFor(data, today);
   if (!hasToday) {
@@ -176,12 +176,24 @@ export function updateTask(id: string, patch: Partial<TaskDraft> & { remainingMi
 
 export function completeTask(id: string) {
   const data = current();
+  // Completing the task that's running closes its station as well.
+  if (activeSession(data.sessions)?.taskId === id) {
+    run((d, now) => engine.finishEarly(d, now, true));
+    return;
+  }
   const now = iso(new Date());
   const tasks = data.tasks.map((t) =>
     t.id === id ? { ...t, status: "done" as const, remainingMinutes: 0, completedAt: now, updatedAt: now } : t,
   );
   const { data: next, change } = replan({ ...data, tasks }, "task-change");
   commit(next, change);
+}
+
+/** The estimate ran out but the work isn't finished: add time and re-plan. */
+export function addTaskTime(id: string, minutes: number) {
+  const t = current().tasks.find((x) => x.id === id);
+  if (!t) return;
+  updateTask(id, { estimatedMinutes: t.estimatedMinutes + minutes, remainingMinutes: t.remainingMinutes + minutes });
 }
 
 export function reopenTask(id: string) {
@@ -204,14 +216,7 @@ export function logProgress(id: string, minutes: number) {
 }
 
 export function deleteTask(id: string) {
-  const data = current();
-  const today = toDateKey(new Date());
-  const tasks = data.tasks.filter((t) => t.id !== id);
-  // History stays with its journey; future stations for the task go away.
-  const sessions = data.sessions.filter((s) => s.taskId !== id);
-  const base = { ...data, tasks, sessions: renumberDay(sessions, today) };
-  const { data: next, change } = replan(base, "task-change");
-  commit(next, change);
+  run((d, now) => engine.removeTask(d, id, now));
 }
 
 // ---------------------------------------------------------------------------
@@ -310,7 +315,7 @@ export function skipToday(id: string) {
 
 export function doNow(id: string) {
   const data = current();
-  const today = toDateKey(new Date());
+  const today = serviceDate(new Date());
   const planned = sessionsOn(data.sessions, today).filter((s) => s.status === "planned" && !s.locked);
   const order = [id, ...planned.map((s) => s.id).filter((x) => x !== id)];
   const unlocked = patchSession(data, id, { locked: false });
@@ -338,7 +343,9 @@ export function moveSessionTo(id: string, hhmm: string) {
   const data = current();
   const s = data.sessions.find((x) => x.id === id);
   if (!s || s.status !== "planned") return;
-  const start = atMinutes(s.date, parseHM(hhmm));
+  // Times after midnight belong to the same night.
+  const minutes = parseHM(hhmm) < DAY_START_MINUTES ? parseHM(hhmm) + 1440 : parseHM(hhmm);
+  const start = atMinutes(s.date, minutes);
   const end = new Date(start.getTime() + s.plannedMinutes * 60_000);
   const moved = patchSession(data, id, { plannedStart: iso(start), plannedEnd: iso(end), locked: true });
   const { data: next, change } = replan({ ...moved, sessions: renumberDay(moved.sessions, s.date) }, "edit", { mode: "retime" });
@@ -363,9 +370,23 @@ export const pause = () => run((d, now) => engine.pause(d, now));
 export const resume = () => run((d, now) => engine.resume(d, now));
 export const depart = () => run((d, now) => engine.depart(d, now));
 export const extendStop = (minutes: number) => run((d, now) => engine.extendStop(d, now, minutes));
-export const reassessFocus = (level: FocusLevel) => run((d, now) => engine.reassessFocus(d, now, level));
+export function reassessFocus(level: FocusLevel) {
+  const { data, change } = engine.reassessFocus(current(), new Date(), level);
+  commit(data, change);
+  if (!change) {
+    const word = { low: "Low", steady: "Steady", sharp: "Sharp" }[level];
+    useStore.getState().notify({ headline: `Signal · ${word}`, lines: ["The route already suits how you feel."], tone: "info" });
+  }
+}
 export const resumeService = (focus: FocusLevel) => run((d, now) => engine.resumeService(d, now, focus));
 export const endJourney = () => run((d, now) => engine.endJourney(d, now));
+
+/** After an early finish, keep riding with upcoming work. Returns false if nothing is due soon. */
+export function continueService(): boolean {
+  const result = engine.continueService(current(), new Date());
+  if (result.added) commit(result.data);
+  return result.added;
+}
 
 export function issueTicket(journeyId: string): string {
   const { data, ticket } = engine.issueTicket(current(), journeyId, new Date());
@@ -375,7 +396,7 @@ export function issueTicket(journeyId: string): string {
 
 export function setCarriage(carriage: CarriageId) {
   const data = current();
-  const journey = engine.journeyFor(data, toDateKey(new Date()));
+  const journey = engine.journeyFor(data, serviceDate(new Date()));
   let next = updateProfileData(data, { preferredCarriage: carriage });
   if (journey) {
     next = {

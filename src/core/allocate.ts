@@ -14,7 +14,7 @@
  */
 import { availabilityForDate, breakAfter, capacityOf, clipIntervals, subtractIntervals, type Interval } from "./availability";
 import { creditedOn, remainingSeconds, remainingWork, spanOf } from "./sessions";
-import { addDays, dayOfWeek, diffDays, minutesOfDay, roundTo, roundUp, toDateKey } from "./time";
+import { addDays, dayOfWeek, diffDays, roundTo, roundUp, serviceDate, serviceMinutes } from "./time";
 import type { DateKey, StudySession, StudyWindow, Task } from "./types";
 
 export const DEFAULT_HORIZON = 14;
@@ -72,7 +72,7 @@ export function isSchedulable(t: Task): boolean {
 export function recursOn(t: Task, date: DateKey): boolean {
   if (!t.recurrence) return false;
   if (t.deadline && date > t.deadline) return false;
-  if (t.createdAt && date < toDateKey(new Date(t.createdAt))) return false;
+  if (t.createdAt && date < serviceDate(new Date(t.createdAt))) return false;
   if (t.recurrence.freq === "daily") return true;
   return t.recurrence.days.includes(dayOfWeek(date));
 }
@@ -87,7 +87,7 @@ function fixedOn(
 ): { blocks: Interval[]; committed: Record<string, number> } {
   const blocks: Interval[] = [];
   const committed: Record<string, number> = {};
-  const nowMin = date === today ? minutesOfDay(now) : 0;
+  const nowMin = date === today ? serviceMinutes(now, today) : 0;
   for (const s of sessions) {
     if (s.date !== date) continue;
     let work = 0;
@@ -106,7 +106,7 @@ function fixedOn(
 
 export function allocate(input: AllocatorInput): Forecast {
   const { tasks, windows, sessions, now, keepTodayPlan } = input;
-  const today = toDateKey(now);
+  const today = serviceDate(now);
   const excludeToday = input.excludeToday ?? new Set<string>();
 
   const active = tasks.filter(isSchedulable);
@@ -123,7 +123,7 @@ export function allocate(input: AllocatorInput): Forecast {
     const date = addDays(today, i);
     let intervals = availabilityForDate(windows, date);
     const { blocks, committed } = fixedOn(sessions, date, today, now, keepTodayPlan);
-    if (i === 0) intervals = clipIntervals(intervals, roundUp(input.todayFrom ?? minutesOfDay(now), 5));
+    if (i === 0) intervals = clipIntervals(intervals, roundUp(input.todayFrom ?? serviceMinutes(now, today), 5));
     intervals = subtractIntervals(intervals, blocks);
     days.push({ date, index: i, intervals, capacity: capacityOf(intervals), load: 0, allocations: {}, committed });
   }
@@ -219,8 +219,12 @@ export function allocate(input: AllocatorInput): Forecast {
       if (t.splittable && give_ < left) {
         const rounded = Math.floor(give_ / 5) * 5;
         give_ = rounded >= chunkMin ? rounded : give_;
-        // Avoid leaving a crumb smaller than a useful session behind.
-        if (left - give_ > 0 && left - give_ < chunkMin && room >= left) give_ = left;
+        // Avoid leaving a crumb smaller than a useful session behind:
+        // take it all if there's room, otherwise leave one proper session.
+        if (left - give_ > 0 && left - give_ < chunkMin) {
+          if (room >= left) give_ = left;
+          else if (left - chunkMin >= chunkMin) give_ = left - chunkMin;
+        }
       }
       if (give_ <= 0) {
         excluded.add(best.index);

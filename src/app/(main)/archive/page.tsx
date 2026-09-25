@@ -3,14 +3,14 @@
 import Link from "next/link";
 import { useMemo } from "react";
 import { archiveStats, focusByDay, ticketFace } from "@/core/stats";
-import { formatDuration, formatHM, parseDateKey, toDateKey, WEEKDAY_SHORT } from "@/core/time";
+import { formatDuration, formatHM, parseDateKey, serviceDate, WEEKDAY_SHORT } from "@/core/time";
 import { Ticket } from "@/components/ticket/Ticket";
 import { useData } from "@/state/store";
 import { ticketHref } from "@/lib/paths";
 
 export default function ArchivePage() {
   const data = useData();
-  const today = toDateKey(new Date());
+  const today = serviceDate(new Date());
   const journeys = useMemo(
     () =>
       data.journeys

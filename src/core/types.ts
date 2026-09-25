@@ -12,7 +12,8 @@ export type ISODateTime = string;
 export type FocusLevel = "low" | "steady" | "sharp";
 export type Level = 1 | 2 | 3 | 4 | 5;
 
-export type TaskStatus = "inbox" | "active" | "done";
+/** `archived` = deleted by the traveller but kept so past journeys stay intact. */
+export type TaskStatus = "inbox" | "active" | "done" | "archived";
 
 export type Recurrence =
   | { freq: "daily" }

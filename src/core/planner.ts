@@ -11,9 +11,9 @@ import { allocate, isRecurring, type Forecast } from "./allocate";
 import { availabilityForDate, breakAfter, clipIntervals, subtractIntervals, type Interval } from "./availability";
 import { newId } from "./ids";
 import { chunksFor, packInOrder, packOptimized, type Chunk, type Slot } from "./route";
-import { isClosed, remainingSeconds, sessionsOn, spanOf } from "./sessions";
+import { isClosed, remainingSeconds, remainingWork, sessionsOn, spanOf } from "./sessions";
 import { stationName } from "./stations";
-import { atMinutes, clock, formatDuration, minutesOfDay, roundUp, toDateKey } from "./time";
+import { atMinutes, clock, formatDuration, roundUp, serviceDate, serviceMinutes } from "./time";
 import type { DateKey, FocusLevel, ReplanReason, RouteChange, StudySession, StudyWindow, Task } from "./types";
 
 export type ReplanMode = "reoptimize" | "retime";
@@ -36,6 +36,12 @@ export interface PlanTodayOptions {
   order?: string[];
   /** Task whose unfinished remainder was just handed back (Low Focus). */
   returnedWork?: { taskId: string; minutes: number };
+  /**
+   * `tonight` re-sorts and re-chunks only the work already on tonight's route
+   * (a signal change never adds work); `all` (default) lets the planner pull
+   * in whatever tonight should hold.
+   */
+  scope?: "tonight" | "all";
 }
 
 export interface PlanTodayResult {
@@ -56,8 +62,8 @@ export function freeTimeToday(
   now: Date,
   from: number,
 ): Interval[] {
-  const today = toDateKey(now);
-  const nowMin = minutesOfDay(now);
+  const today = serviceDate(now);
+  const nowMin = serviceMinutes(now, today);
   const blocks: Interval[] = [];
   for (const s of sessions) {
     if (s.date !== today) continue;
@@ -109,7 +115,7 @@ export function renumberDay(sessions: StudySession[], date: DateKey): StudySessi
 export function planToday(input: PlanTodayInput, opts: PlanTodayOptions): PlanTodayResult {
   const { tasks, windows, userId } = input;
   const { now, focus, mode, reason } = opts;
-  const today = toDateKey(now);
+  const today = serviceDate(now);
   const tasksById = new Map(tasks.map((t) => [t.id, t]));
 
   // Stations whose task no longer exists or is finished simply leave the route.
@@ -120,9 +126,9 @@ export function planToday(input: PlanTodayInput, opts: PlanTodayOptions): PlanTo
   const movable = sessionsOn(sessions, today).filter((s) => isMovable(s, today));
   const kept = sessions.filter((s) => !isMovable(s, today));
 
-  const nowMin = minutesOfDay(now);
+  const nowMin = serviceMinutes(now, today);
   const fromMin =
-    opts.startFrom && toDateKey(opts.startFrom) === today ? Math.max(nowMin, minutesOfDay(opts.startFrom)) : nowMin;
+    opts.startFrom && serviceDate(opts.startFrom) === today ? Math.max(nowMin, serviceMinutes(opts.startFrom, today)) : nowMin;
   const free = freeTimeToday(windows, kept, now, fromMin);
   const minSessionFor = (id: string) => tasksById.get(id)?.minSessionMinutes ?? 25;
 
@@ -148,19 +154,43 @@ export function planToday(input: PlanTodayInput, opts: PlanTodayOptions): PlanTo
         .filter((s) => s.status === "skipped")
         .map((s) => s.taskId),
     );
-    const forecast = allocate({
-      tasks,
-      windows,
-      sessions: kept,
-      now,
-      keepTodayPlan: false,
-      excludeToday: skippedToday,
-      todayFrom: fromMin,
-    });
+    let dayWork: Record<string, number>;
+    if (opts.scope === "tonight") {
+      dayWork = {};
+      for (const s of movable) dayWork[s.taskId] = (dayWork[s.taskId] ?? 0) + s.workMinutes;
+      if (opts.returnedWork) {
+        const { taskId, minutes } = opts.returnedWork;
+        dayWork[taskId] = (dayWork[taskId] ?? 0) + minutes;
+      }
+      // Never more than the task still needs beyond what's running or locked.
+      for (const id of Object.keys(dayWork)) {
+        const t = tasksById.get(id);
+        if (!t || t.status !== "active") {
+          delete dayWork[id];
+          continue;
+        }
+        const committed = kept
+          .filter((s) => s.taskId === id && s.date === today && (s.status === "active" || (s.status === "planned" && s.locked)))
+          .reduce((sum, s) => sum + (s.status === "active" ? remainingWork(s, now) : s.workMinutes), 0);
+        const ceiling = t.recurrence ? t.estimatedMinutes : t.remainingMinutes;
+        dayWork[id] = Math.max(0, Math.min(dayWork[id], Math.round(ceiling - committed)));
+      }
+    } else {
+      const forecast = allocate({
+        tasks,
+        windows,
+        sessions: kept,
+        now,
+        keepTodayPlan: false,
+        excludeToday: skippedToday,
+        todayFrom: fromMin,
+      });
+      dayWork = forecast.days[0]?.allocations ?? {};
+    }
     const chunks: Chunk[] = [];
-    for (const [taskId, minutes] of Object.entries(forecast.days[0]?.allocations ?? {})) {
+    for (const [taskId, minutes] of Object.entries(dayWork)) {
       const t = tasksById.get(taskId);
-      if (t) chunks.push(...chunksFor(t, minutes));
+      if (t) chunks.push(...chunksFor(t, minutes, focus));
     }
     ({ slots, overflow } = packOptimized(chunks, free, { date: today, focus, tasks: tasksById, previousTaskId }, minSessionFor));
   }
@@ -216,7 +246,10 @@ function minutesByTask(list: StudySession[]): Map<string, number> {
   return m;
 }
 
-/** Plain-language explanation of what moved, without blame. */
+/**
+ * Plain-language explanation of what moved: why first, then the one detail
+ * that matters, then the arrival. Never framed as failure.
+ */
 export function describeChange(
   before: StudySession[],
   after: StudySession[],
@@ -226,67 +259,84 @@ export function describeChange(
   deferred: { taskId: string; minutes: number }[],
 ): RouteChange | null {
   const title = (id: string) => tasks.get(id)?.title ?? "A task";
-  const lines: string[] = [];
   const oldMin = minutesByTask(before);
   const newMin = minutesByTask(after);
+  const next = after[0];
+  const reasons: string[] = [];
+  const details: string[] = [];
 
-  if (opts.reason === "late-start" && after[0]) {
-    lines.push(`Departure moved to ${clock(after[0].plannedStart)}.`);
+  const reordered = before.map((s) => s.taskId).join() !== after.map((s) => s.taskId).join();
+  const nextChanged = !!next && next.taskId !== before[0]?.taskId;
+
+  switch (opts.reason) {
+    case "low-focus":
+      if (next) reasons.push(`Lighter work first while your focus recovers — ${title(next.taskId)} is next.`);
+      break;
+    case "signal-change":
+    case "boarding":
+      if (nextChanged && next && opts.focus === "sharp") reasons.push(`Sharp focus: ${title(next.taskId)} moves up while it's easiest.`);
+      else if (nextChanged && next && opts.focus === "low") reasons.push(`Shorter, lighter stations for now — ${title(next.taskId)} is next.`);
+      else if (reordered) reasons.push("Stations re-balanced for how you feel.");
+      break;
+    case "late-start":
+      if (next) reasons.push(`Departure moved to ${clock(next.plannedStart)}; the route re-formed around it.`);
+      break;
+    case "finish-early":
+      reasons.push("Finished early — the rest of the route moves up.");
+      break;
+    case "more-time":
+      reasons.push("Taking the time it needs — later stations shift to make room.");
+      break;
+    case "skip":
+      reasons.push("Skipped for tonight; it goes back to the planner for another day.");
+      break;
+    default:
+      if (nextChanged && next && before.length > 0 && opts.reason !== "reorder") reasons.push(`${title(next.taskId)} is now the next station.`);
   }
 
   if (opts.returnedWork && opts.returnedWork.minutes >= 5) {
     const { taskId, minutes } = opts.returnedWork;
     const placed = after.find((s) => s.taskId === taskId);
-    lines.push(
+    details.push(
       placed
-        ? `The remaining ${formatDuration(minutes)} of ${title(taskId)} ${minutes === 1 ? "was" : "were"} moved later, to ${clock(placed.plannedStart)}.`
-        : `The remaining ${formatDuration(minutes)} of ${title(taskId)} will continue on another day.`,
+        ? `The remaining ${formatDuration(minutes)} of ${title(taskId)} moves to ${clock(placed.plannedStart)}.`
+        : `The remaining ${formatDuration(minutes)} of ${title(taskId)} continues on another day.`,
     );
   }
-
   for (const d of deferred) {
     if (d.minutes < 5 || d.taskId === opts.returnedWork?.taskId) continue;
     const t = tasks.get(d.taskId);
-    const where = t && isRecurring(t) ? "is set aside for tonight" : "moved to a later day";
-    lines.push(`${title(d.taskId)} · ${formatDuration(d.minutes)} ${where}.`);
+    details.push(t && isRecurring(t) ? `${title(d.taskId)} rests for tonight.` : `${title(d.taskId)} · ${formatDuration(d.minutes)} moves to a later day.`);
   }
-
   for (const [taskId, minutes] of newMin) {
-    const was = oldMin.get(taskId) ?? 0;
-    if (was === 0 && before.length > 0 && taskId !== opts.returnedWork?.taskId) {
+    if ((oldMin.get(taskId) ?? 0) === 0 && before.length > 0 && taskId !== opts.returnedWork?.taskId) {
       const first = after.find((s) => s.taskId === taskId)!;
-      lines.push(`${title(taskId)} · ${formatDuration(minutes)} joins the route at ${clock(first.plannedStart)}.`);
+      details.push(`${title(taskId)} · ${formatDuration(minutes)} joins at ${clock(first.plannedStart)}.`);
     }
   }
   for (const [taskId, minutes] of oldMin) {
-    if (!newMin.has(taskId) && !deferred.some((d) => d.taskId === taskId) && tasks.get(taskId)?.status === "active") {
-      lines.push(`${title(taskId)} · ${formatDuration(minutes)} moved to a later day.`);
+    if (!newMin.has(taskId) && !deferred.some((d) => d.taskId === taskId) && tasks.get(taskId)?.status === "active" && opts.reason !== "skip") {
+      details.push(`${title(taskId)} · ${formatDuration(minutes)} moves to a later day.`);
     }
-  }
-
-  const firstBefore = before[0]?.taskId;
-  const firstAfter = after[0]?.taskId;
-  const reordered = before.map((s) => s.taskId).join() !== after.map((s) => s.taskId).join();
-  if (reordered && firstAfter && firstAfter !== firstBefore && opts.reason !== "late-start" && !opts.returnedWork) {
-    lines.push(`${title(firstAfter)} is now the next station.`);
   }
 
   const beforeArrival = arrivalOf(dayAfter, before);
   const afterArrival = arrivalOf(dayAfter, after);
   const shift = beforeArrival !== null && afterArrival !== null ? (afterArrival - beforeArrival) / 60_000 : 0;
-  const meaningful = lines.length > 0 || Math.abs(shift) >= 5;
-  if (!meaningful) return null;
+  if (reasons.length === 0 && details.length === 0 && Math.abs(shift) < 5) return null;
 
+  let arrival: string | null = null;
   if (afterArrival !== null) {
     const at = clock(new Date(afterArrival));
-    if (Math.abs(shift) < 5) lines.push(`Your expected arrival remains ${at}.`);
-    else if (shift < 0) lines.push(`Ahead of schedule · expected arrival is now ${at}.`);
-    else lines.push(`Expected arrival is now ${at}.`);
+    if (Math.abs(shift) < 5) arrival = `Expected arrival stays ${at}.`;
+    else if (shift < 0) arrival = `Ahead of schedule · arriving ${at}.`;
+    else arrival = `Expected arrival is now ${at}.`;
   } else if (before.length > 0) {
-    lines.push("No further stations tonight.");
+    arrival = "No further stations tonight.";
   }
 
-  return { at: opts.now.toISOString(), reason: opts.reason, headline: "Route updated", lines: lines.slice(0, 4) };
+  const lines = [...reasons.slice(0, 1), ...details.slice(0, reasons.length ? 1 : 2), ...(arrival ? [arrival] : [])];
+  return { at: opts.now.toISOString(), reason: opts.reason, headline: "Route updated", lines };
 }
 
 /** Future-days forecast consistent with the persisted route for today. */

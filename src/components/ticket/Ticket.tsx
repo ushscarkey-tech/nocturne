@@ -5,9 +5,9 @@ import type { CarriageId } from "@/core/types";
 
 const STYLES: Record<CarriageId, { from: string; to: string; ink: string; accent: string }> = {
   rain: { from: "#1a2336", to: "#101727", ink: "#dfe4ee", accent: "#9fb4d6" },
-  quiet: { from: "#1c1f29", to: "#12151d", ink: "#e6e1d6", accent: "#b8b1a2" },
+  quiet: { from: "#1f2a25", to: "#101714", ink: "#e9e2d2", accent: "#b9c2a6" },
   tunnel: { from: "#17181c", to: "#0c0d10", ink: "#ddd6c8", accent: "#e0b068" },
-  moon: { from: "#221f22", to: "#141319", ink: "#efe6d5", accent: "#e8cf9f" },
+  moon: { from: "#2a221c", to: "#151210", ink: "#efe6d3", accent: "#e3c79a" },
 };
 
 /**
@@ -26,7 +26,7 @@ export function Ticket({ face, style, size = "lg" }: { face: TicketFace; style: 
 
   return (
     <article
-      aria-label={`Ticket ${face.dateLabel}, ${face.departure} to ${face.arrival}, ${face.stops} stops, ${formatDuration(face.focused)} focused, ${face.status.toLowerCase()}`}
+      aria-label={`Ticket ${face.dateLabel}, ${face.departure} to ${face.arrival}, ${face.stops} stops, ${formatDuration(face.focused)} focused, ${face.completion}% of planned work, ${face.status.toLowerCase()}`}
       className={`relative overflow-hidden rounded-[1.1rem] border border-white/[0.07] text-[color:var(--ticket-ink)] shadow-[0_30px_80px_-40px_rgba(0,0,0,0.9)] ${
         lg ? "w-full max-w-[20rem] px-7 pb-7 pt-8" : "w-full px-4 pb-4 pt-5"
       }`}
@@ -100,7 +100,10 @@ export function Ticket({ face, style, size = "lg" }: { face: TicketFace; style: 
           </div>
         )}
 
-        <p className={`font-mono tracking-[0.3em] text-[color:var(--ticket-accent)] ${lg ? "mt-6 text-[0.72rem]" : "mt-3 text-[0.5rem]"}`}>{face.status}</p>
+        <div className={`flex items-baseline justify-between gap-2 font-mono text-[color:var(--ticket-accent)] ${lg ? "mt-6" : "mt-3"}`}>
+          <p className={`tracking-[0.3em] ${lg ? "text-[0.72rem]" : "text-[0.5rem]"}`}>{face.status}</p>
+          <p className={`tabular tracking-[0.1em] ${lg ? "text-[0.72rem]" : "text-[0.5rem]"}`}>{face.completion}%</p>
+        </div>
       </div>
     </article>
   );

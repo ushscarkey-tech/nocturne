@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import { toDateKey } from "@/core/time";
+import { serviceDate } from "@/core/time";
 import type { Line } from "@/core/types";
 import { Button } from "@/components/ui/Button";
 import { Field } from "@/components/ui/controls";
@@ -39,7 +39,7 @@ export function LineForm({
         <input className="field text-lg" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Biology Midterm" autoFocus />
       </Field>
       <Field label="Target date" hint="The exam, presentation or goal date.">
-        <input type="date" className="field font-mono" value={targetDate} min={toDateKey(new Date())} onChange={(e) => setTargetDate(e.target.value)} />
+        <input type="date" className="field font-mono" value={targetDate} min={serviceDate(new Date())} onChange={(e) => setTargetDate(e.target.value)} />
       </Field>
       <Field label="Notes">
         <textarea className="field min-h-16 resize-y" value={description} onChange={(e) => setDescription(e.target.value)} />

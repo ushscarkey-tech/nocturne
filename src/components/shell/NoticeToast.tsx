@@ -41,7 +41,7 @@ export function NoticeToast({ placement = "tabs" }: { placement?: "tabs" | "imme
                 </p>
               ))}
             </div>
-            <button type="button" onClick={dismiss} className="-m-1 p-1 text-haze hover:text-paper" aria-label="Dismiss">
+            <button type="button" onClick={dismiss} className="-m-3 flex h-10 w-10 shrink-0 items-center justify-center text-haze hover:text-paper" aria-label="Dismiss">
               <Icon name="close" size={16} />
             </button>
           </div>

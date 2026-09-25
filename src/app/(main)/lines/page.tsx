@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { formatDuration, toDateKey } from "@/core/time";
+import { formatDuration, serviceDate } from "@/core/time";
 import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
 import { LineRoute, lineProgress, lineTasks } from "@/components/lines/LineRoute";
@@ -15,7 +15,7 @@ import { lineHref } from "@/lib/paths";
 export default function LinesPage() {
   const data = useData();
   const [creating, setCreating] = useState(false);
-  const today = toDateKey(new Date());
+  const today = serviceDate(new Date());
   const lines = [...data.lines].sort((a, b) => (a.targetDate ?? "9999").localeCompare(b.targetDate ?? "9999"));
 
   return (

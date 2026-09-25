@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { journeyFor } from "@/core/journey";
-import { clock, formatDuration, toDateKey } from "@/core/time";
+import { clock, formatDuration, serviceDate } from "@/core/time";
 import type { FocusLevel } from "@/core/types";
 import { Button, ButtonLink } from "@/components/ui/Button";
 import { FocusPicker } from "@/components/ui/controls";
@@ -21,7 +21,7 @@ type StationItem = Extract<RouteItem, { kind: "station" }>;
 export default function RoutePage() {
   const data = useData();
   const now = useNow(30_000);
-  const today = toDateKey(now);
+  const today = serviceDate(now);
   const items = routeItems(data, today);
   const summary = routeSummary(data, today);
   const journey = journeyFor(data, today);

@@ -4,13 +4,14 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import { scheduleFor } from "@/core/allocate";
-import { clock, formatDuration, formatShortDate, relativeDay, toDateKey } from "@/core/time";
+import { clock, formatDuration, formatShortDate, relativeDay, serviceDate } from "@/core/time";
 import type { Level } from "@/core/types";
 import { Button } from "@/components/ui/Button";
 import { MinutesInput } from "@/components/ui/controls";
 import { Icon } from "@/components/ui/Icon";
 import { Sheet } from "@/components/ui/Sheet";
 import { TaskForm, draftFrom } from "@/components/tasks/TaskForm";
+import { ConfirmFinish } from "@/components/journey/ConfirmFinish";
 import { useNow } from "@/lib/hooks";
 import { useForecast } from "@/lib/use-planner";
 import { completeTask, deleteTask, logProgress, reopenTask, updateTask } from "@/state/actions";
@@ -39,7 +40,7 @@ function TaskDetail() {
   const [logMinutes, setLogMinutes] = useState(30);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const task = data.tasks.find((t) => t.id === id);
-  const today = toDateKey(now);
+  const today = serviceDate(now);
 
   if (!task) {
     return (
@@ -69,9 +70,19 @@ function TaskDetail() {
 
       <header className="mt-8">
         <p className="eyebrow">
-          {task.status === "inbox" ? "Inbox" : task.status === "done" ? "Completed" : line ? line.title : task.recurrence ? "Recurring" : "Task"}
+          {task.status === "archived"
+            ? "Deleted · kept for past journeys"
+            : task.status === "inbox"
+              ? "Inbox"
+              : task.status === "done"
+                ? "Completed"
+                : line
+                  ? line.title
+                  : task.recurrence
+                    ? "Recurring"
+                    : "Task"}
         </p>
-        <h1 className="mt-2 font-display text-4xl leading-tight">{task.title}</h1>
+        <h1 className="mt-2 break-words font-display text-4xl leading-tight">{task.title}</h1>
         {task.description && <p className="mt-3 max-w-lg text-sm leading-relaxed text-mist">{task.description}</p>}
       </header>
 
@@ -99,6 +110,10 @@ function TaskDetail() {
           <div className="h-px bg-lamp transition-[width] duration-1000" style={{ width: `${progress * 100}%` }} />
         </div>
       )}
+
+      <div className="mt-8">
+        <ConfirmFinish tasks={[task]} compact />
+      </div>
 
       <section className="mt-10 grid grid-cols-3 gap-6" aria-label="How the task feels">
         <Scale label="Interest" value={task.interest} caption={INTEREST[task.interest - 1]} />
@@ -165,6 +180,7 @@ function TaskDetail() {
         </section>
       )}
 
+      {task.status !== "archived" && (
       <div className="mt-12 flex flex-wrap gap-3 border-t border-rule-soft pt-8">
         <Button variant="secondary" onClick={() => setEditing(true)}>
           Edit
@@ -187,6 +203,7 @@ function TaskDetail() {
           Delete
         </Button>
       </div>
+      )}
 
       <Sheet open={editing} onClose={() => setEditing(false)} title="Edit task" eyebrow={task.title}>
         <TaskForm

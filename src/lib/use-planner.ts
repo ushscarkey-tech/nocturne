@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 import { worstConflict, type Forecast } from "@/core/allocate";
 import { forecast } from "@/core/planner";
-import { toDateKey } from "@/core/time";
+import { serviceDate } from "@/core/time";
 import type { NocturneData } from "@/core/types";
 
 /**
@@ -20,5 +20,5 @@ export function useForecast(data: NocturneData, now: Date): Forecast {
 
 export function useConflict(data: NocturneData, now: Date) {
   const f = useForecast(data, now);
-  return { forecast: f, conflict: worstConflict(f), today: toDateKey(now) };
+  return { forecast: f, conflict: worstConflict(f), today: serviceDate(now) };
 }

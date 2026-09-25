@@ -12,7 +12,7 @@
 
 export type LayerId = "rail" | "cabin" | "rain" | "wind" | "night" | "brown" | "tunnelHum";
 export type BusId = "train" | "environment" | "focus";
-export type PresetId = "quiet-cabin" | "rain-window" | "night-rail" | "tunnel" | "platform" | "silence";
+export type PresetId = "quiet-cabin" | "rain-window" | "night-rail" | "tunnel" | "rumble" | "platform" | "platform-rain" | "silence";
 
 const LAYER_BUS: Record<LayerId, BusId> = {
   rail: "train",
@@ -28,12 +28,15 @@ export const PRESETS: Record<PresetId, Partial<Record<LayerId, number>>> = {
   "quiet-cabin": { cabin: 0.55, rail: 0.14, night: 0.08 },
   "rain-window": { rain: 0.6, rail: 0.3, cabin: 0.18 },
   "night-rail": { wind: 0.42, rail: 0.45, night: 0.3, cabin: 0.1 },
-  tunnel: { rail: 0.32, tunnelHum: 0.5, brown: 0.5, cabin: 0.08 },
+  // Entering a tunnel: the rail deepens before the hum takes over.
+  rumble: { rail: 0.55, brown: 0.22, tunnelHum: 0.15, cabin: 0.06 },
+  tunnel: { rail: 0.28, tunnelHum: 0.5, brown: 0.55, cabin: 0.06 },
   platform: { cabin: 0.22, night: 0.25, rail: 0.03 },
+  "platform-rain": { cabin: 0.2, rain: 0.38, night: 0.12 },
   silence: {},
 };
 
-export const PRESET_LABELS: Record<Exclude<PresetId, "platform" | "silence">, { title: string; detail: string }> = {
+export const PRESET_LABELS: Record<Exclude<PresetId, "platform" | "platform-rain" | "rumble" | "silence">, { title: string; detail: string }> = {
   "rain-window": { title: "Rain Window", detail: "Rain on glass, quiet rail movement" },
   "night-rail": { title: "Night Rail", detail: "Soft wind, distant track" },
   tunnel: { title: "Tunnel", detail: "Low mechanical hum, brown noise" },

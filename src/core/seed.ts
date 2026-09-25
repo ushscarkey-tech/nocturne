@@ -6,7 +6,7 @@
 import { newId } from "./ids";
 import { planToday } from "./planner";
 import { boardingDetails, stationName } from "./stations";
-import { addDays, atMinutes, parseHM, toDateKey } from "./time";
+import { addDays, atMinutes, parseHM, serviceDate } from "./time";
 import type {
   CarriageId,
   Journey,
@@ -49,7 +49,7 @@ export function defaultWindows(userId: string): StudyWindow[] {
 }
 
 export function createSeedData(now: Date, profileBase?: Partial<Profile>): NocturneData {
-  const today = toDateKey(now);
+  const today = serviceDate(now);
   const userId = profileBase?.id ?? newId();
   const stamp = (daysAgo: number) => atMinutes(addDays(today, -daysAgo), 12 * 60).toISOString();
 

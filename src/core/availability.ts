@@ -1,4 +1,4 @@
-import { dayOfWeek, parseHM } from "./time";
+import { DAY_START_MINUTES, dayOfWeek, parseHM } from "./time";
 import type { DateKey, StudyWindow } from "./types";
 
 /** Half-open interval in minutes past local midnight. */
@@ -47,6 +47,32 @@ export function clipIntervals(list: Interval[], from: number): Interval[] {
     .filter((i) => i.end - i.start > 0);
 }
 
+/**
+ * A window's minutes on its service day. Times before 04:00 belong to the
+ * same night (after midnight), and an end earlier than the start crosses
+ * midnight: 22:00–01:00 is 1320–1500.
+ */
+export function windowInterval(w: Pick<StudyWindow, "startTime" | "endTime">): Interval {
+  let start = parseHM(w.startTime);
+  let end = parseHM(w.endTime);
+  if (start < DAY_START_MINUTES) {
+    start += 1440;
+    end += 1440;
+  } else if (end <= start) {
+    end += 1440;
+  }
+  return { start, end };
+}
+
+/** Why a window can't be saved, or null when it is valid. */
+export function windowProblem(w: Pick<StudyWindow, "startTime" | "endTime">): string | null {
+  const { start, end } = windowInterval(w);
+  if (end <= start) return "Service must end after it starts.";
+  if (end > 1440 + DAY_START_MINUTES) return "A night's service has to end by 04:00.";
+  if (end - start < MIN_USEFUL_MINUTES) return `Windows need at least ${MIN_USEFUL_MINUTES} minutes.`;
+  return null;
+}
+
 export function windowAppliesTo(w: StudyWindow, date: DateKey): boolean {
   if (!w.enabled) return false;
   if (w.recurring) return w.dayOfWeek === dayOfWeek(date);
@@ -56,7 +82,7 @@ export function windowAppliesTo(w: StudyWindow, date: DateKey): boolean {
 /** Service Time for a date: weekly windows + one-off additions − blocked exceptions. */
 export function availabilityForDate(windows: StudyWindow[], date: DateKey): Interval[] {
   const applicable = windows.filter((w) => windowAppliesTo(w, date));
-  const toInterval = (w: StudyWindow): Interval => ({ start: parseHM(w.startTime), end: parseHM(w.endTime) });
+  const toInterval = windowInterval;
   const available = applicable.filter((w) => w.kind === "available").map(toInterval);
   const blocked = applicable.filter((w) => w.kind === "blocked").map(toInterval);
   return subtractIntervals(available, blocked);

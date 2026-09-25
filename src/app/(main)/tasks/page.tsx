@@ -4,7 +4,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useMemo, useState, type FormEvent } from "react";
 import { recursOn } from "@/core/allocate";
 import { routeOf } from "@/core/sessions";
-import { toDateKey } from "@/core/time";
+import { serviceDate } from "@/core/time";
 import type { Task } from "@/core/types";
 import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
@@ -12,7 +12,7 @@ import { Sheet } from "@/components/ui/Sheet";
 import { TaskForm, draftFrom } from "@/components/tasks/TaskForm";
 import { TaskRow } from "@/components/tasks/TaskRow";
 import { createTask } from "@/state/actions";
-import { useData } from "@/state/store";
+import { useData, useStore } from "@/state/store";
 
 export default function TasksPage() {
   return (
@@ -29,7 +29,7 @@ function TasksView() {
   const [formOpen, setFormOpen] = useState(params.get("new") === "1");
   const [capture, setCapture] = useState("");
   const [showDone, setShowDone] = useState(false);
-  const today = toDateKey(new Date());
+  const today = serviceDate(new Date());
 
   const tonight = useMemo(() => {
     const m = new Map<string, number>();
@@ -48,6 +48,7 @@ function TasksView() {
     const someday: Task[] = [];
     const done: Task[] = [];
     for (const t of data.tasks) {
+      if (t.status === "archived") continue;
       if (t.status === "done") done.push(t);
       else if (t.status === "inbox") inbox.push(t);
       else if (tonight.has(t.id) || (t.deadline && t.deadline <= today && !t.recurrence) || (t.recurrence && recursOn(t, today))) todayList.push(t);
@@ -67,8 +68,13 @@ function TasksView() {
     e.preventDefault();
     const title = capture.trim();
     if (!title) return;
-    createTask({ ...draftFrom(), title, estimatedMinutes: 0 });
+    const task = createTask({ ...draftFrom(), title, estimatedMinutes: 0 });
     setCapture("");
+    useStore.getState().notify({
+      headline: "Captured to Inbox",
+      lines: [`Add a deadline and estimate to ${task.title} when you're ready — then it joins the plan.`],
+      tone: "info",
+    });
   }
 
   function closeForm() {
@@ -76,7 +82,7 @@ function TasksView() {
     if (params.get("new")) router.replace("/tasks");
   }
 
-  const empty = data.tasks.length === 0;
+  const empty = !data.tasks.some((t) => t.status !== "archived");
 
   return (
     <div className="animate-fade">
@@ -101,7 +107,9 @@ function TasksView() {
             value={capture}
             onChange={(e) => setCapture(e.target.value)}
             placeholder="Capture a task — details later"
-            className="w-full bg-transparent py-3 text-paper placeholder:text-haze focus:outline-none"
+            enterKeyHint="done"
+            autoComplete="off"
+            className="w-full bg-transparent py-3 text-base text-paper placeholder:text-haze focus:outline-none"
           />
         </div>
       </form>

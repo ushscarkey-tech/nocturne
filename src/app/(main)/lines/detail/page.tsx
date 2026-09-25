@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
-import { formatDuration, formatLongDate, toDateKey } from "@/core/time";
+import { formatDuration, formatLongDate, serviceDate } from "@/core/time";
 import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
 import { Sheet } from "@/components/ui/Sheet";
@@ -28,7 +28,7 @@ function LineDetail() {
   const data = useData();
   const [sheet, setSheet] = useState<null | "edit" | "attach" | "task" | "delete">(null);
   const line = data.lines.find((l) => l.id === id);
-  const today = toDateKey(new Date());
+  const today = serviceDate(new Date());
 
   if (!line) {
     return (
@@ -41,7 +41,7 @@ function LineDetail() {
 
   const tasks = lineTasks(line, data.tasks);
   const p = lineProgress(tasks);
-  const unattached = data.tasks.filter((t) => t.lineId !== line.id && t.status !== "done");
+  const unattached = data.tasks.filter((t) => t.lineId !== line.id && (t.status === "active" || t.status === "inbox"));
 
   return (
     <div className="animate-fade">

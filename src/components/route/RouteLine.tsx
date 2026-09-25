@@ -1,9 +1,15 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useRef, type ReactNode } from "react";
 import { clock, formatDuration } from "@/core/time";
 import type { RouteItem } from "@/lib/route-view";
 import { Icon } from "@/components/ui/Icon";
+import { useFlip } from "@/lib/hooks";
+
+/** Changes whenever stations move, appear or leave. */
+export function routeSignature(items: RouteItem[]): string {
+  return items.map((i) => (i.kind === "station" ? `${i.session.id}@${i.session.plannedStart}` : i.key)).join("|");
+}
 
 /**
  * The vertical train line. Stations are filled dots, stops are hollow,
@@ -20,8 +26,10 @@ export function RouteLine({
   renderActions?: (item: Extract<RouteItem, { kind: "station" }>) => ReactNode;
   highlightId?: string | null;
 }) {
+  const ref = useRef<HTMLOListElement>(null);
+  useFlip(ref, routeSignature(items));
   return (
-    <ol className="relative" aria-label="Route">
+    <ol ref={ref} className="relative" aria-label="Route">
       {items.map((item, i) => (
         <RouteRow
           key={item.kind === "station" ? item.session.id : item.key}
@@ -56,7 +64,7 @@ export function RouteRow({
 }) {
   if (item.kind === "stop") {
     return (
-      <li className="grid grid-cols-[3.25rem_1.5rem_1fr]" aria-label={`Station stop, ${item.minutes} minutes`}>
+      <li data-flip={item.key} className="grid grid-cols-[3.25rem_1.5rem_1fr]" aria-label={`Station stop, ${item.minutes} minutes`}>
         <span />
         <Rail first={first} last={last}>
           <span className="h-2 w-2 rounded-full border border-haze bg-night-900" />
@@ -69,7 +77,7 @@ export function RouteRow({
   }
   if (item.kind === "pause") {
     return (
-      <li className="grid grid-cols-[3.25rem_1.5rem_1fr]" aria-label={`Service paused until ${clock(item.until)}`}>
+      <li data-flip={item.key} className="grid grid-cols-[3.25rem_1.5rem_1fr]" aria-label={`Service paused until ${clock(item.until)}`}>
         <span />
         <div className="relative flex h-full min-h-12 justify-center" aria-hidden>
           <span className="absolute top-0 h-3 w-px bg-rule" />
@@ -86,6 +94,7 @@ export function RouteRow({
   const active = s.status === "active";
   return (
     <li
+      data-flip={s.id}
       {...rowProps}
       className={`group grid grid-cols-[3.25rem_1.5rem_1fr] transition-colors duration-700 ${highlight ? "animate-rise" : ""} ${rowProps?.className ?? ""}`}
     >

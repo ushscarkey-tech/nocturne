@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, type ReactNode } from "react";
 import { journeyFor } from "@/core/journey";
 import { activeSession, remainingSeconds } from "@/core/sessions";
-import { toDateKey } from "@/core/time";
+import { serviceDate } from "@/core/time";
 import { checkNotifications } from "@/lib/notify";
 import { arrive, depart, ensureToday } from "@/state/actions";
 import { bootstrap } from "@/state/session";
@@ -59,14 +59,14 @@ export function DataGate({ children }: { children: ReactNode }) {
  * rolls over at midnight.
  */
 function JourneyDaemon() {
-  const lastDay = useRef(toDateKey(new Date()));
+  const lastDay = useRef(serviceDate(new Date()));
 
   useEffect(() => {
     const tick = () => {
       const data = useStore.getState().data;
       if (!data) return;
       const now = new Date();
-      const today = toDateKey(now);
+      const today = serviceDate(now);
       if (today !== lastDay.current) {
         lastDay.current = today;
         ensureToday();

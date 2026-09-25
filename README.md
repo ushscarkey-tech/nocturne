@@ -20,9 +20,9 @@ weekday Service Time and a week of past journeys, saved in your browser's local 
 
 ### Cloud accounts (Supabase)
 
-1. Create a Supabase project and run `supabase/migrations/20260925000000_init.sql`
-   (via `supabase db push` or the SQL editor). It creates the tables, row level security policies
-   and a trigger that creates a profile on sign-up.
+1. Create a Supabase project and run the files in `supabase/migrations/` in order
+   (via `supabase db push` or the SQL editor). They create the tables, row level security policies,
+   a trigger that creates a profile on sign-up, and allow archived tasks and late-night windows.
 2. Copy `.env.example` to `.env.local` and fill in the project URL and publishable (anon) key.
 3. Restart the dev server. `/login` now offers email/password sign-up and sign-in; "Explore the
    demo" remains available.
@@ -87,7 +87,18 @@ supabase/        SQL migrations
   inserted between stations.
 - **Adaptation** – every change rebuilds or retimes **only future, unlocked stations**. Completed
   and partial stations, the active station and locked stations never move. Each adjustment
-  produces a plain-language "Route updated" explanation.
+  produces a short "Route updated" explanation: why first, then the one detail that matters.
+- **Signals never add work** – Low / Steady / Sharp, Low Focus and resuming service only re-sort
+  and re-chunk the work already on tonight's route (Low focus → stations of 30 minutes at most,
+  easy and appealing work first; Sharp → important, hard work first). Only an explicit
+  "Optimize route", a task change or "keep going" after finishing early pulls new work in.
+- **Service Time is respected** – boarding before a window opens waits on the platform (or departs
+  early on request), and a station never runs past the end of its window.
+- **The night ends at 04:00** – the service day rolls over at 04:00, so windows such as 22:00–01:00
+  belong to the evening they start on.
+- **Estimates are checked, not trusted** – when a task's planned time runs out, Nocturne asks
+  whether it's finished or needs more time instead of silently closing it.
+- **Deleting keeps history** – a task with past journeys is archived so tickets stay intact.
 
 ### Terminology
 
@@ -105,6 +116,6 @@ supabase/        SQL migrations
 
 ## Known limits of v1
 
-- Service windows can't cross midnight.
+- A night's service must end by 04:00.
 - Reminders are browser notifications while Nocturne is open (no push service yet).
 - Natural-language quick add, calendar sync and learned focus patterns are planned for later.

@@ -1,12 +1,24 @@
 import { describe, expect, it } from "vitest";
 import { allocate, worstConflict } from "../allocate";
 import { availabilityForDate } from "../availability";
-import { arrive, board, depart, endJourney, finishEarly, issueTicket, lowFocus, needMoreTime } from "../journey";
+import {
+  arrive,
+  awaitingConfirmation,
+  board,
+  continueService,
+  depart,
+  endJourney,
+  finishEarly,
+  issueTicket,
+  lowFocus,
+  needMoreTime,
+  removeTask,
+} from "../journey";
 import { planToday } from "../planner";
 import { createSeedData, createEmptyData } from "../seed";
-import { activeSession, routeOf, sessionsOn } from "../sessions";
+import { activeSession, routeOf, sessionsOn, upcomingOn } from "../sessions";
 import { summarizeJourney } from "../stats";
-import { addDays, minutesFrom, toDateKey } from "../time";
+import { addDays, minutesFrom, serviceDate, toDateKey } from "../time";
 import type { Level, NocturneData, StudySession, StudyWindow, Task } from "../types";
 
 // Thursday, Sep 24 2026, local time.
@@ -191,7 +203,8 @@ describe("journey vertical slice", () => {
     expect(r.change?.headline).toBe("Route updated");
     expect(r.change?.lines.join(" ")).toMatch(/remaining 30m of Math/);
     expect(d.journeys[0].phase).toBe("stop");
-    expect(d.journeys[0].routeChanges).toBe(1);
+    // One change when Sharp re-sorted the route at boarding, one for Low Focus.
+    expect(d.journeys[0].routeChanges).toBe(2);
 
     const upcoming = sessionsOn(d.sessions, TODAY).filter((s) => s.status === "planned");
     expect(upcoming[0].taskId).not.toBe("math"); // lighter work first
@@ -209,7 +222,9 @@ describe("journey vertical slice", () => {
       clock = new Date(clock.getTime() + 5 * 60_000);
     }
     expect(d.journeys[0].phase).toBe("final");
-    expect(d.tasks.every((t) => t.status === "done")).toBe(true);
+    // Planned time is used up; each task waits for the traveller to confirm it's finished.
+    expect(d.tasks.every((t) => t.remainingMinutes === 0 && t.status === "active")).toBe(true);
+    expect(d.tasks.every(awaitingConfirmation)).toBe(true);
 
     const { data: withTicket, ticket } = issueTicket(d, d.journeys[0].id, clock);
     expect(ticket.serial).toBe("0924");
@@ -273,5 +288,142 @@ describe("ending early", () => {
     const later = f.days.slice(1).reduce((sum, day) => sum + (day.allocations.a ?? 0) + (day.allocations.b ?? 0), 0);
     expect(later).toBeGreaterThan(0);
     expect(summarizeJourney(d, d.journeys[0]).delayMinutes).toBeGreaterThanOrEqual(0);
+  });
+});
+
+describe("daily-use edge cases", () => {
+  const plan = (d: NocturneData, now: Date, focus: "low" | "steady" | "sharp" = "steady") => ({
+    ...d,
+    sessions: planToday({ ...d, userId: "u" }, { now, focus, mode: "reoptimize", reason: "initial" }).sessions,
+  });
+
+  it("boarding before Service Time waits on the platform instead of starting", () => {
+    const d = plan(data([task({ id: "a", estimatedMinutes: 60, deadline: addDays(TODAY, 1) })]), at(18));
+    const r = board(d, { focus: "steady", carriage: "rain" }, at(19, 20));
+    expect(activeSession(r.data.sessions)).toBeUndefined();
+    expect(r.data.journeys[0].phase).toBe("stop");
+    expect(r.data.journeys[0].stopEndsAt).toBe(at(19, 40).toISOString());
+    const departed = depart(r.data, at(19, 40)).data;
+    expect(activeSession(departed.sessions)?.taskId).toBe("a");
+  });
+
+  it("never runs a station past the end of the Service window", () => {
+    const d = plan(data([task({ id: "a", estimatedMinutes: 120, maxSessionMinutes: 90, deadline: addDays(TODAY, 1) })]), at(22, 10));
+    const r = board(d, { focus: "steady", carriage: "rain" }, at(22, 30));
+    const s = activeSession(r.data.sessions)!;
+    expect(new Date(s.plannedEnd).getTime()).toBeLessThanOrEqual(at(23).getTime());
+    expect(s.plannedMinutes).toBe(30);
+  });
+
+  it("supports windows that cross midnight on the same service day", () => {
+    const late = [0, 1, 2, 3, 4, 5, 6].map((d) => win(d, "22:00", "01:00"));
+    const d = plan(data([task({ id: "a", estimatedMinutes: 150, deadline: addDays(TODAY, 1) })], late), at(21));
+    const route = routeOf(d.sessions, TODAY);
+    expect(route.length).toBeGreaterThan(1);
+    const lastEnd = new Date(route[route.length - 1].plannedEnd);
+    expect(lastEnd.getTime()).toBeGreaterThan(at(23, 59).getTime());
+    expect(lastEnd.getTime()).toBeLessThanOrEqual(at(1, 0, 25).getTime());
+    // At 00:30 it is still the same night.
+    expect(serviceDate(at(0, 30, 25))).toBe(TODAY);
+  });
+
+  it("keeps a task open when its estimate runs out, until the traveller confirms", () => {
+    const d0 = plan(data([task({ id: "a", estimatedMinutes: 30, deadline: addDays(TODAY, 1) })]), at(19));
+    let d = board(d0, { focus: "steady", carriage: "rain" }, at(19, 40)).data;
+    d = arrive(d, at(20, 10)).data;
+    const t = d.tasks[0];
+    expect(t.remainingMinutes).toBe(0);
+    expect(t.status).toBe("active");
+    expect(awaitingConfirmation(t)).toBe(true);
+  });
+
+  it("deleting a task mid-station banks the work and keeps the record", () => {
+    const d0 = plan(
+      data([
+        task({ id: "a", estimatedMinutes: 60, deadline: addDays(TODAY, 1) }),
+        task({ id: "b", estimatedMinutes: 40, deadline: addDays(TODAY, 1) }),
+      ]),
+      at(19),
+    );
+    let d = board(d0, { focus: "steady", carriage: "rain" }, at(19, 40)).data;
+    const running = activeSession(d.sessions)!;
+    d = removeTask(d, running.taskId, at(20)).data;
+    expect(d.tasks.find((t) => t.id === running.taskId)?.status).toBe("archived");
+    expect(d.sessions.find((s) => s.id === running.id)?.status).toBe("partial");
+    expect(upcomingOn(d.sessions, TODAY).every((s) => s.taskId !== running.taskId)).toBe(true);
+    expect(["stop", "paused"]).toContain(d.journeys[0].phase);
+  });
+
+  it("an urgent new task routes around a locked station and never moves it", () => {
+    const d0 = plan(data([task({ id: "a", estimatedMinutes: 60, deadline: addDays(TODAY, 2) })]), at(18));
+    const s = routeOf(d0.sessions, TODAY)[0];
+    const locked = { ...d0, sessions: d0.sessions.map((x) => (x.id === s.id ? { ...x, locked: true } : x)) };
+    const urgent = task({ id: "u", estimatedMinutes: 400, deadline: TODAY, importance: 5 });
+    const r = planToday({ ...locked, tasks: [...locked.tasks, urgent], userId: "u" }, { now: at(18), focus: "steady", mode: "reoptimize", reason: "task-change" });
+    const kept = r.sessions.find((x) => x.id === s.id)!;
+    expect(kept.plannedStart).toBe(s.plannedStart);
+    assertNoOverlap(routeOf(r.sessions, TODAY));
+    const f = allocate({ tasks: [...locked.tasks, urgent], windows: everyEvening, sessions: r.sessions, now: at(18), keepTodayPlan: true });
+    expect(worstConflict(f)?.taskIds).toContain("u");
+  });
+
+  it("low focus builds shorter stations; sharp puts important hard work first", () => {
+    const tasks = [
+      task({ id: "hard", estimatedMinutes: 90, maxSessionMinutes: 60, deadline: addDays(TODAY, 1), difficulty: 5, interest: 1, importance: 5 }),
+      task({ id: "easy", estimatedMinutes: 40, deadline: addDays(TODAY, 1), difficulty: 1, interest: 4, importance: 2 }),
+    ];
+    const low = plan(data(tasks), at(19), "low");
+    // Hard work comes in short blocks when focus is low (easy work keeps its 25-minute minimum).
+    expect(routeOf(low.sessions, TODAY).filter((s) => s.taskId === "hard").every((s) => s.plannedMinutes <= 30)).toBe(true);
+    expect(routeOf(low.sessions, TODAY)[0].taskId).toBe("easy");
+    const sharp = plan(data(tasks), at(19), "sharp");
+    expect(routeOf(sharp.sessions, TODAY)[0].taskId).toBe("hard");
+    const steady = plan(data(tasks), at(19), "steady");
+    expect(routeOf(steady.sessions, TODAY).slice(0, 2).some((s) => s.taskId === "hard")).toBe(true);
+  });
+
+  it("after finishing everything early, Service Time can pull later work forward", () => {
+    const d0 = plan(
+      data([
+        task({ id: "a", estimatedMinutes: 30, deadline: addDays(TODAY, 1) }),
+        task({ id: "later", estimatedMinutes: 120, deadline: addDays(TODAY, 6) }),
+      ]),
+      at(19),
+    );
+    let d = board(d0, { focus: "steady", carriage: "rain" }, at(19, 40)).data;
+    while (activeSession(d.sessions)) d = finishEarly(d, at(20), true).data;
+    for (let guard = 0; guard < 5 && d.journeys[0].phase !== "final"; guard++) {
+      d = depart(d, at(20, 5)).data;
+      if (activeSession(d.sessions)) d = finishEarly(d, at(20, 6), true).data;
+    }
+    expect(d.journeys[0].phase).toBe("final");
+    const r = continueService(d, at(20, 10));
+    expect(r.added).toBe(true);
+    expect(activeSession(r.data.sessions)).toBeDefined();
+  });
+});
+
+describe("signal changes never add work", () => {
+  it("low focus re-sorts tonight's work without pulling in more", () => {
+    const d0 = data([
+      task({ id: "a", estimatedMinutes: 60, deadline: addDays(TODAY, 1), difficulty: 5 }),
+      task({ id: "b", estimatedMinutes: 40, deadline: addDays(TODAY, 1), difficulty: 1 }),
+      task({ id: "later", estimatedMinutes: 300, deadline: addDays(TODAY, 8) }),
+    ]);
+    const planned = planToday({ ...d0, userId: "u" }, { now: at(19), focus: "steady", mode: "reoptimize", reason: "initial" });
+    let d: NocturneData = { ...d0, sessions: planned.sessions };
+    const workBefore = routeOf(d.sessions, TODAY).reduce((s, x) => s + x.workMinutes, 0);
+    d = board(d, { focus: "steady", carriage: "rain" }, at(19, 40)).data;
+    d = lowFocus(d, at(20)).data;
+    const workAfter = routeOf(d.sessions, TODAY).reduce((s, x) => s + (x.status === "partial" ? x.creditedMinutes : x.workMinutes), 0);
+    expect(workAfter).toBeLessThanOrEqual(workBefore + 1);
+  });
+
+  it("splits a task over days without leaving a crumb below the minimum session", () => {
+    const t = task({ id: "e", estimatedMinutes: 120, deadline: addDays(TODAY, 4), minSessionMinutes: 25 });
+    const f = allocate({ tasks: [t], windows: everyEvening, sessions: [], now: at(12), keepTodayPlan: false });
+    const parts = f.days.map((d) => d.allocations.e ?? 0).filter((m) => m > 0);
+    expect(parts.reduce((a, b) => a + b, 0)).toBe(120);
+    expect(Math.min(...parts)).toBeGreaterThanOrEqual(25);
   });
 });
