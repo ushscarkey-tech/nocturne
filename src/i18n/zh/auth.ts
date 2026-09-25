@@ -24,6 +24,19 @@ const auth: Partial<Record<keyof typeof source, string>> = {
   "auth.errorWeakPassword": "至少 6 个字符。",
   "auth.errorTooMany": "尝试次数太多，请稍后再试。",
   "auth.errorNetwork": "没有网络，联网后再试。",
+  "auth.syncPitch": "登录后，每台设备上都能接着过同一个夜晚。这台设备上的记录也会一起带过去。",
+  "auth.google": "用 Google 继续",
+  "auth.or": "或使用邮箱",
+  "auth.forgot": "忘记密码了？",
+  "auth.resetSent": "密码重置链接已发送，请检查邮箱。",
+  "auth.resetNeedEmail": "请先在上面输入邮箱。",
+  "auth.later": "稍后再说",
+  "auth.laterNote": "现在的数据会保存在这台设备上。你可以随时在设置里登录，登录后数据会移到账户里。",
+  "auth.cancelled": "已取消。",
+  "auth.errorPopupBlocked": "登录窗口被拦截了。请允许此网站的弹窗并重试。",
+  "auth.errorDomain": "这个地址还不能登录。",
+  "auth.errorProviderOff": "这种登录方式还没有启用。",
+  "auth.errorOtherMethod": "这个邮箱用其他方式登录过，试试邮箱和密码。",
 };
 
 export default auth;

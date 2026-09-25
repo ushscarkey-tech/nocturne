@@ -12,9 +12,9 @@ const settings: Partial<Record<keyof typeof source, string>> = {
   "settings.carriage.rain": "雨の車両",
   "settings.carriage.tunnel": "トンネルの車両",
   "settings.cloudNote": "アカウントに同期されています。",
-  "settings.confirmReset": "デモをリセットしますか?",
+  "settings.confirmReset": "このデバイスの記録を消しますか?",
   "settings.confirmSample": "サンプルデータに置き換えますか?",
-  "settings.demo": "デモ",
+  "settings.demo": "このデバイス",
   "settings.demoNote": "このブラウザのみに保存。",
   "settings.focusHistory": "スケジューリング用に集中の履歴を使用",
   "settings.guide": "紹介を再度見る",
@@ -28,8 +28,8 @@ const settings: Partial<Record<keyof typeof source, string>> = {
   "settings.remindersHint": "発車の5分前。",
   "settings.remindersOn": "オン。ブラウザの設定で変更できます。",
   "settings.replace": "置き換える",
-  "settings.resetBody": "このブラウザのすべてがサンプルデータに置き換わります。",
-  "settings.resetDemo": "デモをリセット",
+  "settings.resetBody": "このブラウザに保存されたタスク、ルート、チケットが削除されます。戻せません。",
+  "settings.resetDemo": "このデバイスの記録を消す",
   "settings.sampleBody": "タスク、ライン、旅、乗車券がサンプルデータに置き換わります。",
   "settings.serviceTime": "運行時間",
   "settings.signIn": "ログイン",
@@ -37,6 +37,8 @@ const settings: Partial<Record<keyof typeof source, string>> = {
   "settings.soundEffects": "効果音",
   "settings.soundEffectsHint": "券売機、ドア、チャイム",
   "settings.title": "設定",
+  "settings.syncPitch": "ログインすると、すべてのデバイスで同じ夜を続けられます。今の記録はアカウントに移ります。",
+  "settings.signInCta": "ログインまたはアカウント作成",
 };
 
 export default settings;

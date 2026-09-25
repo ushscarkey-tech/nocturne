@@ -24,6 +24,19 @@ const auth: Partial<Record<keyof typeof source, string>> = {
   "auth.errorWeakPassword": "6文字以上にしてください。",
   "auth.errorTooMany": "試行が多すぎます。少し待ってください。",
   "auth.errorNetwork": "接続がありません。オンラインで再試行してください。",
+  "auth.syncPitch": "ログインすると、すべてのデバイスで同じ夜を続けられます。このデバイスの記録もそのまま移ります。",
+  "auth.google": "Googleで続ける",
+  "auth.or": "またはメールで",
+  "auth.forgot": "パスワードを忘れましたか?",
+  "auth.resetSent": "新しいパスワードを設定するリンクを送信しました。メールボックスを確認してください。",
+  "auth.resetNeedEmail": "上にメールアドレスを入力してください。",
+  "auth.later": "今はしない",
+  "auth.laterNote": "今の記録はこのデバイスに残ります。設定からいつでもログインできます。ログインすると、アカウントに移ります。",
+  "auth.cancelled": "キャンセルしました。",
+  "auth.errorPopupBlocked": "ログインウィンドウがブロックされました。このサイトのポップアップを許可してもう一度試してください。",
+  "auth.errorDomain": "このアドレスからはまだログインできません。",
+  "auth.errorProviderOff": "このログイン方法はまだ有効になっていません。",
+  "auth.errorOtherMethod": "このメールアドレスは別の方法で登録されています。メールアドレスとパスワードで試してください。",
 };
 
 export default auth;

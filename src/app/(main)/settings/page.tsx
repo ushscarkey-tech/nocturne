@@ -144,7 +144,9 @@ export default function SettingsPage() {
         <h2 id="account-title" className="eyebrow">
           {mode === "cloud" ? t("settings.account") : t("settings.demo")}
         </h2>
-        <p className="mt-2 text-sm text-mist">{mode === "cloud" ? t("settings.cloudNote") : t("settings.demoNote")}</p>
+        <p className="mt-2 text-sm text-mist">
+          {mode === "cloud" ? t("settings.cloudNote") : isCloudConfigured ? t("settings.syncPitch") : t("settings.demoNote")}
+        </p>
         <div className="mt-5 flex flex-wrap gap-3">
           {mode === "cloud" ? (
             <>
@@ -163,20 +165,14 @@ export default function SettingsPage() {
             </>
           ) : (
             <>
+              {isCloudConfigured && (
+                <Button variant="primary" onClick={() => router.push("/login")}>
+                  {t("settings.signInCta")}
+                </Button>
+              )}
               <Button variant="secondary" onClick={() => setConfirm("reset")}>
                 {t("settings.resetDemo")}
               </Button>
-              {isCloudConfigured && (
-                <Button
-                  variant="ghost"
-                  onClick={async () => {
-                    await signOut();
-                    router.replace("/login");
-                  }}
-                >
-                  {t("settings.signIn")}
-                </Button>
-              )}
             </>
           )}
         </div>

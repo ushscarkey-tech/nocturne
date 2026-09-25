@@ -2,7 +2,10 @@ import { initializeApp, getApps, type FirebaseApp } from "firebase/app";
 import {
   createUserWithEmailAndPassword,
   getAuth,
+  GoogleAuthProvider,
+  sendPasswordResetEmail,
   signInWithEmailAndPassword,
+  signInWithPopup,
   signOut as firebaseSignOut,
   updateProfile,
   type Auth,
@@ -172,8 +175,16 @@ function authMessage(e: unknown): Error {
     "auth/weak-password": "auth.errorWeakPassword",
     "auth/too-many-requests": "auth.errorTooMany",
     "auth/network-request-failed": "auth.errorNetwork",
+    "auth/missing-email": "auth.resetNeedEmail",
+    "auth/popup-blocked": "auth.errorPopupBlocked",
+    "auth/popup-closed-by-user": "auth.cancelled",
+    "auth/cancelled-popup-request": "auth.cancelled",
+    "auth/unauthorized-domain": "auth.errorDomain",
+    "auth/operation-not-allowed": "auth.errorProviderOff",
+    "auth/account-exists-with-different-credential": "auth.errorOtherMethod",
   };
-  const err = new Error(map[code] ?? (e instanceof Error ? e.message : "auth.errorDefault"));
+  if (!map[code]) console.warn("[nocturne] sign-in failed:", e);
+  const err = new Error(map[code] ?? "auth.errorDefault");
   (err as Error & { i18nKey?: string }).i18nKey = map[code];
   return err;
 }
@@ -204,6 +215,22 @@ export const firebaseBackend: CloudBackend = {
   },
   async signOut() {
     await firebaseSignOut(firebase().auth);
+  },
+  async signInWithGoogle() {
+    // A popup, not a redirect: redirects break in Safari when the app and
+    // the auth domain aren't the same site.
+    try {
+      await signInWithPopup(firebase().auth, new GoogleAuthProvider());
+    } catch (e) {
+      throw authMessage(e);
+    }
+  },
+  async resetPassword(email) {
+    try {
+      await sendPasswordResetEmail(firebase().auth, email);
+    } catch (e) {
+      throw authMessage(e);
+    }
   },
   repository(userId, onLateError) {
     return new FirebaseRepository(userId, onLateError);

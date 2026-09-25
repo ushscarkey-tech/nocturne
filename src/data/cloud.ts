@@ -18,6 +18,10 @@ export interface CloudBackend {
   signIn(email: string, password: string): Promise<void>;
   signUp(name: string, email: string, password: string): Promise<"signed-in" | "confirm-email">;
   signOut(): Promise<void>;
+  /** One tap with a Google account, where the backend offers it. */
+  signInWithGoogle?(): Promise<void>;
+  /** Email a link to set a new password. */
+  resetPassword?(email: string): Promise<void>;
   repository(userId: string, onLateError?: (message: string) => void): Repository;
 }
 
@@ -32,6 +36,8 @@ const supabaseConfigured = Boolean(
 );
 
 export const isCloudConfigured = firebaseConfigured || supabaseConfigured;
+/** Which backend is in use, known without loading it. */
+export const cloudKind: CloudBackend["kind"] | null = firebaseConfigured ? "firebase" : supabaseConfigured ? "supabase" : null;
 
 let backend: Promise<CloudBackend> | null = null;
 

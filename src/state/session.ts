@@ -5,7 +5,7 @@ import { createEmptyData, defaultWindows } from "@/core/seed";
 import { detectLocale } from "@/i18n";
 import { COLLECTIONS } from "@/data/repository";
 import { PROFILE_DEFAULTS, type NocturneData } from "@/core/types";
-import { getCloud, isCloudConfigured } from "@/data/cloud";
+import { cloudKind, getCloud, isCloudConfigured } from "@/data/cloud";
 import { LocalRepository } from "@/data/local";
 import { ensureToday } from "./actions";
 import { useStore } from "./store";
@@ -20,7 +20,11 @@ function readMode(): string | null {
   }
 }
 
-function writeMode(mode: "demo" | null) {
+/**
+ * "cloud" once someone has signed in on this browser; anything else means
+ * the data lives here. Accounts are optional: nobody meets a login wall.
+ */
+function writeMode(mode: "cloud" | "demo" | null) {
   try {
     if (mode) window.localStorage.setItem(MODE_KEY, mode);
     else window.localStorage.removeItem(MODE_KEY);
@@ -46,10 +50,11 @@ export function bootstrap(): Promise<BootResult> {
 async function doBootstrap(): Promise<BootResult> {
   const store = useStore.getState();
   try {
-    const useCloud = isCloudConfigured && readMode() !== "demo";
+    const useCloud = isCloudConfigured && readMode() === "cloud";
     if (useCloud) {
       const cloud = await getCloud();
       const user = await cloud.currentUser();
+      // Signed out elsewhere or expired: ask again (with a way to carry on locally).
       if (!user) return "login";
       const repo = cloud.repository(user.id, (message) => useStore.setState({ syncError: message }));
       store.begin("cloud", repo);
@@ -120,16 +125,34 @@ async function localDataFor(userId: string, name: string | null): Promise<Noctur
 
 export async function signIn(email: string, password: string) {
   await (await getCloud()).signIn(email, password);
-  writeMode(null);
+  writeMode("cloud");
   useStore.getState().reset();
 }
 
 export async function signUp(name: string, email: string, password: string): Promise<"signed-in" | "confirm-email"> {
   const result = await (await getCloud()).signUp(name, email, password);
-  writeMode(null);
+  if (result === "signed-in") writeMode("cloud");
   useStore.getState().reset();
   return result;
 }
+
+export async function signInWithGoogle() {
+  const cloud = await getCloud();
+  if (!cloud.signInWithGoogle) throw new Error("auth.errorProviderOff");
+  await cloud.signInWithGoogle();
+  writeMode("cloud");
+  useStore.getState().reset();
+}
+
+export async function resetPassword(email: string) {
+  if (!email.trim()) throw new Error("auth.resetNeedEmail");
+  const cloud = await getCloud();
+  if (!cloud.resetPassword) throw new Error("auth.errorDefault");
+  await cloud.resetPassword(email.trim());
+}
+
+/** Whether this backend offers Google sign-in (known without loading it). */
+export const hasGoogleSignIn = cloudKind === "firebase";
 
 export async function signOut() {
   const { mode } = useStore.getState();

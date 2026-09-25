@@ -22,6 +22,19 @@ const auth = {
   "auth.errorWeakPassword": "Use at least 6 characters.",
   "auth.errorTooMany": "Too many tries. Wait a moment.",
   "auth.errorNetwork": "No connection. Try again when online.",
+  "auth.syncPitch": "Sign in to keep your nights on every device. What's on this one comes with you.",
+  "auth.google": "Continue with Google",
+  "auth.or": "OR WITH EMAIL",
+  "auth.forgot": "Forgot password?",
+  "auth.resetSent": "A link to set a new password is on its way. Check your inbox.",
+  "auth.resetNeedEmail": "Type your email above first.",
+  "auth.later": "Not now",
+  "auth.laterNote": "Everything stays on this device. Sign in any time from Settings; what's here moves into your account.",
+  "auth.cancelled": "Cancelled.",
+  "auth.errorPopupBlocked": "The sign-in window was blocked. Allow pop-ups for this site and try again.",
+  "auth.errorDomain": "This address isn't allowed to sign in yet.",
+  "auth.errorProviderOff": "This way of signing in isn't switched on yet.",
+  "auth.errorOtherMethod": "That email already signs in another way. Try email and password.",
 } as const;
 
 export default auth;

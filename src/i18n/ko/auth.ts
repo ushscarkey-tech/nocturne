@@ -24,6 +24,19 @@ const auth: Partial<Record<keyof typeof source, string>> = {
   "auth.errorWeakPassword": "6자 이상으로 정해 주세요.",
   "auth.errorTooMany": "시도가 너무 많아요. 잠시 후에 다시.",
   "auth.errorNetwork": "연결이 없어요. 온라인일 때 다시 해 주세요.",
+  "auth.syncPitch": "로그인하면 어느 기기에서든 같은 밤을 이어 갈 수 있어요. 이 기기의 기록도 그대로 옮겨져요.",
+  "auth.google": "Google로 계속하기",
+  "auth.or": "또는 이메일로",
+  "auth.forgot": "비밀번호를 잊으셨나요?",
+  "auth.resetSent": "새 비밀번호를 정하는 링크를 보냈어요. 메일함을 확인해 주세요.",
+  "auth.resetNeedEmail": "위에 이메일을 먼저 적어 주세요.",
+  "auth.later": "나중에 하기",
+  "auth.laterNote": "지금 기록은 이 기기에 그대로 남아요. 설정에서 언제든 로그인할 수 있고, 로그인하면 계정으로 옮겨져요.",
+  "auth.cancelled": "취소했어요.",
+  "auth.errorPopupBlocked": "로그인 창이 막혔어요. 이 사이트의 팝업을 허용한 뒤 다시 시도해 주세요.",
+  "auth.errorDomain": "이 주소에서는 아직 로그인할 수 없어요.",
+  "auth.errorProviderOff": "이 로그인 방식이 아직 켜져 있지 않아요.",
+  "auth.errorOtherMethod": "이 이메일은 다른 방식으로 가입돼 있어요. 이메일과 비밀번호로 시도해 주세요.",
 };
 
 export default auth;
