@@ -10,7 +10,7 @@
  * - Focus pattern: when hard work tends to get finished, and when focus fades.
  */
 import { addDays, diffDays, minutesFrom, serviceDate } from "./time";
-import type { NocturneData, StudySession, Task } from "./types";
+import type { Level, NocturneData, StudySession, Task } from "./types";
 
 // ---------------------------------------------------------------------------
 // Similarity
@@ -64,6 +64,46 @@ export function similarityKey(task: Pick<Task, "title" | "lineId">): string | nu
 export function isSimilar(a: Pick<Task, "title" | "lineId">, b: Pick<Task, "title" | "lineId">): boolean {
   const ka = similarityKey(a);
   return ka !== null && ka === similarityKey(b);
+}
+
+// ---------------------------------------------------------------------------
+// How a task feels
+// ---------------------------------------------------------------------------
+
+export const MIN_SIMILAR_FOR_FEEL = 2;
+
+export interface FeelSuggestion {
+  interest: Level;
+  difficulty: Level;
+  importance: Level;
+  samples: number;
+  /** A similar task, to say what the guess is based on. */
+  example: string;
+}
+
+const clampLevel = (n: number) => Math.min(5, Math.max(1, Math.round(n))) as Level;
+
+/**
+ * Interest, difficulty and importance for a new task, taken from how the
+ * traveller rated similar work before (median of each). Null with too few
+ * similar tasks, or when learning is switched off.
+ */
+export function suggestFeel(data: NocturneData, draft: Pick<Task, "title" | "lineId"> & { id?: string }): FeelSuggestion | null {
+  if (!data.profile.learnFromSessions) return null;
+  const key = similarityKey(draft);
+  if (!key) return null;
+  const similar = data.tasks
+    .filter((t) => t.id !== draft.id && !t.recurrence && similarityKey(t) === key)
+    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+    .slice(0, 8);
+  if (similar.length < MIN_SIMILAR_FOR_FEEL) return null;
+  return {
+    interest: clampLevel(median(similar.map((t) => t.interest))),
+    difficulty: clampLevel(median(similar.map((t) => t.difficulty))),
+    importance: clampLevel(median(similar.map((t) => t.importance))),
+    samples: similar.length,
+    example: similar[0].title,
+  };
 }
 
 // ---------------------------------------------------------------------------

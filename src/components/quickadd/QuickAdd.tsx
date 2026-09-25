@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/Button";
 import { InterestSlider, LevelPicker, MinutesInput, Toggle } from "@/components/ui/controls";
 import { Icon } from "@/components/ui/Icon";
 import { Sheet } from "@/components/ui/Sheet";
+import { feelPreset, useFeelStep } from "./FeelSheet";
 import { TaskForm, draftFrom } from "@/components/tasks/TaskForm";
 import { useI18n, type MessageKey } from "@/i18n";
 import { createTask, type TaskDraft } from "@/state/actions";
@@ -68,7 +69,7 @@ export function QuickAddSheet() {
   );
 }
 
-export function QuickAddBody({ initialText, onDone }: { initialText: string; onDone: () => void }) {
+export function QuickAddBody({ initialText, onDone, askFeel = true }: { initialText: string; onDone: () => void; askFeel?: boolean }) {
   const data = useData();
   const { t, fmt } = useI18n();
   const [text, setText] = useState(initialText);
@@ -111,6 +112,8 @@ export function QuickAddBody({ initialText, onDone }: { initialText: string; onD
       ? calibrate(data, { title: v.title, lineId: v.lineId }, v.estimatedMinutes)
       : null;
 
+  const feel = feelPreset(data, { title: v.title, lineId: v.lineId }, { interest: v.interest, difficulty: v.difficulty, importance: v.importance });
+
   function toDraft(): TaskDraft {
     const max = v.maxSessionMinutes ?? 60;
     return {
@@ -118,9 +121,9 @@ export function QuickAddBody({ initialText, onDone }: { initialText: string; onD
       title: v.title.trim() || text.trim(),
       deadline: v.deadline,
       estimatedMinutes: v.estimatedMinutes ?? 0,
-      interest: v.interest ?? 3,
-      difficulty: v.difficulty ?? 3,
-      importance: v.importance ?? 3,
+      interest: feel.interest,
+      difficulty: feel.difficulty,
+      importance: feel.importance,
       recurrence: v.recurrence,
       splittable: v.splittable ?? true,
       maxSessionMinutes: max,
@@ -140,6 +143,8 @@ export function QuickAddBody({ initialText, onDone }: { initialText: string; onD
       tone: "info",
     });
     onDone();
+    // Second step, in its own sheet: how the task feels.
+    if (askFeel) useFeelStep.getState().ask(task, feel);
   }
 
   if (fullForm) {
@@ -149,9 +154,11 @@ export function QuickAddBody({ initialText, onDone }: { initialText: string; onD
         lines={data.lines}
         submitLabel={t("quickadd.confirm")}
         onCancel={() => setFullForm(false)}
+        feel={false}
         onSubmit={(d) => {
-          createTask(d);
+          const task = createTask(d);
           onDone();
+          if (askFeel) useFeelStep.getState().ask(task, feel);
         }}
       />
     );
@@ -211,28 +218,6 @@ export function QuickAddBody({ initialText, onDone }: { initialText: string; onD
           step={15}
           min={0}
         />
-      ),
-    },
-    {
-      field: "interest",
-      label: t("quickadd.interest"),
-      value: interestWord(v.interest),
-      editor: <InterestSlider value={v.interest ?? 3} onChange={(n) => set({ interest: n })} />,
-    },
-    {
-      field: "importance",
-      label: t("quickadd.importance"),
-      value: levelWord(v.importance),
-      editor: (
-        <LevelPicker label={t("quickadd.importance")} value={v.importance ?? 3} onChange={(n) => set({ importance: n })} low={t("quickadd.level.1")} high={t("quickadd.level.5")} />
-      ),
-    },
-    {
-      field: "difficulty",
-      label: t("quickadd.difficulty"),
-      value: levelWord(v.difficulty),
-      editor: (
-        <LevelPicker label={t("quickadd.difficulty")} value={v.difficulty ?? 3} onChange={(n) => set({ difficulty: n })} low={t("quickadd.level.1")} high={t("quickadd.level.5")} />
       ),
     },
     {

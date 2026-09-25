@@ -44,6 +44,13 @@ const quickadd: Partial<Record<keyof typeof source, string>> = {
   "quickadd.keep": "{min} 그대로",
   "quickadd.inUse": "지금",
   "quickadd.revert": "{min}으로 되돌리기",
+  "quickadd.feelTitle": "어떤 일인가요?",
+  "quickadd.feelStep": "2 / 2",
+  "quickadd.feelFromSimilar": "비슷한 일({task}) 기준으로 채워 뒀어요. 다르면 바꿔 주세요.",
+  "quickadd.feelFromText": "적어 주신 말에서 읽었어요.",
+  "quickadd.feelWhy": "밤의 순서를 정할 때 써요. 흐린 날엔 가볍고 끌리는 일부터, 또렷한 날엔 어렵고 중요한 일부터.",
+  "quickadd.save": "저장",
+  "quickadd.skip": "건너뛰기",
 };
 
 export default quickadd;

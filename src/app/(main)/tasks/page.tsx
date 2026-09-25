@@ -1,5 +1,6 @@
 "use client";
 
+import { feelPreset, useFeelStep } from "@/components/quickadd/FeelSheet";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useMemo, useState, type FormEvent } from "react";
 import { recursOn } from "@/core/allocate";
@@ -150,9 +151,11 @@ function TasksView() {
           lines={data.lines}
           submitLabel={t("quickadd.confirm")}
           onCancel={closeForm}
+          feel={false}
           onSubmit={(d) => {
-            createTask(d);
+            const task = createTask(d);
             closeForm();
+            useFeelStep.getState().ask(task, feelPreset(data, d));
           }}
         />
       </Sheet>

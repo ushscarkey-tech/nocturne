@@ -168,7 +168,7 @@ export default function WelcomePage() {
           {step === 4 && (
             <Panel>
               <h1 className="mb-6 font-display text-3xl">{t("onboarding.firstTaskQ")}</h1>
-              <QuickAddBody initialText="" onDone={() => setStep(5)} />
+              <QuickAddBody initialText="" onDone={() => setStep(5)} askFeel={false} />
               <button type="button" onClick={() => setStep(5)} className="mt-4 min-h-11 text-sm text-mist hover:text-paper">
                 {t("onboarding.skip")}
               </button>

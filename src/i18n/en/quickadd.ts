@@ -42,6 +42,13 @@ const quickadd = {
   "quickadd.keep": "Keep {min}",
   "quickadd.inUse": "Now",
   "quickadd.revert": "Back to {min}",
+  "quickadd.feelTitle": "What kind of task is it?",
+  "quickadd.feelStep": "2 / 2",
+  "quickadd.feelFromSimilar": "Filled in from similar work ({task}). Change anything that's off.",
+  "quickadd.feelFromText": "Taken from what you wrote.",
+  "quickadd.feelWhy": "Nocturne uses these to order the night: light, appealing work when focus is low; hard, important work when you're sharp.",
+  "quickadd.save": "Save",
+  "quickadd.skip": "Skip",
 } as const;
 
 export default quickadd;

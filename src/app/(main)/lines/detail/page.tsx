@@ -1,5 +1,6 @@
 "use client";
 
+import { feelPreset, useFeelStep } from "@/components/quickadd/FeelSheet";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
@@ -154,9 +155,11 @@ function LineDetail() {
           lines={data.lines}
           submitLabel={t("lines.newTask")}
           onCancel={() => setSheet(null)}
+          feel={false}
           onSubmit={(d) => {
-            createTask(d);
+            const task = createTask(d);
             setSheet(null);
+            useFeelStep.getState().ask(task, feelPreset(data, d));
           }}
         />
       </Sheet>

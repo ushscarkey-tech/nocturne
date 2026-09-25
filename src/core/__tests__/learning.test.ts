@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { calibrate, focusProfile, isSimilar, schedulingProfile, similarityKey } from "../learning";
+import { calibrate, focusProfile, isSimilar, schedulingProfile, similarityKey, suggestFeel } from "../learning";
 import { planToday } from "../planner";
 import { createEmptyData } from "../seed";
 import { routeOf } from "../sessions";
@@ -167,5 +167,31 @@ describe("focus pattern", () => {
     // With the switch off the planner is exactly the general one.
     const general = routeOf(planToday({ ...withHistory, userId: "u" }, { now, focus: "steady", mode: "reoptimize", reason: "optimize" }).sessions, TODAY);
     expect(off.map((s) => s.taskId)).toEqual(general.map((s) => s.taskId));
+  });
+});
+
+describe("how a new task feels", () => {
+  it("fills interest, difficulty and importance from similar tasks", () => {
+    const d = data(
+      [
+        task({ title: "수학 문제집 1단원", interest: 2, difficulty: 4, importance: 4 }),
+        task({ title: "Math problem set 2", interest: 2, difficulty: 5, importance: 4 }),
+        task({ title: "영어 에세이", interest: 5, difficulty: 2, importance: 2 }),
+      ],
+      [],
+    );
+    const s = suggestFeel(d, { title: "수학 문제풀이 3단원", lineId: null })!;
+    expect(s).not.toBeNull();
+    expect(s.interest).toBe(2);
+    expect(s.difficulty).toBeGreaterThanOrEqual(4);
+    expect(s.importance).toBe(4);
+    expect(s.samples).toBe(2);
+  });
+
+  it("does not guess from one similar task, or when learning is off", () => {
+    const one = data([task({ title: "수학 문제집 1단원", interest: 2 })], []);
+    expect(suggestFeel(one, { title: "수학 문제풀이", lineId: null })).toBeNull();
+    const off = data([task({ title: "수학 문제집 1" }), task({ title: "수학 문제집 2" })], [], { learnFromSessions: false });
+    expect(suggestFeel(off, { title: "수학 문제풀이", lineId: null })).toBeNull();
   });
 });

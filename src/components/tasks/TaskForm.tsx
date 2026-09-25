@@ -39,6 +39,7 @@ export function TaskForm({
   onSubmit,
   onCancel,
   focusField,
+  feel = true,
 }: {
   initial: TaskDraft;
   lines: Line[];
@@ -46,6 +47,8 @@ export function TaskForm({
   onSubmit: (d: TaskDraft) => void;
   onCancel?: () => void;
   focusField?: "deadline" | "estimate" | null;
+  /** Interest, difficulty and importance; new tasks ask for them in a second step. */
+  feel?: boolean;
 }) {
   const { t, fmt } = useI18n();
   const [d, setD] = useState<TaskDraft>(initial);
@@ -155,7 +158,7 @@ export function TaskForm({
         {d.estimatedMinutes === 0 && <p className="mt-1 text-xs text-haze">{t("tasks.withoutEstimate")}</p>}
       </div>
 
-      <InterestSlider value={d.interest} onChange={(v) => set("interest", v)} />
+      {feel && <InterestSlider value={d.interest} onChange={(v) => set("interest", v)} />}
 
       <div className="border-t border-rule-soft pt-2">
         <button
@@ -171,8 +174,12 @@ export function TaskForm({
         </button>
         {showMore && (
           <div className="animate-rise space-y-7 pb-2 pt-3">
-            <LevelPicker label={t("tasks.difficulty")} value={d.difficulty} onChange={(v: Level) => set("difficulty", v)} low={t("tasks.light")} high={t("tasks.demanding")} />
-            <LevelPicker label={t("tasks.importance")} value={d.importance} onChange={(v: Level) => set("importance", v)} low={t("tasks.niceToDo")} high={t("tasks.essential")} />
+            {feel && (
+              <>
+                <LevelPicker label={t("tasks.difficulty")} value={d.difficulty} onChange={(v: Level) => set("difficulty", v)} low={t("tasks.light")} high={t("tasks.demanding")} />
+                <LevelPicker label={t("tasks.importance")} value={d.importance} onChange={(v: Level) => set("importance", v)} low={t("tasks.niceToDo")} high={t("tasks.essential")} />
+              </>
+            )}
 
             <div>
               <Toggle
