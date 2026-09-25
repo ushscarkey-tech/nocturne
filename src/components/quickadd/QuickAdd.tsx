@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import { create } from "zustand";
+import { useSettledFocus } from "@/lib/hooks";
 import { calibrate } from "@/core/learning";
 import { parseQuickAdd, type ParsedTask, type QuickField } from "@/core/quickadd";
 import { addDays, serviceDate } from "@/core/time";
@@ -79,9 +80,7 @@ export function QuickAddBody({ initialText, onDone }: { initialText: string; onD
   const today = serviceDate(new Date());
   const activeLines = data.lines;
 
-  useEffect(() => {
-    inputRef.current?.focus();
-  }, []);
+  useSettledFocus(inputRef);
 
   const parsed: ParsedTask | null = useMemo(
     () => (text.trim() ? parseQuickAdd(text, new Date(), activeLines) : null),

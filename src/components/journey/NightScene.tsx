@@ -253,25 +253,31 @@ function roundRectPath(p: Path2D, x: number, y: number, w: number, h: number, r:
   p.closePath();
 }
 
-/** The carriage reflected in the glass: seat backs across the lower half, the opposite window. */
+/**
+ * The carriage reflected in the glass. You sit beside the window, so what
+ * the glass catches are the seat rows across the aisle, side-on: tall
+ * backrests with their white headrest covers, and the opposite window.
+ */
 function reflectionPaths(w: number, h: number) {
   const seats = new Path2D();
   const rests = new Path2D();
-  const n = w < 700 ? 3 : 5;
+  const n = w < 700 ? 2 : 4;
   const pitch = w / n;
-  const top = h * 0.6;
+  const top = h * 0.5;
   for (let i = 0; i < n; i++) {
-    const x = i * pitch + pitch * 0.1;
-    const sw = pitch * 0.8;
-    const r = Math.min(20, sw * 0.12);
+    const x = i * pitch + pitch * 0.18;
+    const bw = Math.min(90, pitch * 0.32);
+    // Backrest leaning back a little, then the seat cushion toward the aisle.
     seats.moveTo(x, h);
-    seats.lineTo(x, top + r);
-    seats.quadraticCurveTo(x, top, x + r, top);
-    seats.lineTo(x + sw - r, top);
-    seats.quadraticCurveTo(x + sw, top, x + sw, top + r);
-    seats.lineTo(x + sw, h);
+    seats.lineTo(x + bw * 0.18, top + 18);
+    seats.quadraticCurveTo(x + bw * 0.24, top, x + bw * 0.5, top);
+    seats.quadraticCurveTo(x + bw * 0.8, top, x + bw * 0.82, top + 18);
+    seats.lineTo(x + bw, h * 0.8);
+    seats.lineTo(x + bw * 2.1, h * 0.8);
+    seats.quadraticCurveTo(x + bw * 2.2, h * 0.8, x + bw * 2.2, h * 0.84);
+    seats.lineTo(x + bw * 2.2, h);
     seats.closePath();
-    roundRectPath(rests, x + sw * 0.32, top + 5, sw * 0.36, h * 0.03, 4);
+    roundRectPath(rests, x + bw * 0.22, top + 4, bw * 0.58, h * 0.06, 6);
   }
   const frame = new Path2D();
   roundRectPath(frame, w * 0.06, h * 0.21, w * 0.88, h * 0.39, 18);
@@ -1312,18 +1318,45 @@ export function NightScene({
       <canvas ref={canvasRef} className="absolute inset-0 h-full w-full" />
       {/* A soft scrim keeps the centre readable. */}
       <div className="absolute inset-0 bg-[radial-gradient(62%_40%_at_50%_46%,rgba(4,6,10,0.62),transparent_78%)]" />
-      {/* Old green seat backs at the bottom of the frame. */}
-      <svg className="absolute inset-x-0 bottom-0 h-[13vh] w-full" viewBox="0 0 400 100" preserveAspectRatio="none">
+      {/* A pleated curtain tied back at the window's edge. */}
+      <div className="absolute inset-y-0 left-0 w-[5vw] min-w-5 max-w-11 bg-[repeating-linear-gradient(90deg,#141c18_0px,#1d2922_5px,#101612_9px)] opacity-90 shadow-[6px_0_18px_rgba(0,0,0,0.6)]">
+        <div className="absolute inset-x-0 top-[44%] h-2 bg-[#2a2620] shadow-[0_1px_0_rgba(236,214,166,0.12)]" />
+      </div>
+      {/* The seat in front of yours, side-on: worn green moquette, a white headrest cover. */}
+      <svg className="absolute bottom-0 right-0 h-[46vh] w-[10vw] min-w-11 max-w-28 drop-shadow-[-10px_0_18px_rgba(0,0,0,0.55)]" viewBox="0 0 100 400" preserveAspectRatio="none">
         <defs>
-          <linearGradient id="seat" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" stopColor="#2b3a32" />
-            <stop offset="1" stopColor="#0c120f" />
+          <linearGradient id="seat-side" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0" stopColor="#111814" />
+            <stop offset="0.35" stopColor="#1a251f" />
+            <stop offset="1" stopColor="#0b100d" />
+          </linearGradient>
+          <pattern id="moquette" width="4" height="4" patternUnits="userSpaceOnUse">
+            <rect width="4" height="4" fill="transparent" />
+            <circle cx="1" cy="1" r="0.55" fill="rgba(236,214,166,0.035)" />
+            <circle cx="3" cy="3" r="0.55" fill="rgba(0,0,0,0.25)" />
+          </pattern>
+        </defs>
+        <path d="M34 400 L22 70 Q20 22 52 16 L100 12 L100 400 Z" fill="url(#seat-side)" />
+        <path d="M34 400 L22 70 Q20 22 52 16 L100 12 L100 400 Z" fill="url(#moquette)" />
+        <path d="M22 70 Q20 22 52 16 L100 12" fill="none" stroke="rgba(236,214,166,0.09)" strokeWidth="1.2" />
+        {/* Headrest cover. */}
+        <path d="M24 64 Q22 26 52 20 L100 16 L100 78 Q60 84 24 64 Z" fill="#d9d2c1" opacity="0.1" />
+        {/* The armrest end. */}
+        <rect x="8" y="300" width="40" height="10" rx="4" fill="#0f1411" />
+      </svg>
+      {/* Window sill and the wall below it, catching the cabin light; a fold-down table. */}
+      <svg className="absolute inset-x-0 bottom-0 h-[9vh] w-full" viewBox="0 0 400 100" preserveAspectRatio="none">
+        <defs>
+          <linearGradient id="wall" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor="#23282a" />
+            <stop offset="1" stopColor="#0d1012" />
           </linearGradient>
         </defs>
-        <path d="M-10 100 V38 Q-10 18 14 16 H150 Q176 18 176 40 V100 Z" fill="url(#seat)" opacity="0.85" />
-        <path d="M224 100 V40 Q224 18 250 16 H386 Q410 18 410 38 V100 Z" fill="url(#seat)" opacity="0.85" />
-        <path d="M14 17 H150" stroke="rgba(236,214,166,0.12)" strokeWidth="1" />
-        <path d="M250 17 H386" stroke="rgba(236,214,166,0.12)" strokeWidth="1" />
+        <rect y="8" width="400" height="92" fill="url(#wall)" />
+        <rect width="400" height="10" fill="#2c3133" />
+        <path d="M0 0.8 H400" stroke="rgba(236,214,166,0.18)" strokeWidth="1.2" />
+        <path d="M150 10 H250 L244 22 H156 Z" fill="#171b1d" />
+        <path d="M150 10.6 H250" stroke="rgba(236,214,166,0.1)" strokeWidth="1" />
       </svg>
       {/* Window frame. */}
       <div className="absolute inset-2 rounded-[2rem] border border-white/[0.035] shadow-[inset_0_0_140px_50px_rgba(2,3,6,0.9)] sm:inset-5" />

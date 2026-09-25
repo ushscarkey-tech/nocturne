@@ -62,7 +62,7 @@ export function FinalStation({ data, journey, now, arriving = false }: { data: N
           />
         </div>
         <div className="animate-scene-in" style={delay(700)}>
-          <div className="mt-3 rounded-[0.4rem] border border-black/60 bg-[#0b0f13]/92 px-5 py-4 backdrop-blur">
+          <div className="mt-3 rounded-[0.4rem] border border-black/60 bg-[#0b0f13]/95 px-5 py-4">
             <div className="flex items-end justify-between">
               <p className="font-mono text-[0.625rem] tracking-[0.22em] text-haze">{t("scene.arrived")}</p>
               <p className="font-mono text-[2.6rem] font-extralight leading-none tabular text-[#e8c88f]">
@@ -254,7 +254,7 @@ function JourneyTicketPrinter({ data, journey, onClose }: { data: NocturneData; 
   };
 
   return (
-    <div className="fixed inset-0 z-40 flex flex-col items-center bg-night-950/75 px-6 pt-[max(1rem,env(safe-area-inset-top))] backdrop-blur-[3px] animate-fade" role="dialog" aria-label={t("scene.journeyRecord")}>
+    <div className="fixed inset-0 z-40 flex flex-col items-center bg-night-950/85 px-6 pt-[max(1rem,env(safe-area-inset-top))] animate-fade" role="dialog" aria-label={t("scene.journeyRecord")}>
       <div className="flex w-full max-w-md justify-end">
         <button type="button" onClick={onClose} className={`rounded-full p-2 text-mist hover:text-paper ${stage === "printing" || stage === "opening" ? "invisible" : ""}`} aria-label={t("shell.close")}>
           <Icon name="close" size={18} />
@@ -279,7 +279,7 @@ function JourneyTicketPrinter({ data, journey, onClose }: { data: NocturneData; 
 
       <div className="relative w-full max-w-[21rem] flex-1 overflow-hidden">
         <div
-          className={`mx-auto w-fit touch-none select-none ${stage === "printing" ? "motion-safe-only animate-jitter" : ""}`}
+          className="mx-auto w-fit touch-none select-none will-change-transform"
           style={{
             transform:
               stage === "keeping"
@@ -300,7 +300,9 @@ function JourneyTicketPrinter({ data, journey, onClose }: { data: NocturneData; 
           onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && keep()}
           {...pointer}
         >
-          <Ticket face={face} style={journey.selectedCarriage} size="lg" printed={out ? undefined : printed} />
+          <div className={stage === "printing" ? "motion-safe-only animate-jitter" : ""}>
+            <Ticket face={face} style={journey.selectedCarriage} size="lg" printed={out ? undefined : printed} />
+          </div>
         </div>
       </div>
 

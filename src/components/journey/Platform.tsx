@@ -93,7 +93,7 @@ export function StationSign({
 /** Dark departure board with amber figures. */
 function Board({ children }: { children: ReactNode }) {
   return (
-    <div className="mt-3 rounded-[0.4rem] border border-black/60 bg-[#0b0f13]/92 px-5 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] backdrop-blur">
+    <div className="mt-3 rounded-[0.4rem] border border-black/60 bg-[#0b0f13]/95 px-5 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
       {children}
     </div>
   );
@@ -210,7 +210,7 @@ export function StationStop({ data, journey, now, arriving = false }: { data: No
         <Button variant="primary" size="lg" className="flex-1" onClick={() => depart()}>
           {overdue ? t("scene.depart") : closed ? t("scene.departEarly") : t("journey.departNow")}
         </Button>
-        <Button variant="secondary" size="lg" className="bg-night-950/40 backdrop-blur" onClick={() => extendStop(5)}>
+        <Button variant="secondary" size="lg" className="bg-night-950/70" onClick={() => extendStop(5)}>
           {t("scene.stayMore", { min: 5 })}
         </Button>
       </div>

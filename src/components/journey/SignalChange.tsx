@@ -50,7 +50,7 @@ export function SignalChange() {
         className="pointer-events-auto flex max-w-sm flex-col items-center text-center"
         onClick={dismiss}
       >
-        <p className="flex items-center gap-2 rounded-full border border-lamp/25 bg-night-950/60 px-3 py-1 font-mono text-[0.625rem] tracking-[0.3em] text-lamp/90 backdrop-blur animate-fade">
+        <p className="flex items-center gap-2 rounded-full border border-lamp/25 bg-night-950/85 px-3 py-1 font-mono text-[0.625rem] tracking-[0.3em] text-lamp/90 animate-fade">
           <span className="h-1.5 w-1.5 rounded-full bg-lamp motion-safe-only animate-[led_900ms_steps(1)_3]" aria-hidden />
           {stage.step === "signal" ? t("scene.signalChange") : t("scene.routeAdjusted").toUpperCase()}
         </p>

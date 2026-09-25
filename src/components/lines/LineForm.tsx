@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent } from "react";
+import { useSettledFocus } from "@/lib/hooks";
 import { serviceDate } from "@/core/time";
 import type { Line } from "@/core/types";
 import { Button } from "@/components/ui/Button";
@@ -25,6 +26,8 @@ export function LineForm({
   const [description, setDescription] = useState(initial?.description ?? "");
   const [targetDate, setTargetDate] = useState(initial?.targetDate ?? "");
   const [error, setError] = useState<string | null>(null);
+  const titleRef = useRef<HTMLInputElement>(null);
+  useSettledFocus(titleRef);
 
   function submit(e: FormEvent) {
     e.preventDefault();
@@ -38,7 +41,7 @@ export function LineForm({
   return (
     <form onSubmit={submit} className="space-y-7" noValidate>
       <Field label={t("lines.lineName")}>
-        <input className="field text-lg" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Biology Midterm" autoFocus />
+        <input className="field text-lg" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Biology Midterm" ref={titleRef} />
       </Field>
       <Field label={t("lines.targetDate")} hint={t("lines.targetDateHint")}>
         <input type="date" className="field font-mono" value={targetDate} min={serviceDate(new Date())} onChange={(e) => setTargetDate(e.target.value)} />

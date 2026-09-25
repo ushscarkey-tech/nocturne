@@ -176,17 +176,17 @@ export function Cabin({
                   <Icon name="play" size={14} /> {t("common.continue")}
                 </Button>
               ) : (
-                <Button variant="secondary" size="sm" className="h-11 whitespace-nowrap bg-night-950/40 backdrop-blur" onClick={() => { pause(); reveal(); }} tabIndex={showControls ? 0 : -1}>
+                <Button variant="secondary" size="sm" className="h-11 whitespace-nowrap bg-night-950/70" onClick={() => { pause(); reveal(); }} tabIndex={showControls ? 0 : -1}>
                   <Icon name="pause" size={14} /> {t("journey.pauseButton")}
                 </Button>
               )}
-              <Button variant="secondary" size="sm" className="h-11 whitespace-nowrap bg-night-950/40 backdrop-blur" onClick={() => setSheet("early")} tabIndex={showControls ? 0 : -1}>
+              <Button variant="secondary" size="sm" className="h-11 whitespace-nowrap bg-night-950/70" onClick={() => setSheet("early")} tabIndex={showControls ? 0 : -1}>
                 {t("journey.finishEarlyButton")}
               </Button>
-              <Button variant="secondary" size="sm" className="h-11 whitespace-nowrap bg-night-950/40 backdrop-blur" onClick={() => setSheet("more")} tabIndex={showControls ? 0 : -1}>
+              <Button variant="secondary" size="sm" className="h-11 whitespace-nowrap bg-night-950/70" onClick={() => setSheet("more")} tabIndex={showControls ? 0 : -1}>
                 {t("journey.moreTimeButton")}
               </Button>
-              <Button variant="secondary" size="sm" className="h-11 whitespace-nowrap bg-night-950/40 backdrop-blur" onClick={() => lowFocus()} tabIndex={showControls ? 0 : -1}>
+              <Button variant="secondary" size="sm" className="h-11 whitespace-nowrap bg-night-950/70" onClick={() => lowFocus()} tabIndex={showControls ? 0 : -1}>
                 {t("journey.lowFocusButton")}
               </Button>
             </div>

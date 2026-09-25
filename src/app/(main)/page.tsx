@@ -17,6 +17,7 @@ import { PlatformClock } from "@/components/scene/PlatformClock";
 import { PlatformScene } from "@/components/scene/PlatformScene";
 import { RouteStrip } from "@/components/scene/RouteStrip";
 import { ConflictNotice } from "@/components/tonight/ConflictNotice";
+import { StationName, useGlossary, useStationHint } from "@/components/help/Glossary";
 import { useNow } from "@/lib/hooks";
 import { taskHref, ticketHref } from "@/lib/paths";
 import { routeItems, routeSummary } from "@/lib/route-view";
@@ -42,6 +43,7 @@ export default function TonightPage() {
   const windows = availabilityForDate(data.windows, today);
   const { conflict } = useConflict(data, now);
   const [panel, setPanel] = useState<Panel>(null);
+  const [showHint, dismissHint] = useStationHint();
   const ticket = journey ? data.tickets.find((x) => x.journeyId === journey.id) : undefined;
   const tasksById = new Map(data.tasks.map((task) => [task.id, task]));
 
@@ -63,12 +65,12 @@ export default function TonightPage() {
   const fraction = active ? Math.min(1, elapsedSeconds(active, now) / Math.max(1, active.plannedMinutes * 60)) : 0;
 
   return (
-    <div className="relative flex h-full flex-col animate-fade">
+    <div className="relative flex h-full flex-col">
       {/* An empty platform at night. */}
       <PlatformScene className="absolute inset-0 -z-10" fade={false} stationName={next?.stationName ?? "NOCTURNE"} />
       <div className="pointer-events-none absolute inset-0 -z-10 bg-[linear-gradient(180deg,rgba(4,6,10,0.72)_0%,rgba(4,6,10,0.05)_22%,rgba(4,6,10,0)_40%,rgba(4,6,10,0.78)_70%,rgba(4,6,10,0.96)_100%)]" />
 
-      <header className="flex items-center justify-between px-6 pt-[max(1.25rem,env(safe-area-inset-top))] md:px-10 md:pt-8">
+      <header className="flex animate-enter items-center justify-between px-6 pt-[max(1.25rem,env(safe-area-inset-top))] md:px-10 md:pt-8" style={{ animationDelay: "150ms" }}>
         <p className="font-mono text-[0.6875rem] tracking-[0.4em] text-paper-dim">NOCTURNE</p>
         <div className="-mr-2 flex items-center gap-1">
           <PlatformClock now={now} size={26} className="mr-2 opacity-80" />
@@ -82,7 +84,7 @@ export default function TonightPage() {
           </button>
         </div>
       </header>
-      <div className="mt-3 flex items-baseline justify-between gap-4 px-6 md:px-10">
+      <div className="mt-3 flex animate-enter items-baseline justify-between gap-4 px-6 md:px-10" style={{ animationDelay: "350ms" }}>
         <p className="eyebrow text-paper-dim/80">{fmt.longDate(today)}</p>
         {windows.length > 0 && (
           <p className="truncate font-mono text-[0.6875rem] tabular text-mist" aria-label={t("tonight.serviceLabel")}>
@@ -101,7 +103,7 @@ export default function TonightPage() {
 
       <section aria-label={t("tonight.next")} className="w-full px-6 pb-[calc(5.75rem+env(safe-area-inset-bottom))] md:max-w-2xl md:px-10">
         {riding && active && nextTask ? (
-          <>
+          <div className="animate-enter" style={{ animationDelay: "700ms" }}>
             <p className="eyebrow text-lamp/90">
               {t("scene.onBoardNow")} · {active.stationName}
             </p>
@@ -110,7 +112,7 @@ export default function TonightPage() {
               {t("tonight.left", { min: remainingSeconds(active, now) / 60 })}
               {summary.arrival && <> · {t("tonight.finalArrival", { at: clock(summary.arrival) })}</>}
             </p>
-          </>
+          </div>
         ) : riding ? (
           <>
             <p className="eyebrow text-lamp/90">{t("scene.onBoardNow")}</p>
@@ -123,11 +125,11 @@ export default function TonightPage() {
           </>
         ) : summary.next && nextTask ? (
           <>
-            <p className="eyebrow">{t("scene.departure")}</p>
-            <p className="mt-1 font-mono text-[clamp(4.25rem,21vw,6.5rem)] font-extralight leading-none tracking-tight text-lamp tabular">
+            <p className="eyebrow animate-enter" style={{ animationDelay: "700ms" }}>{t("scene.departure")}</p>
+            <p className="mt-1 animate-enter font-mono text-[clamp(4.25rem,21vw,6.5rem)] font-extralight leading-none tracking-tight text-lamp tabular" style={{ animationDelay: "900ms" }}>
               <FlipText text={departsNow ? t("tonight.now") : clock(departsAt!)} />
             </p>
-            <p className="mt-4 font-mono text-sm tabular text-paper-dim">
+            <p className="mt-4 animate-enter font-mono text-sm tabular text-paper-dim" style={{ animationDelay: "1150ms" }}>
               {t("scene.stopsSummary", { n: summary.remaining, min: fmt.duration(summary.plannedMinutes) })}
               {summary.arrival && (
                 <>
@@ -136,11 +138,24 @@ export default function TonightPage() {
                 </>
               )}
             </p>
-            <p className="mt-1.5 truncate text-sm text-mist">
-              <span className="font-mono text-[0.6875rem] tracking-[0.14em] text-haze">{summary.next.stationName}</span>
+            <p className="mt-1.5 animate-enter truncate text-sm text-mist" style={{ animationDelay: "1300ms" }}>
+              <StationName name={summary.next.stationName} className="font-mono text-[0.6875rem] tracking-[0.14em] text-haze" />
               <span className="px-2 text-haze">·</span>
               <span className="text-paper-dim">{nextTask.title}</span>
             </p>
+            {showHint && (
+              <div className="mt-3 max-w-md animate-enter border-l border-lamp/40 pl-3 text-xs leading-relaxed text-mist" style={{ animationDelay: "2300ms" }}>
+                <p>{t("scene.stationHint", { station: summary.next.stationName })}</p>
+                <p className="mt-1.5 flex gap-4">
+                  <button type="button" className="min-h-8 text-paper-dim underline decoration-rule underline-offset-4 hover:text-paper" onClick={() => useGlossary.getState().show("station")}>
+                    {t("scene.seeTerms")}
+                  </button>
+                  <button type="button" className="min-h-8 text-haze hover:text-mist" onClick={dismissHint}>
+                    {t("scene.gotIt")}
+                  </button>
+                </p>
+              </div>
+            )}
           </>
         ) : (
           <EmptyState
@@ -152,7 +167,7 @@ export default function TonightPage() {
         )}
 
         {(conflict || overdue.length > 0 || waiting.length > 0) && (
-          <div className="mt-5 flex flex-wrap gap-2">
+          <div className="mt-5 flex animate-enter flex-wrap gap-2" style={{ animationDelay: "1450ms" }}>
             {conflict && (
               <Chip tone="signal" onClick={() => setPanel("conflict")}>
                 {t("scene.conflict")}
@@ -167,7 +182,7 @@ export default function TonightPage() {
           <button
             type="button"
             onClick={() => setPanel("route")}
-            className="group mt-6 block w-full py-2 text-left"
+            className="group mt-6 block w-full animate-enter py-2 text-left" style={{ animationDelay: "1550ms" }}
             aria-label={t("scene.openRoute")}
           >
             <RouteStrip route={route} activeId={active?.id} fraction={fraction} label={t("tonight.route")} />
@@ -181,7 +196,7 @@ export default function TonightPage() {
           </button>
         )}
 
-        <div className="mt-5">
+        <div className="mt-5 animate-enter" style={{ animationDelay: "1750ms" }}>
           {riding ? (
             <ButtonLink href="/journey" variant="primary" size="lg" className="w-full">
               {t("scene.returnToTrain")}
@@ -243,7 +258,7 @@ function Chip({ children, onClick, tone = "lamp" }: { children: ReactNode; onCli
     <button
       type="button"
       onClick={onClick}
-      className={`inline-flex min-h-9 items-center gap-2 rounded-full border bg-night-900/50 px-3.5 text-xs backdrop-blur transition-colors ${
+      className={`inline-flex min-h-9 items-center gap-2 rounded-full border bg-night-900/75 px-3.5 text-xs transition-colors ${
         tone === "signal" ? "border-signal/40 text-signal hover:border-signal/70" : "border-lamp/30 text-lamp/90 hover:border-lamp/60"
       }`}
     >

@@ -80,3 +80,17 @@ export function useFlip(ref: React.RefObject<HTMLElement | null>, signature: str
     positions.current = next;
   }, [ref, signature, disabled]);
 }
+
+/**
+ * Focus a field only once its sheet or step has settled. On phones the
+ * keyboard rising mid-animation breaks the scene, so it waits for the
+ * slide to finish; with a mouse it can come a little sooner.
+ */
+export function useSettledFocus(ref: React.RefObject<HTMLElement | null>, enabled = true, delayMs = 650) {
+  useEffect(() => {
+    if (!enabled) return;
+    const touch = window.matchMedia("(pointer: coarse)").matches;
+    const timer = setTimeout(() => ref.current?.focus({ preventScroll: true }), touch ? delayMs : Math.min(delayMs, 300));
+    return () => clearTimeout(timer);
+  }, [ref, enabled, delayMs]);
+}

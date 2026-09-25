@@ -4,6 +4,7 @@ import { NoticeToast } from "@/components/shell/NoticeToast";
 import { SyncStatus } from "@/components/shell/SyncStatus";
 import { TabBar } from "@/components/shell/TabBar";
 import { QuickAddButton, QuickAddSheet } from "@/components/quickadd/QuickAdd";
+import { GlossarySheet } from "@/components/help/Glossary";
 
 export default function MainLayout({ children }: LayoutProps<"/">) {
   return (
@@ -14,6 +15,7 @@ export default function MainLayout({ children }: LayoutProps<"/">) {
       <QuickAddSheet />
       <SyncStatus />
       <NoticeToast />
+      <GlossarySheet />
     </DataGate>
   );
 }

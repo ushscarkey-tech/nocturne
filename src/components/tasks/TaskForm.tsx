@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent } from "react";
+import { useSettledFocus } from "@/lib/hooks";
 import { addDays, dayOfWeek, serviceDate } from "@/core/time";
 import type { Level, Line, Recurrence, Task } from "@/core/types";
 import type { TaskDraft } from "@/state/actions";
@@ -52,6 +53,10 @@ export function TaskForm({
     initial.recurrence !== null || initial.lineId !== null || initial.description.length > 0,
   );
   const [error, setError] = useState<string | null>(null);
+  const titleRef = useRef<HTMLInputElement>(null);
+  const deadlineRef = useRef<HTMLInputElement>(null);
+  useSettledFocus(titleRef, !focusField);
+  useSettledFocus(deadlineRef, focusField === "deadline");
   const today = serviceDate(new Date());
   const set = <K extends keyof TaskDraft>(k: K, v: TaskDraft[K]) => setD((prev) => ({ ...prev, [k]: v }));
 
@@ -91,7 +96,7 @@ export function TaskForm({
           value={d.title}
           onChange={(e) => set("title", e.target.value)}
           placeholder={t("tasks.taskPlaceholder")}
-          autoFocus={!focusField}
+          ref={titleRef}
           aria-invalid={!!error && !d.title.trim()}
         />
       </Field>
@@ -123,7 +128,7 @@ export function TaskForm({
           min={today}
           onChange={(e) => set("deadline", e.target.value || null)}
           aria-label={t("tasks.deadline")}
-          autoFocus={focusField === "deadline"}
+          ref={deadlineRef}
         />
         {d.deadline && <p className="mt-1 text-xs text-haze">{t("tasks.lastDay", { date: fmt.shortDate(d.deadline) })}</p>}
       </div>

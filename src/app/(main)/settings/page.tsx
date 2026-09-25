@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/Button";
 import { Field, Toggle } from "@/components/ui/controls";
 import { Icon } from "@/components/ui/Icon";
 import { Sheet } from "@/components/ui/Sheet";
+import { useGlossary } from "@/components/help/Glossary";
 import { LOCALES, rememberLocale, useI18n, type MessageKey } from "@/i18n";
 import { notificationsEnabled, notificationsSupported, requestNotifications } from "@/lib/notify";
 import { loadSampleData, updateProfile } from "@/state/actions";
@@ -188,6 +189,13 @@ export default function SettingsPage() {
           className="mt-6 min-h-11 text-sm text-mist underline decoration-rule underline-offset-4 hover:text-paper"
         >
           {t("settings.guide")}
+        </button>
+        <button
+          type="button"
+          onClick={() => useGlossary.getState().show()}
+          className="ml-6 mt-6 min-h-11 text-sm text-mist underline decoration-rule underline-offset-4 hover:text-paper"
+        >
+          {t("scene.glossary")}
         </button>
       </section>
 
