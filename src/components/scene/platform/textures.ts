@@ -197,7 +197,12 @@ export function vendingFace(body: string, seed: number) {
         const x = 24 + col * 31;
         g.fillStyle = colors[Math.floor(rnd() * colors.length)];
         g.beginPath();
-        g.roundRect(x, y + 14, 20, 52, 5);
+        // A rounded bottle (arcTo, since older Safari has no roundRect).
+        g.moveTo(x + 5, y + 14);
+        g.arcTo(x + 20, y + 14, x + 20, y + 66, 5);
+        g.arcTo(x + 20, y + 66, x, y + 66, 5);
+        g.arcTo(x, y + 66, x, y + 14, 5);
+        g.arcTo(x, y + 14, x + 20, y + 14, 5);
         g.fill();
         g.fillStyle = "rgba(255,255,255,0.35)";
         g.fillRect(x + 4, y + 18, 3, 42);
