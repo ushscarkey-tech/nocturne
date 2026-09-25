@@ -24,7 +24,7 @@ export function NoticeToast({ placement = "tabs" }: { placement?: "tabs" | "imme
     <div
       aria-live="polite"
       className={`pointer-events-none fixed inset-x-0 z-40 flex justify-center px-4 ${
-        placement === "tabs" ? "bottom-[calc(5.5rem+env(safe-area-inset-bottom))] md:bottom-8 md:left-56" : "top-[max(3.5rem,calc(env(safe-area-inset-top)+3rem))]"
+        placement === "tabs" ? "bottom-[calc(5.75rem+env(safe-area-inset-bottom))]" : "top-[max(3.5rem,calc(env(safe-area-inset-top)+3rem))]"
       }`}
     >
       {notice && (

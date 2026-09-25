@@ -36,7 +36,7 @@ export function QuickAddButton() {
       type="button"
       onClick={() => show()}
       aria-label={t("quickadd.open")}
-      className="fixed bottom-[calc(5.25rem+env(safe-area-inset-bottom))] right-5 z-30 flex h-13 w-13 items-center justify-center rounded-full border border-rule bg-night-850/90 text-paper shadow-[0_12px_30px_-12px_rgba(0,0,0,0.9)] backdrop-blur transition-colors duration-500 hover:border-lamp/50 md:bottom-8 md:right-8"
+      className="fixed bottom-[calc(5.25rem+env(safe-area-inset-bottom))] right-5 z-30 flex h-13 w-13 items-center justify-center rounded-full border border-rule bg-night-850/90 text-paper shadow-[0_12px_30px_-12px_rgba(0,0,0,0.9)] backdrop-blur transition-colors duration-500 hover:border-lamp/50 md:right-8"
     >
       <Icon name="plus" size={20} />
     </button>

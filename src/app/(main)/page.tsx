@@ -69,7 +69,7 @@ export default function TonightPage() {
       <div className="pointer-events-none absolute inset-0 -z-10 bg-[linear-gradient(180deg,rgba(4,6,10,0.72)_0%,rgba(4,6,10,0.05)_22%,rgba(4,6,10,0)_40%,rgba(4,6,10,0.78)_70%,rgba(4,6,10,0.96)_100%)]" />
 
       <header className="flex items-center justify-between px-6 pt-[max(1.25rem,env(safe-area-inset-top))] md:px-10 md:pt-8">
-        <p className="font-mono text-[0.6875rem] tracking-[0.4em] text-paper-dim md:invisible">NOCTURNE</p>
+        <p className="font-mono text-[0.6875rem] tracking-[0.4em] text-paper-dim">NOCTURNE</p>
         <div className="-mr-2 flex items-center gap-1">
           <PlatformClock now={now} size={26} className="mr-2 opacity-80" />
           <button
@@ -80,9 +80,6 @@ export default function TonightPage() {
           >
             <Icon name="plus" size={19} />
           </button>
-          <Link href="/settings" aria-label={t("shell.settings")} className="flex h-11 w-11 items-center justify-center text-mist hover:text-paper md:hidden">
-            <Icon name="settings" size={18} />
-          </Link>
         </div>
       </header>
       <div className="mt-3 flex items-baseline justify-between gap-4 px-6 md:px-10">
@@ -102,7 +99,7 @@ export default function TonightPage() {
       {/* The platform breathes here. */}
       <div className="min-h-0 flex-1" />
 
-      <section aria-label={t("tonight.next")} className="w-full px-6 pb-[calc(5.75rem+env(safe-area-inset-bottom))] md:max-w-2xl md:px-10 md:pb-12">
+      <section aria-label={t("tonight.next")} className="w-full px-6 pb-[calc(5.75rem+env(safe-area-inset-bottom))] md:max-w-2xl md:px-10">
         {riding && active && nextTask ? (
           <>
             <p className="eyebrow text-lamp/90">
