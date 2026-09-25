@@ -27,7 +27,7 @@
   --color-signal: #c98a7a;
 
   --font-sans: var(--font-inter), var(--font-cjk-sans), ui-sans-serif, system-ui, sans-serif;
-  --font-mono: var(--font-plex-mono), var(--font-cjk-sans), ui-monospace, "SFMono-Regular", monospace;
+  --font-mono: var(--font-plex-mono), var(--font-cjk-mono), ui-monospace, "SFMono-Regular", monospace;
   --font-display: var(--font-instrument), var(--font-cjk-serif), "Iowan Old Style", Georgia, serif;
 
   --ease-glide: cubic-bezier(0.22, 1, 0.36, 1);
@@ -137,18 +137,28 @@
 
 :root {
   color-scheme: dark;
-  /* Latin comes from Inter / Instrument Serif; CJK glyphs fall through to a
-     face chosen for the active language (Han characters differ by locale). */
-  --font-cjk-sans: "IBM Plex Sans KR", "IBM Plex Sans JP", "Noto Sans SC", "Apple SD Gothic Neo", "Hiragino Sans", "PingFang SC";
-  --font-cjk-serif: "Gowun Batang", "Shippori Mincho", "Noto Serif SC", serif;
+  /* Latin comes from Inter / Instrument Serif / Plex Mono; CJK glyphs fall
+     through to faces chosen for the active language (Han characters differ by
+     locale). Korean: Pretendard beside Inter, a light Noto Serif KR beside
+     Instrument Serif, Plex Sans KR beside Plex Mono. */
+  --font-cjk-sans: "Pretendard Variable", "Pretendard", "IBM Plex Sans KR", "IBM Plex Sans JP", "Noto Sans SC", "Apple SD Gothic Neo", "Hiragino Sans", "PingFang SC";
+  --font-cjk-serif: "Noto Serif KR", "Shippori Mincho", "Noto Serif SC", serif;
+  --font-cjk-mono: "IBM Plex Sans KR", "Pretendard Variable", "IBM Plex Sans JP", "Noto Sans SC";
 }
 :root:lang(ja) {
-  --font-cjk-sans: "IBM Plex Sans JP", "IBM Plex Sans KR", "Noto Sans SC", "Hiragino Sans";
-  --font-cjk-serif: "Shippori Mincho", "Gowun Batang", "Noto Serif SC", serif;
+  --font-cjk-sans: "IBM Plex Sans JP", "Pretendard Variable", "Noto Sans SC", "Hiragino Sans";
+  --font-cjk-serif: "Shippori Mincho", "Noto Serif KR", "Noto Serif SC", serif;
+  --font-cjk-mono: "IBM Plex Sans JP", "IBM Plex Sans KR", "Noto Sans SC";
 }
 :root:lang(zh) {
-  --font-cjk-sans: "Noto Sans SC", "IBM Plex Sans KR", "IBM Plex Sans JP", "PingFang SC";
-  --font-cjk-serif: "Noto Serif SC", "Gowun Batang", "Shippori Mincho", serif;
+  --font-cjk-sans: "Noto Sans SC", "Pretendard Variable", "IBM Plex Sans JP", "PingFang SC";
+  --font-cjk-serif: "Noto Serif SC", "Noto Serif KR", "Shippori Mincho", serif;
+  --font-cjk-mono: "Noto Sans SC", "IBM Plex Sans KR", "IBM Plex Sans JP";
+}
+/* The Korean display serif is set light and a little tight, like Instrument Serif. */
+:root:lang(ko) .font-display {
+  font-weight: 300;
+  letter-spacing: -0.03em;
 }
 /* CJK text reads better with a little more room and no letter-spacing tricks. */
 :root:lang(ko) .eyebrow,

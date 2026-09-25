@@ -17,6 +17,7 @@ import { PlatformClock } from "@/components/scene/PlatformClock";
 import { PlatformScene } from "@/components/scene/PlatformScene";
 import { ConflictNotice } from "@/components/tonight/ConflictNotice";
 import { DepartureBoard, RecentChangeDetail } from "@/components/tonight/DepartureBoard";
+import { ArrivalLine, ArrivalSheet, useArrivals } from "@/components/tonight/ArrivalForecast";
 import { useGlossary, useStationHint } from "@/components/help/Glossary";
 import { useNow } from "@/lib/hooks";
 import { taskHref, ticketHref } from "@/lib/paths";
@@ -26,7 +27,7 @@ import { loadSampleData } from "@/state/actions";
 import { useI18n } from "@/i18n";
 import { useData } from "@/state/store";
 
-type Panel = null | "route" | "conflict" | "overdue" | "confirm";
+type Panel = null | "route" | "conflict" | "overdue" | "confirm" | "arrival";
 
 /**
  * Tonight is one scene: an empty platform at night, the time the train
@@ -42,6 +43,7 @@ export default function TonightPage() {
   const route = routeOf(data.sessions, today);
   const windows = availabilityForDate(data.windows, today);
   const { conflict, forecast } = useConflict(data, now);
+  const arrivals = useArrivals(data, forecast, today);
   const [panel, setPanel] = useState<Panel>(null);
   const [showHint, dismissHint] = useStationHint();
   const ticket = journey ? data.tickets.find((x) => x.journeyId === journey.id) : undefined;
@@ -167,6 +169,10 @@ export default function TonightPage() {
           />
         )}
 
+        {!isEmptyAccount && (
+          <ArrivalLine summary={arrivals} onOpen={() => setPanel("arrival")} className="mt-3 animate-enter" style={{ animationDelay: "1300ms" }} />
+        )}
+
         {(conflict || overdue.length > 0 || waiting.length > 0) && (
           <div className="mt-5 flex animate-enter flex-wrap gap-2" style={{ animationDelay: "1450ms" }}>
             {conflict && (
@@ -213,6 +219,7 @@ export default function TonightPage() {
           </ButtonLink>
         </div>
       </Sheet>
+      <ArrivalSheet open={panel === "arrival"} onClose={() => setPanel(null)} summary={arrivals} today={today} onResolve={() => setPanel("conflict")} />
       <Sheet open={panel === "conflict"} onClose={() => setPanel(null)} title={t("scene.conflict")}>
         {conflict && <ConflictNotice conflict={conflict} tasks={data.tasks} />}
       </Sheet>

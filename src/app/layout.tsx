@@ -9,9 +9,12 @@ const instrument = Instrument_Serif({ variable: "--font-instrument", subsets: ["
 const fontVars = [inter, plexMono, instrument].map((f) => f.variable).join(" ");
 
 // Korean, Japanese and Chinese faces come from Google Fonts at runtime; the
-// browser downloads only the glyph ranges a page actually uses.
+// browser downloads only the glyph ranges a page actually uses. Korean body
+// text uses Pretendard (drawn to sit beside Inter), served with the site in
+// the same small subsets.
 const CJK_FONTS =
-  "https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500&family=Gowun+Batang:wght@400;700&family=IBM+Plex+Sans+JP:wght@400;500&family=Shippori+Mincho:wght@400;500&family=Noto+Sans+SC:wght@400;500&family=Noto+Serif+SC:wght@400;500&display=swap";
+  "https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500&family=Noto+Serif+KR:wght@300;400&family=IBM+Plex+Sans+JP:wght@400;500&family=Shippori+Mincho:wght@400;500&family=Noto+Sans+SC:wght@400;500&family=Noto+Serif+SC:wght@400;500&display=swap";
+const PRETENDARD = `${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/fonts/pretendard/pretendardvariable-dynamic-subset.css`;
 
 export const metadata: Metadata = {
   title: { default: "Nocturne", template: "%s · Nocturne" },
@@ -33,6 +36,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
         <link rel="stylesheet" href={CJK_FONTS} />
+        <link rel="stylesheet" href={PRETENDARD} />
       </head>
       <body>
         <LocaleSync />
