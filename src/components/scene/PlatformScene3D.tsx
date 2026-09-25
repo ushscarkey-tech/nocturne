@@ -5,10 +5,12 @@ import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
 import { Reflector } from "three/examples/jsm/objects/Reflector.js";
 import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";
+import { FXAAPass } from "three/examples/jsm/postprocessing/FXAAPass.js";
 import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
 import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
 import { ShaderPass } from "three/examples/jsm/postprocessing/ShaderPass.js";
 import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
+import { complete, describe, floatSupport, isApple, pickTarget, sceneLog } from "./gl";
 import { GradeShader, MAX_LIGHTS, bokehMaterial, hazeMaterial, rainMaterial, skyMaterial, wetFloor } from "./platform/shaders";
 import * as tx from "./platform/textures";
 
@@ -51,32 +53,6 @@ const QUALITY = [
 
 const lin = (r: number, g: number, b: number) => new THREE.Color().setRGB(r, g, b);
 
-/** Whether the GPU can actually render into this target. */
-function complete(renderer: THREE.WebGLRenderer, target: THREE.WebGLRenderTarget) {
-  const gl = renderer.getContext();
-  target.setSize(4, 4);
-  renderer.setRenderTarget(target);
-  const ok = gl.checkFramebufferStatus(gl.FRAMEBUFFER) === gl.FRAMEBUFFER_COMPLETE;
-  renderer.setRenderTarget(null);
-  return ok;
-}
-
-/** The best frame buffer this device renders into: HDR + MSAA down to plain bytes. */
-function pickTarget(renderer: THREE.WebGLRenderer, floatOK: boolean) {
-  const options: [THREE.TextureDataType, number][] = [
-    [THREE.HalfFloatType, 4],
-    [THREE.HalfFloatType, 0],
-    [THREE.UnsignedByteType, 4],
-  ];
-  for (const [type, samples] of options) {
-    if (type === THREE.HalfFloatType && !floatOK) continue;
-    const t = new THREE.WebGLRenderTarget(1, 1, { type, samples });
-    if (complete(renderer, t)) return t;
-    t.dispose();
-  }
-  return new THREE.WebGLRenderTarget(1, 1);
-}
-
 /**
  * A small country station at night, nearly empty: wet concrete that holds
  * the lamps, fluorescent tubes under a corrugated canopy, a lit waiting
@@ -98,9 +74,13 @@ export default function PlatformScene3D({ mood = "waiting", rain = true, station
     let renderer: THREE.WebGLRenderer;
     try {
       renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: "low-power" });
-    } catch {
-      return; // No WebGL: the gradient behind stays.
+    } catch (err) {
+      const log = sceneLog("platform");
+      log.note(`no WebGL: ${String(err)}`);
+      return () => log.dispose(); // The gradient behind stays.
     }
+    const log = sceneLog("platform");
+    describe(renderer, log);
     // Built in one go; if anything in it fails on this device, the page
     // keeps its quiet gradient instead of a broken canvas.
     const setup = (): (() => void) => {
@@ -114,7 +94,8 @@ export default function PlatformScene3D({ mood = "waiting", rain = true, station
       renderer.domElement.style.width = "100%";
       renderer.domElement.style.height = "100%";
 
-      const floatOK = renderer.extensions.has("EXT_color_buffer_float") || renderer.extensions.has("EXT_color_buffer_half_float");
+      const floatOK = floatSupport(renderer);
+      log.set("float targets", String(floatOK));
       /** Custom shaders, each with a plainer stand-in if it won't compile here. */
       const fallbacks = new Map<THREE.Material, () => void>();
       const hide = (m: THREE.Material) => () => scene.traverse((o) => {
@@ -246,10 +227,13 @@ export default function PlatformScene3D({ mood = "waiting", rain = true, station
       const floor = new Reflector(track(new THREE.PlaneGeometry(PL_W, floorLen)), { textureWidth: 256, textureHeight: 256, multisample: 0 });
       const reflectTarget = floor.getRenderTarget();
       // Mipmapped half-float needs a colour-buffer extension; bytes otherwise.
-      if (!floatOK || !complete(renderer, reflectTarget)) {
+      // Half float keeps the lamps bright in puddles; 8-bit (mipmaps on it work
+      // everywhere) on Apple and on GPUs without float targets.
+      if (!floatOK || isApple() || !complete(renderer, reflectTarget)) {
         reflectTarget.dispose();
         reflectTarget.texture.type = THREE.UnsignedByteType;
       }
+      log.set("reflection", `${reflectTarget.texture.type === THREE.HalfFloatType ? "half float" : "8-bit"}, ${complete(renderer, reflectTarget) ? "ok" : "incomplete"}`);
       reflectTarget.texture.generateMipmaps = true;
       reflectTarget.texture.minFilter = THREE.LinearMipmapLinearFilter;
       const reflectorMaterial = floor.material as THREE.ShaderMaterial;
@@ -591,6 +575,7 @@ export default function PlatformScene3D({ mood = "waiting", rain = true, station
       // ----------------------------------------------------------------- post
       // HDR with MSAA where the GPU can render to it; plainer targets where not.
       const target = pickTarget(renderer, floatOK);
+      log.set("frame buffer", `${target.texture.type === THREE.HalfFloatType ? "half float" : "8-bit"}, msaa ${target.samples}`);
       const composer = new EffectComposer(renderer, target);
       composer.addPass(new RenderPass(scene, camera));
       const hdr = target.texture.type === THREE.HalfFloatType;
@@ -598,12 +583,16 @@ export default function PlatformScene3D({ mood = "waiting", rain = true, station
       composer.addPass(bloom);
       const output = new OutputPass();
       composer.addPass(output);
+      // Without MSAA, smooth edges after tone mapping instead.
+      const fxaa = new FXAAPass();
+      fxaa.enabled = target.samples === 0;
+      composer.addPass(fxaa);
       const grade = new ShaderPass(GradeShader);
       composer.addPass(grade);
       fallbacks.set(grade.material, () => {
         grade.enabled = false;
       });
-      disposables.push(bloom, output, grade, composer);
+      disposables.push(bloom, output, fxaa, grade, composer);
 
       // The reflection camera is cloned from ours on first use; make it now,
       // before the rain layer is switched on, so puddles don't show the rain.
@@ -691,15 +680,31 @@ export default function PlatformScene3D({ mood = "waiting", rain = true, station
       // A shader this GPU can't compile gets its plainer stand-in after the
       // first frame, instead of leaving a hole in the picture.
       let checked = false;
+      let broken = false;
+      let frames = 0;
       const draw = () => {
-        composer.render();
+        if (broken) return;
+        try {
+          composer.render();
+        } catch (err) {
+          // Stop drawing rather than throw every frame; the gradient shows.
+          broken = true;
+          renderer.domElement.style.visibility = "hidden";
+          console.warn("[nocturne] 3D platform stopped:", err);
+          log.note(`render failed: ${String(err)}`);
+          return;
+        }
+        frames += 1;
         if (checked) return;
         checked = true;
+        const glError = renderer.getContext().getError();
+        if (glError) log.note(`gl error after first frame: 0x${glError.toString(16)}`);
         let fixed = false;
         fallbacks.forEach((fix, m) => {
           const program = (renderer.properties.get(m) as { currentProgram?: { diagnostics?: { runnable: boolean } } }).currentProgram;
           if (program?.diagnostics && !program.diagnostics.runnable) {
             console.warn("[nocturne] shader fallback:", m.name || m.type);
+            log.note(`shader fallback: ${m.name || m.type}`);
             fix();
             fixed = true;
           }
@@ -715,7 +720,13 @@ export default function PlatformScene3D({ mood = "waiting", rain = true, station
       let slowFor = 0;
       let warm = 0;
 
+      let fpsFrom = performance.now();
       const frame = (now: number) => {
+        if (now - fpsFrom > 2000) {
+          log.set("fps", `${Math.round((frames * 1000) / (now - fpsFrom))} (visible ${visible})`);
+          frames = 0;
+          fpsFrom = now;
+        }
         raf = requestAnimationFrame(frame);
         const dt = Math.min(0.1, (now - last) / 1000);
         last = now;
@@ -735,6 +746,7 @@ export default function PlatformScene3D({ mood = "waiting", rain = true, station
           slowFor = interval > 1 / 36 ? slowFor + step : 0;
           if (slowFor > 2.5) {
             level += 1;
+            log.set("quality", `step ${level}`);
             slowFor = 0;
             warm = 0;
             resize();
@@ -789,6 +801,7 @@ export default function PlatformScene3D({ mood = "waiting", rain = true, station
 
       return () => {
         disposed = true;
+        log.dispose();
         apiRef.current = null;
         cancelAnimationFrame(raf);
         ro.disconnect();
@@ -806,6 +819,7 @@ export default function PlatformScene3D({ mood = "waiting", rain = true, station
       return setup();
     } catch (err) {
       console.warn("[nocturne] 3D platform unavailable:", err);
+      log.note(`failed: ${err instanceof Error ? `${err.message}\n${err.stack?.split("\n").slice(0, 4).join("\n")}` : String(err)}`);
       apiRef.current = null;
       renderer.dispose();
       renderer.forceContextLoss();
