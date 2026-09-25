@@ -1,0 +1,36 @@
+import type source from "../en/lines";
+
+const lines: Partial<Record<keyof typeof source, string>> = {
+  "lines.longDistance": "长期",
+  "lines.title": "线路",
+  "lines.newLine": "新线路",
+  "lines.aLongTermGoal": "长期目标",
+  "lines.createLine": "创建线路",
+  "lines.noLines": "暂无线路。",
+  "lines.tasksSummary": "{n} 任务 · {time} / {total} 剩余",
+  "lines.noTargetDate": "无目标日期",
+  "lines.progress": "进展",
+  "lines.workload": "工作量",
+  "lines.remaining": "剩余",
+  "lines.tasksOnThisLine": "此线路上的任务",
+  "lines.attach": "附加",
+  "lines.attachTasks": "附加任务",
+  "lines.newTask": "新任务",
+  "lines.editLine": "编辑线路",
+  "lines.deleteQuestion": "删除此线路？",
+  "lines.deleteInfo": "其任务保留。",
+  "lines.keepIt": "保留",
+  "lines.deleteLine": "删除线路",
+  "lines.noAttach": "每个开放任务都在此线路上。",
+  "lines.onThisLine": "在此线路上",
+  "lines.detach": "分离",
+  "lines.attachEmpty": "附加现有任务或添加新任务。",
+  "lines.lineName": "名称",
+  "lines.targetDate": "目标日期",
+  "lines.targetDateHint": "考试、演示或目标日期。",
+  "lines.notes": "备注",
+  "lines.nameRequired": "给线路起个名字。",
+  "lines.back": "线路",
+};
+
+export default lines;

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import { scheduleFor } from "@/core/allocate";
-import { clock, formatDuration, formatShortDate, relativeDay, serviceDate } from "@/core/time";
+import { clock, serviceDate } from "@/core/time";
 import type { Level } from "@/core/types";
 import { Button } from "@/components/ui/Button";
 import { MinutesInput } from "@/components/ui/controls";
@@ -12,12 +12,12 @@ import { Icon } from "@/components/ui/Icon";
 import { Sheet } from "@/components/ui/Sheet";
 import { TaskForm, draftFrom } from "@/components/tasks/TaskForm";
 import { ConfirmFinish } from "@/components/journey/ConfirmFinish";
+import { EstimateNote } from "@/components/tasks/EstimateNote";
 import { useNow } from "@/lib/hooks";
 import { useForecast } from "@/lib/use-planner";
 import { completeTask, deleteTask, logProgress, reopenTask, updateTask } from "@/state/actions";
 import { useData } from "@/state/store";
-
-const INTEREST = ["Avoiding it", "Reluctant", "Neutral", "Curious", "Drawn to it"];
+import { useI18n } from "@/i18n";
 
 export default function TaskDetailPage() {
   return (
@@ -28,6 +28,7 @@ export default function TaskDetailPage() {
 }
 
 function TaskDetail() {
+  const { t, fmt } = useI18n();
   const params = useSearchParams();
   const id = params.get("id") ?? "";
   const router = useRouter();
@@ -46,7 +47,7 @@ function TaskDetail() {
     return (
       <div className="animate-fade">
         <BackLink />
-        <p className="mt-10 text-mist">This task is no longer on the line.</p>
+        <p className="mt-10 text-mist">{t("tasks.noTaskFound")}</p>
       </div>
     );
   }
@@ -71,37 +72,37 @@ function TaskDetail() {
       <header className="mt-8">
         <p className="eyebrow">
           {task.status === "archived"
-            ? "Deleted · kept for past journeys"
+            ? t("tasks.archivedStatus")
             : task.status === "inbox"
-              ? "Inbox"
+              ? t("tasks.inbox")
               : task.status === "done"
-                ? "Completed"
+                ? t("tasks.completeStatus")
                 : line
                   ? line.title
                   : task.recurrence
-                    ? "Recurring"
-                    : "Task"}
+                    ? t("tasks.recurring")
+                    : t("tasks.task")}
         </p>
         <h1 className="mt-2 break-words font-display text-4xl leading-tight">{task.title}</h1>
         {task.description && <p className="mt-3 max-w-lg text-sm leading-relaxed text-mist">{task.description}</p>}
       </header>
 
       <dl className="mt-10 grid grid-cols-2 gap-x-8 gap-y-6 border-t border-rule-soft pt-8 sm:grid-cols-4">
-        <Stat label={task.recurrence ? "Repeats" : "Deadline"}>
+        <Stat label={task.recurrence ? t("tasks.repeats") : t("tasks.deadline")}>
           {task.recurrence
             ? task.recurrence.freq === "daily"
-              ? "Daily"
-              : "Weekly"
+              ? t("tasks.daily")
+              : t("tasks.weekly")
             : task.deadline
-              ? `${formatShortDate(task.deadline)}`
-              : "Someday"}
-          {task.deadline && !task.recurrence && <span className="block text-xs text-mist">{relativeDay(today, task.deadline)}</span>}
+              ? `${fmt.shortDate(task.deadline)}`
+              : t("common.someday")}
+          {task.deadline && !task.recurrence && <span className="block text-xs text-mist">{fmt.relativeDay(today, task.deadline)}</span>}
         </Stat>
-        <Stat label={task.recurrence ? "Each time" : "Estimated"}>{formatDuration(task.estimatedMinutes)}</Stat>
-        {!task.recurrence && <Stat label="Completed">{formatDuration(completed)}</Stat>}
+        <Stat label={task.recurrence ? t("tasks.eachTime") : t("tasks.estimated")}>{fmt.duration(task.estimatedMinutes)}</Stat>
+        {!task.recurrence && <Stat label={t("tasks.completed")}>{fmt.duration(completed)}</Stat>}
         {!task.recurrence && (
-          <Stat label="Remaining" accent>
-            {formatDuration(task.remainingMinutes)}
+          <Stat label={t("tasks.remainingTime")} accent>
+            {fmt.duration(task.remainingMinutes)}
           </Stat>
         )}
       </dl>
@@ -111,24 +112,25 @@ function TaskDetail() {
         </div>
       )}
 
-      <div className="mt-8">
+      <div className="mt-8 space-y-4">
         <ConfirmFinish tasks={[task]} compact />
+        <EstimateNote taskId={task.id} />
       </div>
 
-      <section className="mt-10 grid grid-cols-3 gap-6" aria-label="How the task feels">
-        <Scale label="Interest" value={task.interest} caption={INTEREST[task.interest - 1]} />
-        <Scale label="Difficulty" value={task.difficulty} />
-        <Scale label="Importance" value={task.importance} />
+      <section className="mt-10 grid grid-cols-3 gap-6" aria-label={t("tasks.howTaskFeel")}>
+        <Scale label={t("tasks.interest")} value={task.interest} caption={t(`common.interest.${task.interest}` as const)} />
+        <Scale label={t("tasks.difficulty")} value={task.difficulty} />
+        <Scale label={t("tasks.importance")} value={task.importance} />
       </section>
 
       {task.status === "active" && (
         <section className="mt-12" aria-labelledby="schedule-title">
           <h2 id="schedule-title" className="eyebrow">
-            Scheduled
+            {t("tasks.scheduled")}
           </h2>
           {unscheduled > 0 && (
             <p className="mt-3 text-sm text-signal">
-              {formatDuration(unscheduled)} doesn&rsquo;t fit before the deadline yet.{" "}
+              {fmt.duration(unscheduled)} doesn&rsquo;t fit before the deadline yet.{" "}
               <Link href="/service" className="underline underline-offset-4">
                 Add Service Time
               </Link>
@@ -138,22 +140,22 @@ function TaskDetail() {
             {tonightStations.map((s) => (
               <li key={s.id} className="flex items-center justify-between py-3 text-sm">
                 <span className="text-paper">
-                  Tonight <span className="ml-2 font-mono text-xs text-lamp tabular">{clock(s.plannedStart)}</span>
+                  {t("tasks.tonight", { at: clock(s.plannedStart) })}
                 </span>
-                <span className="font-mono text-xs text-mist tabular">{formatDuration(s.plannedMinutes)}</span>
+                <span className="font-mono text-xs text-mist tabular">{fmt.duration(s.plannedMinutes)}</span>
               </li>
             ))}
             {later.slice(0, 8).map((s) => (
               <li key={s.date} className="flex items-center justify-between py-3 text-sm">
                 <span className="text-paper-dim">
-                  {relativeDay(today, s.date)}
-                  <span className="ml-2 text-xs text-haze">{formatShortDate(s.date)}</span>
+                  {fmt.relativeDay(today, s.date)}
+                  <span className="ml-2 text-xs text-haze">{fmt.shortDate(s.date)}</span>
                 </span>
-                <span className="font-mono text-xs text-mist tabular">{formatDuration(s.minutes)}</span>
+                <span className="font-mono text-xs text-mist tabular">{fmt.duration(s.minutes)}</span>
               </li>
             ))}
             {tonightStations.length === 0 && later.length === 0 && unscheduled === 0 && (
-              <li className="py-3 text-sm text-mist">Nothing scheduled in the next two weeks.</li>
+              <li className="py-3 text-sm text-mist">{t("tasks.nothingScheduled")}</li>
             )}
           </ul>
         </section>
@@ -162,17 +164,17 @@ function TaskDetail() {
       {history.length > 0 && (
         <section className="mt-12" aria-labelledby="history-title">
           <h2 id="history-title" className="eyebrow">
-            Journeys
+            {t("tasks.journeys")}
           </h2>
           <ul className="mt-3 divide-y divide-rule-soft">
             {history.slice(0, 8).map((s) => (
               <li key={s.id} className="flex items-center justify-between py-3 text-sm">
                 <span className="text-paper-dim">
-                  {formatShortDate(s.date)} <span className="ml-2 text-xs text-haze">{s.stationName}</span>
+                  {fmt.shortDate(s.date)} <span className="ml-2 text-xs text-haze">{s.stationName}</span>
                 </span>
                 <span className="font-mono text-xs text-mist tabular">
-                  {formatDuration(s.completedMinutes)}
-                  {s.status === "partial" ? " · partial" : ""}
+                  {fmt.duration(s.completedMinutes)}
+                  {s.status === "partial" ? " · " + t("tasks.partial") : ""}
                 </span>
               </li>
             ))}
@@ -183,33 +185,33 @@ function TaskDetail() {
       {task.status !== "archived" && (
       <div className="mt-12 flex flex-wrap gap-3 border-t border-rule-soft pt-8">
         <Button variant="secondary" onClick={() => setEditing(true)}>
-          Edit
+          {t("tasks.edit")}
         </Button>
         {task.status === "active" && !task.recurrence && (
           <Button variant="secondary" onClick={() => setLogging(true)}>
-            Log progress
+            {t("tasks.logProgress")}
           </Button>
         )}
         {task.status !== "done" ? (
           <Button variant="secondary" onClick={() => completeTask(task.id)}>
-            <Icon name="check" size={16} /> Mark complete
+            <Icon name="check" size={16} /> {t("tasks.markComplete")}
           </Button>
         ) : (
           <Button variant="secondary" onClick={() => reopenTask(task.id)}>
-            Reopen
+            {t("tasks.reopenButton")}
           </Button>
         )}
         <Button variant="ghost" onClick={() => setConfirmDelete(true)} className="ml-auto">
-          Delete
+          {t("common.delete")}
         </Button>
       </div>
       )}
 
-      <Sheet open={editing} onClose={() => setEditing(false)} title="Edit task" eyebrow={task.title}>
+      <Sheet open={editing} onClose={() => setEditing(false)} title={t("tasks.editingTitle")} eyebrow={task.title}>
         <TaskForm
           initial={draftFrom(task)}
           lines={data.lines}
-          submitLabel="Save changes"
+          submitLabel={t("tasks.saveChanges")}
           focusField={editParam === "deadline" ? "deadline" : null}
           onCancel={() => setEditing(false)}
           onSubmit={(d) => {
@@ -219,14 +221,14 @@ function TaskDetail() {
         />
       </Sheet>
 
-      <Sheet open={logging} onClose={() => setLogging(false)} title="Log progress" eyebrow="Work done outside a journey">
-        <p className="text-sm text-mist">Nocturne will subtract this from what&rsquo;s left and adjust the plan.</p>
+      <Sheet open={logging} onClose={() => setLogging(false)} title={t("tasks.logProgress")} eyebrow={t("tasks.logWorkDone")}>
+        <p className="text-sm text-mist">{t("tasks.logHelp")}</p>
         <div className="mt-6 flex justify-center">
-          <MinutesInput label="minutes done" value={logMinutes} onChange={setLogMinutes} step={5} min={5} max={task.remainingMinutes} />
+          <MinutesInput label={t("tasks.logLabel")} value={logMinutes} onChange={setLogMinutes} step={5} min={5} max={task.remainingMinutes} />
         </div>
         <div className="mt-8 flex justify-end gap-3">
           <Button variant="ghost" onClick={() => setLogging(false)}>
-            Cancel
+            {t("common.cancel")}
           </Button>
           <Button
             variant="primary"
@@ -235,18 +237,18 @@ function TaskDetail() {
               setLogging(false);
             }}
           >
-            Log {formatDuration(logMinutes)}
+            Log {fmt.duration(logMinutes)}
           </Button>
         </div>
       </Sheet>
 
-      <Sheet open={confirmDelete} onClose={() => setConfirmDelete(false)} title="Delete this task?" eyebrow={task.title}>
+      <Sheet open={confirmDelete} onClose={() => setConfirmDelete(false)} title={t("tasks.deleteQuestion")} eyebrow={task.title}>
         <p className="text-sm leading-relaxed text-mist">
-          Its future stations will leave the route. Past journeys keep their record.
+          {t("tasks.deleteInfo")}
         </p>
         <div className="mt-8 flex justify-end gap-3">
           <Button variant="ghost" onClick={() => setConfirmDelete(false)}>
-            Keep it
+            {t("tasks.keepIt")}
           </Button>
           <Button
             variant="danger"
@@ -255,7 +257,7 @@ function TaskDetail() {
               deleteTask(task.id);
             }}
           >
-            Delete task
+            {t("tasks.deleteTask")}
           </Button>
         </div>
       </Sheet>
@@ -264,9 +266,10 @@ function TaskDetail() {
 }
 
 function BackLink() {
+  const { t } = useI18n();
   return (
     <Link href="/tasks" className="inline-flex items-center gap-1 text-sm text-mist transition-colors hover:text-paper">
-      <Icon name="back" size={16} /> Tasks
+      <Icon name="back" size={16} /> {t("tasks.back")}
     </Link>
   );
 }
@@ -281,10 +284,11 @@ function Stat({ label, children, accent = false }: { label: string; children: Re
 }
 
 function Scale({ label, value, caption }: { label: string; value: Level; caption?: string }) {
+  const { t } = useI18n();
   return (
     <div>
       <p className="eyebrow text-[0.625rem]">{label}</p>
-      <div className="mt-2 flex gap-1" aria-label={`${label} ${value} of 5`} role="img">
+      <div className="mt-2 flex gap-1" aria-label={t("common.levelOf", { label, n: value })} role="img">
         {[1, 2, 3, 4, 5].map((n) => (
           <span key={n} className={`h-1 flex-1 rounded-full ${n <= value ? "bg-lamp/70" : "bg-rule"}`} />
         ))}

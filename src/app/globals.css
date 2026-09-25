@@ -26,9 +26,9 @@
   --color-umber: #5a4535;
   --color-signal: #c98a7a;
 
-  --font-sans: var(--font-inter), ui-sans-serif, system-ui, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
-  --font-mono: var(--font-plex-mono), ui-monospace, "SFMono-Regular", monospace;
-  --font-display: var(--font-instrument), "Iowan Old Style", Georgia, serif;
+  --font-sans: var(--font-inter), var(--font-cjk-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-plex-mono), var(--font-cjk-sans), ui-monospace, "SFMono-Regular", monospace;
+  --font-display: var(--font-instrument), var(--font-cjk-serif), "Iowan Old Style", Georgia, serif;
 
   --ease-glide: cubic-bezier(0.22, 1, 0.36, 1);
 
@@ -64,6 +64,24 @@
 
 :root {
   color-scheme: dark;
+  /* Latin comes from Inter / Instrument Serif; CJK glyphs fall through to a
+     face chosen for the active language (Han characters differ by locale). */
+  --font-cjk-sans: "IBM Plex Sans KR", "IBM Plex Sans JP", "Noto Sans SC", "Apple SD Gothic Neo", "Hiragino Sans", "PingFang SC";
+  --font-cjk-serif: "Gowun Batang", "Shippori Mincho", "Noto Serif SC", serif;
+}
+:root:lang(ja) {
+  --font-cjk-sans: "IBM Plex Sans JP", "IBM Plex Sans KR", "Noto Sans SC", "Hiragino Sans";
+  --font-cjk-serif: "Shippori Mincho", "Gowun Batang", "Noto Serif SC", serif;
+}
+:root:lang(zh) {
+  --font-cjk-sans: "Noto Sans SC", "IBM Plex Sans KR", "IBM Plex Sans JP", "PingFang SC";
+  --font-cjk-serif: "Noto Serif SC", "Gowun Batang", "Shippori Mincho", serif;
+}
+/* CJK text reads better with a little more room and no letter-spacing tricks. */
+:root:lang(ko) .eyebrow,
+:root:lang(ja) .eyebrow,
+:root:lang(zh) .eyebrow {
+  letter-spacing: 0.08em;
 }
 
 html {

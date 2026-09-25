@@ -1,0 +1,53 @@
+import type { Locale } from "./types";
+
+/** Sample task and line names, in each supported language. */
+export const SEED_TEXT: Record<Locale, Record<string, string>> = {
+  en: {
+    bioLine: "Biology Midterm", bioLineDesc: "Ecology, photosynthesis and cellular respiration.",
+    researchLine: "Research Presentation", researchLineDesc: "Report and slides for the science fair.",
+    math: "Mathematics problem set", mathDesc: "Chapter 4 — differentiation, problems 1–40.",
+    physics: "Physics workbook", physicsDesc: "Kinematics, pages 58–91.",
+    bio: "Biology memorization", bioDesc: "Ecosystem terms and energy flow.",
+    report: "Science report", reportDesc: "Results and discussion.",
+    vocab: "English vocabulary", vocabDesc: "30 words from the daily list.",
+    photo: "Photosynthesis review", resp: "Cellular respiration", slides: "Presentation slides",
+    popeco: "Population ecology", community: "Community ecology", chem: "Chemistry lab notes",
+    book: "Reading: The Selfish Gene", bookDesc: "A chapter at a time.", essay: "History essay outline",
+  },
+  ko: {
+    bioLine: "생명과학 중간고사", bioLineDesc: "생태계, 광합성, 세포호흡.",
+    researchLine: "탐구 발표", researchLineDesc: "과학 탐구 보고서와 발표 자료.",
+    math: "수학 문제집", mathDesc: "4단원 미분법, 1–40번.",
+    physics: "물리 문제집", physicsDesc: "운동학, 58–91쪽.",
+    bio: "생명 암기", bioDesc: "생태계 용어와 에너지 흐름.",
+    report: "과학 탐구 보고서", reportDesc: "결과와 고찰.",
+    vocab: "영어 단어", vocabDesc: "오늘의 단어 30개.",
+    photo: "광합성 복습", resp: "세포호흡", slides: "발표 슬라이드",
+    popeco: "개체군 생태", community: "군집 생태", chem: "화학 실험 노트",
+    book: "독서: 이기적 유전자", bookDesc: "한 장씩.", essay: "역사 에세이 개요",
+  },
+  ja: {
+    bioLine: "生物 中間試験", bioLineDesc: "生態系、光合成、細胞呼吸。",
+    researchLine: "研究発表", researchLineDesc: "レポートと発表スライド。",
+    math: "数学の問題集", mathDesc: "第4章 微分、1〜40問。",
+    physics: "物理の問題集", physicsDesc: "運動学、58〜91ページ。",
+    bio: "生物の暗記", bioDesc: "生態系の用語とエネルギーの流れ。",
+    report: "理科レポート", reportDesc: "結果と考察。",
+    vocab: "英単語", vocabDesc: "今日の30語。",
+    photo: "光合成の復習", resp: "細胞呼吸", slides: "発表スライド",
+    popeco: "個体群の生態", community: "群集の生態", chem: "化学実験ノート",
+    book: "読書:利己的な遺伝子", bookDesc: "一章ずつ。", essay: "歴史エッセイの構成",
+  },
+  zh: {
+    bioLine: "生物期中考试", bioLineDesc: "生态系统、光合作用、细胞呼吸。",
+    researchLine: "研究展示", researchLineDesc: "报告与展示幻灯片。",
+    math: "数学习题集", mathDesc: "第四章 导数，第1–40题。",
+    physics: "物理练习册", physicsDesc: "运动学，第58–91页。",
+    bio: "生物背诵", bioDesc: "生态系统术语与能量流动。",
+    report: "科学报告", reportDesc: "结果与讨论。",
+    vocab: "英语单词", vocabDesc: "今天的30个单词。",
+    photo: "光合作用复习", resp: "细胞呼吸", slides: "展示幻灯片",
+    popeco: "种群生态", community: "群落生态", chem: "化学实验笔记",
+    book: "阅读：《自私的基因》", bookDesc: "一次一章。", essay: "历史论文提纲",
+  },
+};

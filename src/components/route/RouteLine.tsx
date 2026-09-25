@@ -1,10 +1,11 @@
 "use client";
 
 import { useRef, type ReactNode } from "react";
-import { clock, formatDuration } from "@/core/time";
+import { clock } from "@/core/time";
 import type { RouteItem } from "@/lib/route-view";
 import { Icon } from "@/components/ui/Icon";
 import { useFlip } from "@/lib/hooks";
+import { useI18n } from "@/i18n";
 
 /** Changes whenever stations move, appear or leave. */
 export function routeSignature(items: RouteItem[]): string {
@@ -62,15 +63,16 @@ export function RouteRow({
   highlight: boolean;
   rowProps?: React.LiHTMLAttributes<HTMLLIElement> & { ref?: React.Ref<HTMLLIElement> };
 }) {
+  const { t, fmt } = useI18n();
   if (item.kind === "stop") {
     return (
-      <li data-flip={item.key} className="grid grid-cols-[3.25rem_1.5rem_1fr]" aria-label={`Station stop, ${item.minutes} minutes`}>
+      <li data-flip={item.key} className="grid grid-cols-[3.25rem_1.5rem_1fr]" aria-label={`Station stop, ${fmt.duration(item.minutes)}`}>
         <span />
         <Rail first={first} last={last}>
           <span className="h-2 w-2 rounded-full border border-haze bg-night-900" />
         </Rail>
         <p className={`eyebrow self-center text-haze ${compact ? "py-2" : "py-3"}`}>
-          Station stop · {formatDuration(item.minutes)}
+          {t("route.stationStop", { min: item.minutes })}
         </p>
       </li>
     );
@@ -84,7 +86,7 @@ export function RouteRow({
           <span className="absolute top-1/2 h-px w-3 bg-haze" />
           <span className="absolute bottom-0 h-3 w-px bg-rule" />
         </div>
-        <p className="eyebrow self-center py-4 text-haze">Service paused · resumes {clock(item.until)}</p>
+        <p className="eyebrow self-center py-4 text-haze">{t("route.servicePaused", { at: clock(item.until) })}</p>
       </li>
     );
   }
@@ -122,20 +124,20 @@ export function RouteRow({
           <p className={`eyebrow ${active ? "text-lamp/90" : ""}`}>
             {s.stationName}
             {s.locked && (
-              <span className="ml-2 inline-flex translate-y-[1px] text-mist" title="Locked">
-                <Icon name="lock" size={11} aria-label="Locked" />
+              <span className="ml-2 inline-flex translate-y-[1px] text-mist" title={t("route.locked")}>
+                <Icon name="lock" size={11} aria-label={t("route.locked")} />
               </span>
             )}
           </p>
           <p className={`mt-1 truncate ${compact ? "text-[0.95rem]" : "text-base"} ${done ? "text-mist line-through decoration-haze/60" : "text-paper"}`}>
-            {task?.title ?? "Removed task"}
+            {task?.title ?? t("route.removedTask")}
           </p>
           <p className="mt-0.5 text-xs text-mist tabular">
             {done
-              ? `${formatDuration(s.completedMinutes)} ${s.status === "partial" ? "· continued later" : "completed"}`
+              ? `${fmt.duration(s.completedMinutes)} ${s.status === "partial" ? "· " + t("route.continuedLater") : t("route.completed")}`
               : active
-                ? `Now · ${formatDuration(s.plannedMinutes)}`
-                : formatDuration(s.plannedMinutes)}
+                ? `${t("route.now")} · ${fmt.duration(s.plannedMinutes)}`
+                : fmt.duration(s.plannedMinutes)}
           </p>
         </div>
         {actions}

@@ -12,7 +12,9 @@ import { Sheet } from "@/components/ui/Sheet";
 import { TaskForm, draftFrom } from "@/components/tasks/TaskForm";
 import { TaskRow } from "@/components/tasks/TaskRow";
 import { createTask } from "@/state/actions";
-import { useData, useStore } from "@/state/store";
+import { useData } from "@/state/store";
+import { useQuickAdd } from "@/components/quickadd/QuickAdd";
+import { useI18n } from "@/i18n";
 
 export default function TasksPage() {
   return (
@@ -28,6 +30,7 @@ function TasksView() {
   const params = useSearchParams();
   const [formOpen, setFormOpen] = useState(params.get("new") === "1");
   const [capture, setCapture] = useState("");
+  const { t } = useI18n();
   const [showDone, setShowDone] = useState(false);
   const today = serviceDate(new Date());
 
@@ -64,17 +67,13 @@ function TasksView() {
     };
   }, [data.tasks, tonight, today]);
 
+  // Typing here hands the sentence to Quick Add, which reads it and shows a preview.
   function quickCapture(e: FormEvent) {
     e.preventDefault();
-    const title = capture.trim();
-    if (!title) return;
-    const task = createTask({ ...draftFrom(), title, estimatedMinutes: 0 });
+    const text = capture.trim();
+    if (!text) return;
     setCapture("");
-    useStore.getState().notify({
-      headline: "Captured to Inbox",
-      lines: [`Add a deadline and estimate to ${task.title} when you're ready — then it joins the plan.`],
-      tone: "info",
-    });
+    useQuickAdd.getState().show(text);
   }
 
   function closeForm() {
@@ -82,23 +81,22 @@ function TasksView() {
     if (params.get("new")) router.replace("/tasks");
   }
 
-  const empty = !data.tasks.some((t) => t.status !== "archived");
+  const empty = !data.tasks.some((task) => task.status !== "archived");
 
   return (
     <div className="animate-fade">
       <header className="flex items-end justify-between gap-4">
         <div>
-          <p className="eyebrow">All work</p>
-          <h1 className="mt-2 font-display text-5xl leading-none">Tasks</h1>
+          <h1 className="font-display text-5xl leading-none">{t("tasksPage.title")}</h1>
         </div>
         <Button variant="primary" size="md" onClick={() => setFormOpen(true)}>
-          <Icon name="plus" size={16} /> New task
+          <Icon name="plus" size={16} /> {t("tasksPage.newTask")}
         </Button>
       </header>
 
       <form onSubmit={quickCapture} className="mt-10">
         <label className="sr-only" htmlFor="capture">
-          Capture a task to your Inbox
+          {t("quickadd.placeholder")}
         </label>
         <div className="flex items-center gap-3 border-b border-rule focus-within:border-lamp-dim">
           <Icon name="plus" size={16} className="text-haze" />
@@ -106,7 +104,7 @@ function TasksView() {
             id="capture"
             value={capture}
             onChange={(e) => setCapture(e.target.value)}
-            placeholder="Capture a task — details later"
+            placeholder={t("quickadd.placeholder")}
             enterKeyHint="done"
             autoComplete="off"
             className="w-full bg-transparent py-3 text-base text-paper placeholder:text-haze focus:outline-none"
@@ -116,14 +114,14 @@ function TasksView() {
 
       {empty && (
         <p className="mt-12 max-w-sm text-sm leading-relaxed text-mist">
-          Nothing on the line yet. Add a task with a deadline and an estimate, and Nocturne will find the time for it.
+          {t("tasksPage.empty")}
         </p>
       )}
 
-      <TaskSection title="Inbox" hint="Add a deadline and an estimate to schedule these." tasks={sections.inbox} today={today} tonight={tonight} />
-      <TaskSection title="Today" tasks={sections.today} today={today} tonight={tonight} />
-      <TaskSection title="Upcoming" tasks={sections.upcoming} today={today} tonight={tonight} />
-      <TaskSection title="Someday" hint="Scheduled only into spare time." tasks={sections.someday} today={today} tonight={tonight} />
+      <TaskSection id="inbox" title={t("tasksPage.inbox")} hint={t("tasksPage.inboxHint")} tasks={sections.inbox} today={today} tonight={tonight} />
+      <TaskSection id="today" title={t("tasksPage.today")} tasks={sections.today} today={today} tonight={tonight} />
+      <TaskSection id="upcoming" title={t("tasksPage.upcoming")} tasks={sections.upcoming} today={today} tonight={tonight} />
+      <TaskSection id="someday" title={t("tasksPage.someday")} hint={t("tasksPage.somedayHint")} tasks={sections.someday} today={today} tonight={tonight} />
 
       {sections.done.length > 0 && (
         <section className="mt-12">
@@ -133,7 +131,7 @@ function TasksView() {
             aria-expanded={showDone}
             className="eyebrow flex items-center gap-2 hover:text-paper"
           >
-            Completed · {sections.done.length}
+            {t("tasksPage.completed")} · {sections.done.length}
             <Icon name="chevron" size={12} className={`transition-transform duration-500 ${showDone ? "rotate-90" : ""}`} />
           </button>
           {showDone && (
@@ -146,11 +144,11 @@ function TasksView() {
         </section>
       )}
 
-      <Sheet open={formOpen} onClose={closeForm} title="New task" eyebrow="Add to your line">
+      <Sheet open={formOpen} onClose={closeForm} title={t("tasksPage.newTask")}>
         <TaskForm
           initial={draftFrom()}
           lines={data.lines}
-          submitLabel="Add task"
+          submitLabel={t("quickadd.confirm")}
           onCancel={closeForm}
           onSubmit={(d) => {
             createTask(d);
@@ -163,12 +161,14 @@ function TasksView() {
 }
 
 function TaskSection({
+  id,
   title,
   hint,
   tasks,
   today,
   tonight,
 }: {
+  id: string;
   title: string;
   hint?: string;
   tasks: Task[];
@@ -177,9 +177,9 @@ function TaskSection({
 }) {
   if (tasks.length === 0) return null;
   return (
-    <section className="mt-12" aria-labelledby={`section-${title}`}>
+    <section className="mt-12" aria-labelledby={`section-${id}`}>
       <div className="flex items-baseline justify-between">
-        <h2 id={`section-${title}`} className="eyebrow">
+        <h2 id={`section-${id}`} className="eyebrow">
           {title}
         </h2>
         <span className="font-mono text-xs text-haze">{tasks.length}</span>

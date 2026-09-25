@@ -1,4 +1,4 @@
-import type { NocturneData } from "@/core/types";
+import { normalizeData, type NocturneData } from "@/core/types";
 import type { Repository } from "./repository";
 
 const VERSION = 1;
@@ -17,7 +17,7 @@ export class LocalRepository implements Repository {
       const raw = window.localStorage.getItem(this.key);
       if (!raw) return null;
       const parsed = JSON.parse(raw) as NocturneData;
-      return parsed && parsed.profile && Array.isArray(parsed.tasks) ? parsed : null;
+      return parsed && parsed.profile && Array.isArray(parsed.tasks) ? normalizeData(parsed) : null;
     } catch {
       return null;
     }

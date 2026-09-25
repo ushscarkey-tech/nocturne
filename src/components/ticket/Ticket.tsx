@@ -1,7 +1,10 @@
+"use client";
+
 import type { CSSProperties } from "react";
 import type { TicketFace } from "@/core/stats";
 import { formatDuration } from "@/core/time";
 import type { CarriageId } from "@/core/types";
+import { useI18n } from "@/i18n";
 
 const STYLES: Record<CarriageId, { from: string; to: string; ink: string; accent: string }> = {
   rain: { from: "#1a2336", to: "#101727", ink: "#dfe4ee", accent: "#9fb4d6" },
@@ -15,6 +18,7 @@ const STYLES: Record<CarriageId, { from: string; to: string; ink: string; accent
  * slightly (angle, grain, station marks) while keeping one visual system.
  */
 export function Ticket({ face, style, size = "lg" }: { face: TicketFace; style: CarriageId; size?: "sm" | "lg" }) {
+  const { t } = useI18n();
   const s = STYLES[style];
   const angle = 150 + Math.round(face.hueShift * 40);
   const lg = size === "lg";
@@ -26,7 +30,7 @@ export function Ticket({ face, style, size = "lg" }: { face: TicketFace; style: 
 
   return (
     <article
-      aria-label={`Ticket ${face.dateLabel}, ${face.departure} to ${face.arrival}, ${face.stops} stops, ${formatDuration(face.focused)} focused, ${face.completion}% of planned work, ${face.status.toLowerCase()}`}
+      aria-label={t("archive.ticketLabel", { date: face.dateLabel, departure: face.departure, arrival: face.arrival, stops: face.stops, focused: formatDuration(face.focused), completion: face.completion, status: face.status.toLowerCase() })}
       className={`relative overflow-hidden rounded-[1.1rem] border border-white/[0.07] text-[color:var(--ticket-ink)] shadow-[0_30px_80px_-40px_rgba(0,0,0,0.9)] ${
         lg ? "w-full max-w-[20rem] px-7 pb-7 pt-8" : "w-full px-4 pb-4 pt-5"
       }`}

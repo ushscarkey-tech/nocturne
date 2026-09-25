@@ -2,11 +2,12 @@
 
 import { useId, type ReactNode } from "react";
 import type { FocusLevel, Level } from "@/core/types";
+import { useI18n, type MessageKey } from "@/i18n";
 
-export const FOCUS_OPTIONS: { value: FocusLevel; label: string; hint: string }[] = [
-  { value: "low", label: "Low", hint: "Shorter, lighter stations" },
-  { value: "steady", label: "Steady", hint: "Keep the route as planned" },
-  { value: "sharp", label: "Sharp", hint: "Hard work goes first" },
+export const FOCUS_OPTIONS: { value: FocusLevel; label: MessageKey; hint: MessageKey }[] = [
+  { value: "low", label: "common.low", hint: "common.focusLow.hint" },
+  { value: "steady", label: "common.steady", hint: "common.focusSteady.hint" },
+  { value: "sharp", label: "common.sharp", hint: "common.focusSharp.hint" },
 ];
 
 /** Low / Steady / Sharp as an accessible radio group. */
@@ -14,13 +15,14 @@ export function FocusPicker({
   value,
   onChange,
   size = "md",
-  label = "Current focus",
+  label,
 }: {
   value: FocusLevel | null;
   onChange: (v: FocusLevel) => void;
   size?: "md" | "lg";
-  label?: string;
+  label: string;
 }) {
+  const { t } = useI18n();
   return (
     <div role="radiogroup" aria-label={label} className="grid grid-cols-3 gap-2">
       {FOCUS_OPTIONS.map((o) => {
@@ -48,9 +50,9 @@ export function FocusPicker({
               ))}
             </span>
             <span className={`block ${size === "lg" ? "text-base" : "text-sm"} ${checked ? "text-paper" : "text-paper-dim"}`}>
-              {o.label}
+              {t(o.label)}
             </span>
-            {size === "lg" && <span className="mt-1 block text-xs text-mist">{o.hint}</span>}
+            {size === "lg" && <span className="mt-1 block text-xs text-mist">{t(o.hint)}</span>}
           </button>
         );
       })}
@@ -58,15 +60,15 @@ export function FocusPicker({
   );
 }
 
-const INTEREST_LABELS = ["Avoiding it", "Reluctant", "Neutral", "Curious", "Drawn to it"];
-
 /** Emotional interest input: Avoiding ←→ Drawn to it. Stored as 1–5. */
 export function InterestSlider({ value, onChange }: { value: Level; onChange: (v: Level) => void }) {
   const id = useId();
+  const { t } = useI18n();
+  const word = t(`common.interest.${value}` as MessageKey);
   return (
     <div>
       <label htmlFor={id} className="mb-1 block text-sm text-paper-dim">
-        How does this task feel?
+        {t("common.interestQuestion")}
       </label>
       <input
         id={id}
@@ -76,13 +78,13 @@ export function InterestSlider({ value, onChange }: { value: Level; onChange: (v
         step={1}
         value={value}
         onChange={(e) => onChange(Number(e.target.value) as Level)}
-        aria-valuetext={INTEREST_LABELS[value - 1]}
+        aria-valuetext={word}
         className="rail"
       />
       <div className="flex justify-between text-xs text-mist">
-        <span className={value <= 2 ? "text-paper-dim" : ""}>Avoiding</span>
-        <span className="font-mono text-[0.7rem] tracking-wider text-lamp/80">{INTEREST_LABELS[value - 1]}</span>
-        <span className={value >= 4 ? "text-paper-dim" : ""}>Drawn to it</span>
+        <span className={value <= 2 ? "text-paper-dim" : ""}>{t("common.interestLow")}</span>
+        <span className="font-mono text-[0.7rem] tracking-wider text-lamp/80">{word}</span>
+        <span className={value >= 4 ? "text-paper-dim" : ""}>{t("common.interestHigh")}</span>
       </div>
     </div>
   );
@@ -102,6 +104,7 @@ export function LevelPicker({
   low: string;
   high: string;
 }) {
+  const { t } = useI18n();
   return (
     <div>
       <p className="mb-2 text-sm text-paper-dim">{label}</p>
@@ -112,7 +115,7 @@ export function LevelPicker({
             type="button"
             role="radio"
             aria-checked={value === n}
-            aria-label={`${label} ${n} of 5`}
+            aria-label={t("common.levelOf", { label, n })}
             onClick={() => onChange(n)}
             className="flex h-9 flex-1 items-center justify-center rounded-lg transition-colors hover:bg-white/[0.03]"
           >
@@ -194,27 +197,25 @@ export function MinutesInput({
   max?: number;
   label: string;
 }) {
-  const h = Math.floor(value / 60);
-  const m = value % 60;
+  const { t, fmt } = useI18n();
   return (
     <div className="flex items-center gap-3" role="group" aria-label={label}>
       <button
         type="button"
         onClick={() => onChange(Math.max(min, value - step))}
         className="h-9 w-9 rounded-full border border-rule text-mist transition-colors hover:text-paper"
-        aria-label={`Decrease ${label}`}
+        aria-label={t("common.decrease", { label })}
       >
         −
       </button>
       <output className="min-w-20 text-center font-mono text-lg tabular" aria-live="polite">
-        {h > 0 ? `${h}h ` : ""}
-        {String(m).padStart(h > 0 ? 2 : 1, "0")}m
+        {fmt.duration(value)}
       </output>
       <button
         type="button"
         onClick={() => onChange(Math.min(max, value + step))}
         className="h-9 w-9 rounded-full border border-rule text-mist transition-colors hover:text-paper"
-        aria-label={`Increase ${label}`}
+        aria-label={t("common.increase", { label })}
       >
         +
       </button>

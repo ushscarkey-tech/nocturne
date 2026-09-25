@@ -80,10 +80,12 @@ export interface OrderContext {
   tasks: Map<string, Task>;
   /** Task of the station immediately before the first slot, if any. */
   previousTaskId?: string | null;
+  /** Learned nudge for placing a task at a given minute (0 when unknown). */
+  history?: (task: Task, startMinute: number) => number;
 }
 
 /** Score a chunk for the next position in the route. Higher is better. */
-function scoreChunk(c: Chunk, position: number, prev: Chunk | null, ctx: OrderContext): number {
+function scoreChunk(c: Chunk, position: number, prev: Chunk | null, ctx: OrderContext, startMinute: number): number {
   const t = ctx.tasks.get(c.taskId);
   if (!t) return -Infinity;
   // Reported focus applies now and drifts down gently through the evening.
@@ -98,6 +100,9 @@ function scoreChunk(c: Chunk, position: number, prev: Chunk | null, ctx: OrderCo
   // Important work the traveller is avoiding goes early while they're fresh,
   // so low interest never quietly pushes it to the end of every night.
   if (ctx.focus !== "low" && t.interest <= 2 && t.importance >= 4 && position <= 1) score += 0.3;
+  // What the traveller's own history says about this hour (small by design:
+  // never outweighs deadlines, importance or how they feel right now).
+  if (ctx.history) score += ctx.history(t, startMinute);
   const prevTaskId = prev?.taskId ?? (position === 0 ? ctx.previousTaskId : null);
   if (prevTaskId === c.taskId) score -= 0.8;
   if (prev) {
@@ -135,7 +140,7 @@ export function packOptimized(
         const t = ctx.tasks.get(c.taskId);
         const canSplit = !!t?.splittable && canSplitAt(c.minutes, space, minSessionFor(c.taskId));
         if (!fits && !canSplit) return;
-        const s = scoreChunk(c, slots.length, prev, ctx) + (fits ? 0.2 : 0);
+        const s = scoreChunk(c, slots.length, prev, ctx, cursor) + (fits ? 0.2 : 0);
         if (s > bestScore) {
           bestScore = s;
           bestIdx = idx;

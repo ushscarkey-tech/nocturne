@@ -1,0 +1,37 @@
+import type source from "../en/route";
+
+const route: Partial<Record<keyof typeof source, string>> = {
+  "route.stationStop": "停靠 · {min}",
+  "route.servicePaused": "运行已暂停 · {at} 恢复",
+  "route.continuedLater": "稍后继续",
+  "route.completed": "已完成",
+  "route.now": "现在",
+  "route.removedTask": "已移除任务",
+  "route.locked": "已锁定",
+  "route.reorder": "重新排序 {task}",
+  "route.options": "{task} 选项",
+  "route.tonightRoute": "今晚路线",
+  "route.line": "今晚线路",
+  "route.routeTitle": "路线",
+  "route.noStations": "今晚没有站点。",
+  "route.dragToReorder": "拖动重排。已锁站点不动。",
+  "route.boardTrain": "上车",
+  "route.returnToJourney": "返回行程",
+  "route.optimizeRoute": "优化路线",
+  "route.howAreYouTonight": "今晚状态如何？",
+  "route.optimizeHelp": "重建未开始的站点。",
+  "route.doNext": "下一个做",
+  "route.unlockTime": "解锁",
+  "route.lockTime": "锁定时间",
+  "route.length": "时长",
+  "route.shortenBy": "缩短 {n} 分钟",
+  "route.extendBy": "延长 {n} 分钟",
+  "route.moveToTime": "移至指定时间",
+  "route.moveAndLock": "移至并锁定",
+  "route.openTask": "打开任务",
+  "route.skipToday": "今天跳过",
+  "route.underWay": "此站正在进行。",
+  "route.completeRecord": "此站已完成并保留记录。",
+};
+
+export default route;

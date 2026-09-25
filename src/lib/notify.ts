@@ -1,7 +1,8 @@
 "use client";
 
 import { upcomingOn } from "@/core/sessions";
-import { clock, diffDays, formatDuration, serviceDate } from "@/core/time";
+import { clock, diffDays, serviceDate } from "@/core/time";
+import { translate } from "@/i18n";
 import { journeyFor } from "@/core/journey";
 import type { NocturneData } from "@/core/types";
 
@@ -55,6 +56,7 @@ function send(key: string, title: string, body: string) {
 export function checkNotifications(data: NocturneData, now: Date) {
   if (!notificationsEnabled()) return;
   const today = serviceDate(now);
+  const tr = (key: string, params?: Record<string, string | number>) => translate(data.profile.locale, key, params);
   const journey = journeyFor(data, today);
   const waiting = !journey || journey.phase === "boarding" || journey.phase === "paused";
   const next = upcomingOn(data.sessions, today)[0];
@@ -62,7 +64,7 @@ export function checkNotifications(data: NocturneData, now: Date) {
     const minutes = (new Date(next.plannedStart).getTime() - now.getTime()) / 60_000;
     if (minutes > 0 && minutes <= 5) {
       const platform = journey?.platform ?? "03";
-      send(`depart:${next.id}`, "Your train departs in 5 min", `Platform ${platform} · ${clock(next.plannedStart)}`);
+      send(`depart:${next.id}`, tr("notify.departs"), tr("notify.platform", { platform, at: clock(next.plannedStart) }));
     }
   }
 
@@ -72,7 +74,7 @@ export function checkNotifications(data: NocturneData, now: Date) {
     .filter((x) => x.days >= 0 && x.days <= 2)
     .sort((a, b) => a.days - b.days || b.t.remainingMinutes - a.t.remainingMinutes)[0];
   if (soon && now.getHours() >= 16) {
-    const label = soon.days === 0 ? "Due today" : soon.days === 1 ? "1 day remaining" : `${soon.days} days remaining`;
-    send(`deadline:${today}`, label, `${soon.t.title} · ${formatDuration(soon.t.remainingMinutes)} left`);
+    const label = soon.days === 0 ? tr("notify.dueToday") : soon.days === 1 ? tr("notify.dueTomorrow") : tr("notify.dueIn", { n: soon.days });
+    send(`deadline:${today}`, label, tr("notify.left", { task: soon.t.title, min: soon.t.remainingMinutes }));
   }
 }

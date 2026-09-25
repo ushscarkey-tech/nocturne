@@ -8,6 +8,7 @@ import * as engine from "@/core/journey";
 import { newId } from "@/core/ids";
 import { planToday, renumberDay } from "@/core/planner";
 import { createSeedData } from "@/core/seed";
+import { schedulingProfile } from "@/core/learning";
 import { activeSession, sessionsOn } from "@/core/sessions";
 import { atMinutes, DAY_START_MINUTES, parseHM, serviceDate } from "@/core/time";
 import type {
@@ -55,7 +56,7 @@ function replan(
   if (journey?.phase === "final") return { data, change: null };
   const startFrom = journey?.phase === "stop" && journey.stopEndsAt ? new Date(journey.stopEndsAt) : undefined;
   const result = planToday(
-    { tasks: data.tasks, windows: data.windows, sessions: data.sessions, userId: data.profile.id },
+    { tasks: data.tasks, windows: data.windows, sessions: data.sessions, userId: data.profile.id, focusProfile: schedulingProfile(data, now) },
     {
       now,
       focus: opts.focus ?? journey?.focus ?? "steady",
@@ -106,6 +107,8 @@ export interface TaskDraft {
   maxSessionMinutes: number;
   recurrence: Task["recurrence"];
   lineId: string | null;
+  /** Set when the traveller chose a calibrated estimate over their own. */
+  userEstimatedMinutes?: number | null;
 }
 
 const PLANNING_FIELDS: (keyof Task)[] = [
@@ -137,6 +140,7 @@ export function createTask(draft: TaskDraft): Task {
   const task: Task = {
     id: newId(),
     userId: data.profile.id,
+    userEstimatedMinutes: null,
     ...draft,
     title: draft.title.trim(),
     remainingMinutes: draft.estimatedMinutes,
@@ -185,6 +189,41 @@ export function completeTask(id: string) {
   const tasks = data.tasks.map((t) =>
     t.id === id ? { ...t, status: "done" as const, remainingMinutes: 0, completedAt: now, updatedAt: now } : t,
   );
+  const { data: next, change } = replan({ ...data, tasks }, "task-change");
+  commit(next, change);
+}
+
+/**
+ * Use a calibrated estimate. The traveller's own number is kept so they can
+ * go back to it at any time.
+ */
+export function applySuggestedEstimate(id: string, minutes: number) {
+  const t = current().tasks.find((x) => x.id === id);
+  if (!t || minutes === t.estimatedMinutes) return;
+  const delta = minutes - t.estimatedMinutes;
+  const own = t.userEstimatedMinutes ?? t.estimatedMinutes;
+  commitTaskEstimate(id, {
+    estimatedMinutes: minutes,
+    remainingMinutes: Math.max(0, t.remainingMinutes + delta),
+    userEstimatedMinutes: own === minutes ? null : own,
+  });
+}
+
+/** Back to the traveller's own estimate. */
+export function revertEstimate(id: string) {
+  const t = current().tasks.find((x) => x.id === id);
+  if (!t || t.userEstimatedMinutes === null) return;
+  const delta = t.userEstimatedMinutes - t.estimatedMinutes;
+  commitTaskEstimate(id, {
+    estimatedMinutes: t.userEstimatedMinutes,
+    remainingMinutes: Math.max(0, t.remainingMinutes + delta),
+    userEstimatedMinutes: null,
+  });
+}
+
+function commitTaskEstimate(id: string, patch: Pick<Task, "estimatedMinutes" | "remainingMinutes" | "userEstimatedMinutes">) {
+  const data = current();
+  const tasks = data.tasks.map((t) => (t.id === id ? { ...t, ...patch, updatedAt: iso(new Date()) } : t));
   const { data: next, change } = replan({ ...data, tasks }, "task-change");
   commit(next, change);
 }
@@ -308,7 +347,7 @@ export function skipToday(id: string) {
   const data = current();
   const s = data.sessions.find((x) => x.id === id);
   if (!s || s.status !== "planned") return;
-  const skipped = patchSession(data, id, { status: "skipped", locked: false });
+  const skipped = patchSession(data, id, { status: "skipped", locked: false, endedBy: "skipped" });
   const { data: next, change } = replan(skipped, "skip", { mode: "retime" });
   commit(next, change);
 }
@@ -423,6 +462,35 @@ export function updateProfile(patch: Partial<Profile>) {
 
 export async function loadSampleData() {
   const data = current();
-  const seeded = createSeedData(new Date(), { id: data.profile.id, name: data.profile.name, createdAt: data.profile.createdAt });
+  const seeded = createSeedData(new Date(), { ...data.profile, onboardedAt: data.profile.onboardedAt ?? new Date().toISOString() }, data.profile.locale);
   await useStore.getState().replaceAll(seeded);
+}
+
+/** Replace weekly Service Time (used by the welcome guide). */
+export function setWeeklyWindows(list: { days: number[]; start: string; end: string }[]) {
+  const data = current();
+  const windows: StudyWindow[] = [
+    ...data.windows.filter((w) => !w.recurring),
+    ...list.flatMap((w) =>
+      w.days.map((day) => ({
+        id: newId(),
+        userId: data.profile.id,
+        dayOfWeek: day,
+        specificDate: null,
+        startTime: w.start,
+        endTime: w.end,
+        recurring: true,
+        enabled: true,
+        kind: "available" as const,
+      })),
+    ),
+  ];
+  const { data: next } = replan({ ...data, windows }, "initial");
+  commit(next);
+}
+
+export function finishOnboarding() {
+  const data = current();
+  commit({ ...data, profile: { ...data.profile, onboardedAt: new Date().toISOString() } });
+  ensureToday();
 }

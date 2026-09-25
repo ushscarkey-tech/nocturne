@@ -1,7 +1,7 @@
 "use client";
 
 import { create } from "zustand";
-import type { NocturneData, RouteChange } from "@/core/types";
+import type { Message, NocturneData, RouteChange } from "@/core/types";
 import { diffData, isEmptyChange, type Repository } from "@/data/repository";
 
 export type SessionMode = "demo" | "cloud";
@@ -10,6 +10,9 @@ export interface Notice {
   id: number;
   headline: string;
   lines: string[];
+  /** Translatable versions of headline/lines, rendered in the traveller's language when present. */
+  headlineKey?: string;
+  messages?: Message[];
   tone: "route" | "info" | "error";
 }
 
@@ -65,7 +68,14 @@ export const useStore = create<StoreState & StoreActions>()((set, get) => ({
     const { data: prev, repo } = get();
     if (!prev || prev === next) return;
     set({ data: next });
-    if (change) get().notify({ headline: change.headline, lines: change.lines, tone: "route" });
+    if (change)
+      get().notify({
+        headline: change.headline,
+        lines: change.lines,
+        headlineKey: "change.headline",
+        messages: change.messages,
+        tone: "route",
+      });
     if (!repo) return;
     const changes = diffData(prev, next);
     if (isEmptyChange(changes)) return;

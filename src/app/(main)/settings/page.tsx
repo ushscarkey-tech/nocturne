@@ -3,18 +3,22 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useSyncExternalStore } from "react";
-import { CARRIAGES } from "@/components/journey/Boarding";
+import type { CarriageId } from "@/core/types";
 import { Button } from "@/components/ui/Button";
 import { Field, Toggle } from "@/components/ui/controls";
 import { Icon } from "@/components/ui/Icon";
 import { Sheet } from "@/components/ui/Sheet";
+import { LOCALES, rememberLocale, useI18n, type MessageKey } from "@/i18n";
 import { notificationsEnabled, notificationsSupported, requestNotifications } from "@/lib/notify";
 import { loadSampleData, updateProfile } from "@/state/actions";
 import { isSupabaseConfigured, resetDemo, signOut } from "@/state/session";
 import { useData, useStore } from "@/state/store";
 
+const CARRIAGES: CarriageId[] = ["quiet", "rain", "tunnel", "moon"];
+
 export default function SettingsPage() {
   const data = useData();
+  const { t } = useI18n();
   const mode = useStore((s) => s.mode);
   const router = useRouter();
   const [name, setName] = useState(data.profile.name);
@@ -30,48 +34,74 @@ export default function SettingsPage() {
     () => notificationsEnabled(),
     () => false,
   );
+  const p = data.profile;
 
   return (
     <div className="animate-fade">
       <header>
-        <p className="eyebrow">Traveller</p>
-        <h1 className="mt-2 font-display text-5xl leading-none">Settings</h1>
+        <h1 className="font-display text-5xl leading-none">{t("settings.title")}</h1>
       </header>
 
-      <section className="mt-12 space-y-8" aria-label="Profile">
-        <Field label="Name">
+      <section className="mt-12 space-y-8">
+        <Field label={t("settings.name")}>
           <input
             className="field"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            onBlur={() => name.trim() && name !== data.profile.name && updateProfile({ name: name.trim() })}
+            onBlur={() => name.trim() && name !== p.name && updateProfile({ name: name.trim() })}
           />
         </Field>
+
         <div>
-          <p className="eyebrow">Default carriage</p>
-          <div className="mt-3 grid grid-cols-2 gap-2" role="radiogroup" aria-label="Default carriage">
-            {CARRIAGES.map((c) => (
+          <p className="eyebrow">{t("settings.language")}</p>
+          <div className="mt-3 grid grid-cols-2 gap-2" role="radiogroup" aria-label={t("settings.language")}>
+            {LOCALES.map((l) => (
               <button
-                key={c.id}
+                key={l.id}
                 type="button"
                 role="radio"
-                aria-checked={data.profile.preferredCarriage === c.id}
-                onClick={() => updateProfile({ preferredCarriage: c.id })}
-                className={`rounded-xl border px-4 py-3 text-left text-sm transition-colors ${
-                  data.profile.preferredCarriage === c.id ? "border-lamp/60 text-paper" : "border-rule text-mist hover:text-paper"
+                aria-checked={p.locale === l.id}
+                lang={l.id}
+                onClick={() => {
+                  rememberLocale(l.id);
+                  updateProfile({ locale: l.id });
+                }}
+                className={`min-h-11 rounded-xl border px-4 text-left text-sm transition-colors ${
+                  p.locale === l.id ? "border-lamp/60 text-paper" : "border-rule text-mist hover:text-paper"
                 }`}
               >
-                {c.name}
+                {l.name}
               </button>
             ))}
           </div>
         </div>
+
+        <div>
+          <p className="eyebrow">{t("settings.carriage")}</p>
+          <div className="mt-3 grid grid-cols-2 gap-2" role="radiogroup" aria-label={t("settings.carriage")}>
+            {CARRIAGES.map((c) => (
+              <button
+                key={c}
+                type="button"
+                role="radio"
+                aria-checked={p.preferredCarriage === c}
+                onClick={() => updateProfile({ preferredCarriage: c })}
+                className={`min-h-11 rounded-xl border px-4 text-left text-sm transition-colors ${
+                  p.preferredCarriage === c ? "border-lamp/60 text-paper" : "border-rule text-mist hover:text-paper"
+                }`}
+              >
+                {t(`settings.carriage.${c}` as MessageKey)}
+              </button>
+            ))}
+          </div>
+        </div>
+
         <div className="divide-y divide-rule-soft border-y border-rule-soft">
           <Toggle
-            checked={data.profile.autoTunnel}
+            checked={p.autoTunnel}
             onChange={(v) => updateProfile({ autoTunnel: v })}
-            label="Enter the Tunnel automatically"
-            description="After a quiet minute of focus, the interface fades to deep focus."
+            label={t("settings.autoTunnel")}
+            description={t("settings.autoTunnelHint")}
           />
           {supported && (
             <Toggle
@@ -79,30 +109,46 @@ export default function SettingsPage() {
               onChange={async (v) => {
                 if (v) setNotifyOn(await requestNotifications());
               }}
-              label="Departure reminders"
-              description={granted ? "On. Turn off in your browser's site settings." : "Five minutes before departure, and one deadline note a day."}
+              label={t("settings.reminders")}
+              description={granted ? t("settings.remindersOn") : t("settings.remindersHint")}
             />
           )}
         </div>
-        <Link href="/service" className="flex items-center justify-between py-1 text-sm text-paper-dim hover:text-paper">
-          Service Time <Icon name="chevron" size={16} />
+        <Link href="/service" className="flex min-h-11 items-center justify-between text-sm text-paper-dim hover:text-paper">
+          {t("settings.serviceTime")} <Icon name="chevron" size={16} />
         </Link>
+      </section>
+
+      <section className="mt-14" aria-labelledby="personal-title">
+        <h2 id="personal-title" className="eyebrow">
+          {t("settings.personal")}
+        </h2>
+        <div className="mt-3 divide-y divide-rule-soft border-y border-rule-soft">
+          <Toggle
+            checked={p.learnFromSessions}
+            onChange={(v) => updateProfile({ learnFromSessions: v })}
+            label={t("settings.learn")}
+            description={t("settings.learnHint")}
+          />
+          <div className={p.learnFromSessions ? "" : "pointer-events-none opacity-40"} aria-disabled={!p.learnFromSessions}>
+            <Toggle checked={p.autoAdjustEstimates && p.learnFromSessions} onChange={(v) => updateProfile({ autoAdjustEstimates: v })} label={t("settings.adjust")} />
+          </div>
+          <div className={p.learnFromSessions ? "" : "pointer-events-none opacity-40"} aria-disabled={!p.learnFromSessions}>
+            <Toggle checked={p.useFocusHistory && p.learnFromSessions} onChange={(v) => updateProfile({ useFocusHistory: v })} label={t("settings.focusHistory")} />
+          </div>
+        </div>
       </section>
 
       <section className="mt-14" aria-labelledby="account-title">
         <h2 id="account-title" className="eyebrow">
-          {mode === "cloud" ? "Account" : "Demo"}
+          {mode === "cloud" ? t("settings.account") : t("settings.demo")}
         </h2>
-        <p className="mt-2 text-sm leading-relaxed text-mist">
-          {mode === "cloud"
-            ? "Your tasks and journeys sync to your Nocturne account."
-            : "You're exploring with sample data saved in this browser only."}
-        </p>
+        <p className="mt-2 text-sm text-mist">{mode === "cloud" ? t("settings.cloudNote") : t("settings.demoNote")}</p>
         <div className="mt-5 flex flex-wrap gap-3">
           {mode === "cloud" ? (
             <>
               <Button variant="secondary" onClick={() => setConfirm("sample")}>
-                Load sample data
+                {t("settings.loadSample")}
               </Button>
               <Button
                 variant="ghost"
@@ -111,13 +157,13 @@ export default function SettingsPage() {
                   router.replace("/login");
                 }}
               >
-                Sign out
+                {t("settings.signOut")}
               </Button>
             </>
           ) : (
             <>
               <Button variant="secondary" onClick={() => setConfirm("reset")}>
-                Reset demo
+                {t("settings.resetDemo")}
               </Button>
               {isSupabaseConfigured && (
                 <Button
@@ -127,28 +173,34 @@ export default function SettingsPage() {
                     router.replace("/login");
                   }}
                 >
-                  Sign in instead
+                  {t("settings.signIn")}
                 </Button>
               )}
             </>
           )}
         </div>
+        <button
+          type="button"
+          onClick={() => {
+            updateProfile({ onboardedAt: null });
+            router.push("/welcome");
+          }}
+          className="mt-6 min-h-11 text-sm text-mist underline decoration-rule underline-offset-4 hover:text-paper"
+        >
+          {t("settings.guide")}
+        </button>
       </section>
 
       <Sheet
         open={confirm !== null}
         onClose={() => setConfirm(null)}
-        title={confirm === "reset" ? "Reset the demo?" : "Replace with sample data?"}
-        eyebrow="This can't be undone"
+        title={confirm === "reset" ? t("settings.confirmReset") : t("settings.confirmSample")}
+        eyebrow={t("settings.cantUndo")}
       >
-        <p className="text-sm leading-relaxed text-mist">
-          {confirm === "reset"
-            ? "All demo tasks, journeys and tickets in this browser are replaced with fresh sample data."
-            : "Your current tasks, lines, journeys and tickets are replaced with sample data."}
-        </p>
+        <p className="text-sm leading-relaxed text-mist">{confirm === "reset" ? t("settings.resetBody") : t("settings.sampleBody")}</p>
         <div className="mt-8 flex justify-end gap-3">
           <Button variant="ghost" onClick={() => setConfirm(null)}>
-            Cancel
+            {t("common.cancel")}
           </Button>
           <Button
             variant="danger"
@@ -160,7 +212,7 @@ export default function SettingsPage() {
               router.push("/");
             }}
           >
-            {confirm === "reset" ? "Reset demo" : "Replace data"}
+            {confirm === "reset" ? t("settings.resetDemo") : t("settings.replace")}
           </Button>
         </div>
       </Sheet>

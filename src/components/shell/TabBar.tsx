@@ -3,16 +3,35 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Icon, type IconName } from "@/components/ui/Icon";
+import { useI18n } from "@/i18n";
 
-const TABS: { href: string; label: string; icon: IconName; match: (p: string) => boolean }[] = [
-  { href: "/", label: "Tonight", icon: "moon", match: (p) => p === "/" || p.startsWith("/route") || p.startsWith("/service") },
-  { href: "/tasks", label: "Tasks", icon: "list", match: (p) => p.startsWith("/tasks") },
-  { href: "/lines", label: "Lines", icon: "line", match: (p) => p.startsWith("/lines") },
-  { href: "/archive", label: "Archive", icon: "ticket", match: (p) => p.startsWith("/archive") },
+type TabKey = "shell.tonight" | "shell.tasks" | "shell.lines" | "shell.archive";
+
+const TAB_KEYS = [
+  { href: "/", key: "shell.tonight" as TabKey, icon: "moon" as IconName, match: (p: string) => p === "/" || p.startsWith("/route") || p.startsWith("/service") },
+  { href: "/tasks", key: "shell.tasks" as TabKey, icon: "list" as IconName, match: (p: string) => p.startsWith("/tasks") },
+  { href: "/lines", key: "shell.lines" as TabKey, icon: "line" as IconName, match: (p: string) => p.startsWith("/lines") },
+  { href: "/archive", key: "shell.archive" as TabKey, icon: "ticket" as IconName, match: (p: string) => p.startsWith("/archive") },
 ];
 
 export function TabBar() {
+  const { t } = useI18n();
   const pathname = usePathname();
+  const TABS = TAB_KEYS.map((tab) => {
+    const label = (() => {
+      switch (tab.key) {
+        case "shell.tonight":
+          return t("shell.tonight");
+        case "shell.tasks":
+          return t("shell.tasks");
+        case "shell.lines":
+          return t("shell.lines");
+        case "shell.archive":
+          return t("shell.archive");
+      }
+    })();
+    return { ...tab, label };
+  });
   return (
     <nav
       aria-label="Primary"
@@ -51,7 +70,7 @@ export function TabBar() {
           }`}
         >
           <Icon name="settings" size={18} />
-          Settings
+          {t("shell.settings")}
         </Link>
       </div>
     </nav>

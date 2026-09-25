@@ -4,21 +4,25 @@ import Link from "next/link";
 import { availabilityForDate } from "@/core/availability";
 import { journeyFor } from "@/core/journey";
 import { remainingSeconds } from "@/core/sessions";
-import { clock, formatDuration, formatHM, formatLongDate, formatShortDate, serviceDate, serviceMinutes } from "@/core/time";
-import { ButtonLink } from "@/components/ui/Button";
+import { clock, formatHM, serviceDate, serviceMinutes } from "@/core/time";
+import { ButtonLink, buttonClass } from "@/components/ui/Button";
+import { useQuickAdd } from "@/components/quickadd/QuickAdd";
 import { Icon } from "@/components/ui/Icon";
 import { ConfirmFinish } from "@/components/journey/ConfirmFinish";
 import { RouteLine } from "@/components/route/RouteLine";
+import { PlatformScene } from "@/components/scene/PlatformScene";
 import { ConflictNotice } from "@/components/tonight/ConflictNotice";
 import { useNow } from "@/lib/hooks";
 import { taskHref, ticketHref } from "@/lib/paths";
 import { routeItems, routeSummary } from "@/lib/route-view";
 import { useConflict } from "@/lib/use-planner";
 import { loadSampleData } from "@/state/actions";
+import { useI18n } from "@/i18n";
 import { useData } from "@/state/store";
 
 export default function TonightPage() {
   const data = useData();
+  const { t, fmt } = useI18n();
   const now = useNow(15_000);
   const today = serviceDate(now);
   const journey = journeyFor(data, today);
@@ -26,8 +30,8 @@ export default function TonightPage() {
   const items = routeItems(data, today);
   const windows = availabilityForDate(data.windows, today);
   const { conflict } = useConflict(data, now);
-  const ticket = journey ? data.tickets.find((t) => t.journeyId === journey.id) : undefined;
-  const tasksById = new Map(data.tasks.map((t) => [t.id, t]));
+  const ticket = journey ? data.tickets.find((x) => x.journeyId === journey.id) : undefined;
+  const tasksById = new Map(data.tasks.map((task) => [task.id, task]));
 
   const riding = journey && ["cabin", "stop", "paused"].includes(journey.phase) && !!journey.startedAt;
   const ended = journey?.phase === "final" && !!journey.startedAt;
@@ -37,20 +41,30 @@ export default function TonightPage() {
   const nextTask = next ? tasksById.get(next.taskId) : undefined;
   const departsAt = summary.next ? new Date(summary.next.plannedStart) : null;
   const departsNow = !!departsAt && departsAt.getTime() <= now.getTime() + 60_000;
-  const isEmptyAccount = !data.tasks.some((t) => t.status !== "archived");
+  const isEmptyAccount = !data.tasks.some((task) => task.status !== "archived");
   const hasAnyService = data.windows.some((w) => w.enabled && w.kind === "available");
   const overdue = data.tasks.filter(
-    (t) => t.status === "active" && !t.recurrence && t.deadline && t.deadline < today && t.remainingMinutes > 0,
+    (task) => task.status === "active" && !task.recurrence && task.deadline && task.deadline < today && task.remainingMinutes > 0,
   );
 
   return (
     <div className="animate-fade">
-      <header>
-        <p className="font-mono text-[0.6875rem] tracking-[0.4em] text-paper-dim md:hidden">NOCTURNE</p>
-        <p className="eyebrow mt-8 md:mt-0">{formatLongDate(today)}</p>
-        <h1 className="mt-2 font-display text-[3.5rem] leading-none tracking-tight text-paper">Tonight</h1>
+      <header className="relative">
+        {/* A quiet platform at night, behind the evening's summary. */}
+        <PlatformScene
+          className="absolute -top-[max(2.5rem,env(safe-area-inset-top))] left-1/2 -z-10 h-[min(62vh,560px)] w-screen -translate-x-1/2 md:-top-14 md:w-full md:rounded-b-3xl"
+          stationName={next?.stationName ?? "NOCTURNE"}
+        />
+        <div className="flex items-center justify-between">
+          <p className="font-mono text-[0.6875rem] tracking-[0.4em] text-paper-dim md:invisible">NOCTURNE</p>
+          <Link href="/settings" aria-label={t("shell.settings")} className="-mr-3 flex h-11 w-11 items-center justify-center text-mist hover:text-paper md:hidden">
+            <Icon name="settings" size={18} />
+          </Link>
+        </div>
+        <p className="eyebrow mt-[min(30vh,15rem)] md:mt-[12rem]">{fmt.longDate(today)}</p>
+        <h1 className="mt-2 font-display text-[3.5rem] leading-none tracking-tight text-paper">{t("tonight.title")}</h1>
         {windows.length > 0 ? (
-          <p className="mt-4 font-mono text-base tabular text-paper-dim" aria-label="Service Time tonight">
+          <p className="mt-4 font-mono text-base tabular text-paper-dim" aria-label={t("tonight.serviceLabel")}>
             {windows.map((w, i) => (
               <span key={w.start}>
                 {i > 0 && <span className="px-2 text-haze">·</span>}
@@ -63,45 +77,48 @@ export default function TonightPage() {
             ))}
           </p>
         ) : (
-          <p className="mt-4 text-sm text-mist">No Service Time today.</p>
+          <p className="mt-4 text-sm text-mist">{t("tonight.noServiceToday")}</p>
         )}
       </header>
 
       {/* What happens next — the one thing to read. */}
-      <section aria-label="Next" className="mt-10 border-t border-rule-soft pt-8">
+      <section aria-label={t("tonight.next")} className="mt-10 border-t border-rule-soft pt-8">
         {riding && summary.active && nextTask ? (
           <>
-            <p className="eyebrow text-lamp/90">On board · {summary.active.stationName}</p>
+            <p className="eyebrow text-lamp/90">
+              {t("tonight.onBoard")} · {summary.active.stationName}
+            </p>
             <p className="mt-3 line-clamp-2 break-words font-display text-3xl leading-tight">{nextTask.title}</p>
             <p className="mt-2 font-mono text-sm tabular text-mist">
-              {formatDuration(remainingSeconds(summary.active, now) / 60)} left
-              {summary.arrival && <> · final arrival {clock(summary.arrival)}</>}
+              {t("tonight.left", { min: remainingSeconds(summary.active, now) / 60 })}
+              {summary.arrival && <> · {t("tonight.finalArrival", { at: clock(summary.arrival) })}</>}
             </p>
           </>
         ) : !ended && summary.next && nextTask ? (
           <>
-            <p className="eyebrow">Next departure</p>
-            <p className="mt-2 font-mono text-5xl font-light tabular text-lamp">{departsNow ? "Now" : clock(departsAt!)}</p>
+            <p className="eyebrow">{t("tonight.nextDeparture")}</p>
+            <p className="mt-2 font-mono text-5xl font-light tabular text-lamp">{departsNow ? t("tonight.now") : clock(departsAt!)}</p>
             <p className="mt-4 line-clamp-2 break-words text-lg text-paper">{nextTask.title}</p>
             <p className="mt-1 font-mono text-xs tabular text-mist">
-              {summary.next.stationName} · {formatDuration(summary.next.plannedMinutes)}
+              {summary.next.stationName} · {fmt.duration(summary.next.plannedMinutes)}
             </p>
           </>
         ) : ended ? (
           <>
-            <p className="eyebrow">Final station</p>
-            <p className="mt-3 font-display text-3xl leading-tight">Tonight&rsquo;s journey is complete.</p>
+            <p className="eyebrow">{t("tonight.finalStation")}</p>
+            <p className="mt-3 font-display text-3xl leading-tight">{t("tonight.complete")}</p>
           </>
         ) : null}
 
         {summary.stations > 0 && (
           <p className="mt-6 font-mono text-sm tabular text-paper-dim">
-            {summary.stations} {summary.stations === 1 ? "station" : "stations"}
+            {summary.stations === 1 ? t("common.oneStation") : t("common.nStations", { n: summary.stations })}
             <span className="px-2 text-haze">·</span>
-            {formatDuration(summary.plannedMinutes)} focus
+            {t("tonight.focus", { min: summary.plannedMinutes })}
             {summary.arrival && !ended && (
               <>
-                <span className="px-2 text-haze">·</span>arrive {clock(summary.arrival)}
+                <span className="px-2 text-haze">·</span>
+                {t("tonight.arrive", { at: clock(summary.arrival) })}
               </>
             )}
           </p>
@@ -110,20 +127,20 @@ export default function TonightPage() {
         <div className="mt-8 flex flex-wrap items-center gap-x-4 gap-y-3">
           {riding ? (
             <ButtonLink href="/journey" variant="primary" size="lg">
-              Return to Journey
+              {t("tonight.return")}
             </ButtonLink>
           ) : ended ? (
             <ButtonLink href={ticket ? ticketHref(journey!.id) : "/journey"} variant="primary" size="lg">
-              {ticket ? "View tonight's ticket" : "Issue Ticket"}
+              {ticket ? t("tonight.viewTicket") : t("tonight.issueTicket")}
             </ButtonLink>
           ) : summary.next ? (
             <ButtonLink href="/journey" variant="primary" size="lg">
-              Board Train
+              {t("tonight.board")}
             </ButtonLink>
           ) : null}
           {summary.stations > 0 && (
             <ButtonLink href="/route" variant="ghost" size="md">
-              View Route <Icon name="chevron" size={14} />
+              {t("tonight.viewRoute")} <Icon name="chevron" size={14} />
             </ButtonLink>
           )}
         </div>
@@ -132,48 +149,52 @@ export default function TonightPage() {
           <div className="max-w-md text-sm leading-relaxed text-mist">
             {isEmptyAccount ? (
               <>
-                <p>Your line is empty. Add what you need to do and Nocturne will plan the route.</p>
+                <p>{t("tonight.emptyLine")}</p>
                 <div className="mt-5 flex flex-wrap items-center gap-3">
-                  <ButtonLink href="/tasks?new=1" variant="primary">
-                    Add a task
-                  </ButtonLink>
+                  <button
+                    type="button"
+                    onClick={() => useQuickAdd.getState().show()}
+                    className={buttonClass("primary", "md")}
+                  >
+                    {t("tonight.addTask")}
+                  </button>
                   <button
                     type="button"
                     onClick={() => void loadSampleData()}
                     className="min-h-11 px-2 text-sm text-mist underline decoration-rule underline-offset-4 hover:text-paper"
                   >
-                    Explore with sample tasks
+                    {t("tonight.sample")}
                   </button>
                 </div>
               </>
             ) : !hasAnyService ? (
               <>
-                <p>Nocturne needs to know when you can study before it can plan a route.</p>
+                <p>{t("tonight.needService")}</p>
                 <div className="mt-5">
                   <ButtonLink href="/service" variant="primary">
-                    Set your Service Time
+                    {t("tonight.setService")}
                   </ButtonLink>
                 </div>
               </>
             ) : windows.length === 0 ? (
               <p>
-                No service today — the planner is spreading work across your other days.{" "}
+                {t("tonight.noServiceSpread")}{" "}
                 <Link href="/service" className="text-paper underline decoration-rule underline-offset-4">
-                  Add time today
+                  {t("tonight.addTimeToday")}
                 </Link>
               </p>
             ) : !serviceLeft ? (
               <p>
-                Service has ended for tonight.{" "}
+                {t("tonight.serviceEnded")}{" "}
                 <Link href="/service" className="text-paper underline decoration-rule underline-offset-4">
-                  Adjust Service Time
+                  {t("tonight.adjustService")}
                 </Link>
               </p>
             ) : (
               <p>
-                Nothing is due on tonight&rsquo;s line — you&rsquo;re ahead.{" "}
+                {t("tonight.nothingDue")}{" "}
                 <Link href="/route" className="text-paper underline decoration-rule underline-offset-4">
-                  Pull work forward
+                  {t("tonight.pullForward")}
                 </Link>
               </p>
             )}
@@ -184,16 +205,16 @@ export default function TonightPage() {
       <div className="mt-10 space-y-8">
         <ConfirmFinish tasks={data.tasks} />
         {overdue.length > 0 && (
-          <section aria-label="Past deadline" className="border-l border-lamp/50 pl-5">
-            <p className="eyebrow text-lamp/90">Past deadline</p>
+          <section aria-label={t("tonight.pastDeadline")} className="border-l border-lamp/50 pl-5">
+            <p className="eyebrow text-lamp/90">{t("tonight.pastDeadline")}</p>
             <ul className="mt-2 space-y-1.5 text-sm">
-              {overdue.map((t) => (
-                <li key={t.id} className="text-paper-dim">
-                  <Link href={taskHref(t.id, "deadline")} className="underline decoration-rule underline-offset-4 hover:text-paper">
-                    {t.title}
+              {overdue.map((task) => (
+                <li key={task.id} className="text-paper-dim">
+                  <Link href={taskHref(task.id, "deadline")} className="underline decoration-rule underline-offset-4 hover:text-paper">
+                    {task.title}
                   </Link>{" "}
                   <span className="text-mist">
-                    was due {formatShortDate(t.deadline!)} · {formatDuration(t.remainingMinutes)} left, first in line
+                    {t("tonight.wasDue", { date: fmt.shortDate(task.deadline!), min: task.remainingMinutes })}
                   </span>
                 </li>
               ))}
@@ -207,10 +228,10 @@ export default function TonightPage() {
         <section aria-labelledby="route-preview" className="mt-12">
           <div className="mb-3 flex items-baseline justify-between">
             <h2 id="route-preview" className="eyebrow">
-              Route
+              {t("tonight.route")}
             </h2>
             <Link href="/service" className="py-2 text-xs text-haze transition-colors hover:text-mist">
-              Service Time
+              {t("tonight.serviceTime")}
             </Link>
           </div>
           <RouteLine items={items} compact />

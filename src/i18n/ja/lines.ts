@@ -1,0 +1,36 @@
+import type source from "../en/lines";
+
+const lines: Partial<Record<keyof typeof source, string>> = {
+  "lines.aLongTermGoal": "長期目標",
+  "lines.attach": "添付",
+  "lines.attachEmpty": "既存のタスクを添付するか、新しいタスクを追加してください。",
+  "lines.attachTasks": "タスクを添付",
+  "lines.back": "ライン",
+  "lines.createLine": "ラインを作る",
+  "lines.deleteInfo": "タスクは残ります。",
+  "lines.deleteLine": "ラインを削除",
+  "lines.deleteQuestion": "このラインを削除しますか?",
+  "lines.detach": "削除",
+  "lines.editLine": "ラインを編集",
+  "lines.keepIt": "保持",
+  "lines.lineName": "名前",
+  "lines.longDistance": "長距離",
+  "lines.nameRequired": "ラインに名前をつけてください。",
+  "lines.newLine": "新しいライン",
+  "lines.newTask": "新しいタスク",
+  "lines.noAttach": "すべてのオープンタスクはすでにこのライン上にあります。",
+  "lines.noLines": "ラインはまだありません。",
+  "lines.noTargetDate": "目標日がない",
+  "lines.notes": "メモ",
+  "lines.onThisLine": "このライン上",
+  "lines.progress": "進捗",
+  "lines.remaining": "残り",
+  "lines.targetDate": "目標日",
+  "lines.targetDateHint": "試験、プレゼンテーション、または目標の日。",
+  "lines.tasksOnThisLine": "このラインのタスク",
+  "lines.tasksSummary": "{n}タスク・残り{time}/{total}",
+  "lines.title": "ライン",
+  "lines.workload": "ワークロード",
+};
+
+export default lines;

@@ -1,11 +1,12 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import { addDays, dayOfWeek, formatShortDate, serviceDate, WEEKDAY_SHORT } from "@/core/time";
+import { addDays, dayOfWeek, serviceDate } from "@/core/time";
 import type { Level, Line, Recurrence, Task } from "@/core/types";
 import type { TaskDraft } from "@/state/actions";
 import { Button } from "@/components/ui/Button";
 import { Field, InterestSlider, LevelPicker, MinutesInput, Toggle } from "@/components/ui/controls";
+import { useI18n } from "@/i18n";
 
 export function draftFrom(task?: Task, defaults?: Partial<TaskDraft>): TaskDraft {
   return {
@@ -45,6 +46,7 @@ export function TaskForm({
   onCancel?: () => void;
   focusField?: "deadline" | "estimate" | null;
 }) {
+  const { t, fmt } = useI18n();
   const [d, setD] = useState<TaskDraft>(initial);
   const [showMore, setShowMore] = useState(
     initial.recurrence !== null || initial.lineId !== null || initial.description.length > 0,
@@ -54,25 +56,25 @@ export function TaskForm({
   const set = <K extends keyof TaskDraft>(k: K, v: TaskDraft[K]) => setD((prev) => ({ ...prev, [k]: v }));
 
   const quickDates: { label: string; value: string | null }[] = [
-    { label: "Today", value: today },
-    { label: "Tomorrow", value: addDays(today, 1) },
-    { label: WEEKDAY_SHORT[5], value: nextWeekday(today, 5) },
+    { label: t("common.today"), value: today },
+    { label: t("common.tomorrow"), value: addDays(today, 1) },
+    { label: fmt.weekdayOf(5), value: nextWeekday(today, 5) },
     { label: "In a week", value: addDays(today, 7) },
-    { label: "Someday", value: null },
+    { label: t("common.someday"), value: null },
   ];
 
   function submit(e: FormEvent) {
     e.preventDefault();
     if (!d.title.trim()) {
-      setError("Give the task a name.");
+      setError(t("tasks.nameTask"));
       return;
     }
     if (d.recurrence && d.estimatedMinutes <= 0) {
-      setError("Recurring tasks need a duration for each occurrence.");
+      setError(t("tasks.estimateDuration"));
       return;
     }
     if (d.minSessionMinutes > d.maxSessionMinutes) {
-      setError("The shortest session can't be longer than the longest.");
+      setError(t("tasks.sessionLengthError"));
       return;
     }
     onSubmit({ ...d, title: d.title.trim() });
@@ -83,19 +85,19 @@ export function TaskForm({
 
   return (
     <form onSubmit={submit} className="space-y-7" noValidate>
-      <Field label="Task">
+      <Field label={t("tasks.taskField")}>
         <input
           className="field text-lg"
           value={d.title}
           onChange={(e) => set("title", e.target.value)}
-          placeholder="Physics workbook"
+          placeholder={t("tasks.taskPlaceholder")}
           autoFocus={!focusField}
           aria-invalid={!!error && !d.title.trim()}
         />
       </Field>
 
       <div>
-        <p className="eyebrow">{d.recurrence ? "Repeat until" : "Deadline"}</p>
+        <p className="eyebrow">{d.recurrence ? t("tasks.repeatUntil") : t("tasks.deadline")}</p>
         <div className="mt-3 flex flex-wrap gap-2">
           {quickDates.map((q) => {
             const active = d.deadline === q.value;
@@ -120,16 +122,16 @@ export function TaskForm({
           value={d.deadline ?? ""}
           min={today}
           onChange={(e) => set("deadline", e.target.value || null)}
-          aria-label="Deadline date"
+          aria-label={t("tasks.deadline")}
           autoFocus={focusField === "deadline"}
         />
-        {d.deadline && <p className="mt-1 text-xs text-haze">Last day to work on it: {formatShortDate(d.deadline)}</p>}
+        {d.deadline && <p className="mt-1 text-xs text-haze">{t("tasks.lastDay", { date: fmt.shortDate(d.deadline) })}</p>}
       </div>
 
       <div>
-        <p className="eyebrow">{d.recurrence ? "Each time" : "Estimated time"}</p>
+        <p className="eyebrow">{d.recurrence ? t("tasks.eachTime") : t("tasks.estimatedTime")}</p>
         <div className="mt-3 flex flex-wrap items-center justify-between gap-4">
-          <MinutesInput label="estimated time" value={d.estimatedMinutes} onChange={(v) => set("estimatedMinutes", v)} step={15} />
+          <MinutesInput label={t("tasks.estimatedTime")} value={d.estimatedMinutes} onChange={(v) => set("estimatedMinutes", v)} step={15} />
           <div className="flex gap-1.5">
             {[30, 60, 120, 180].map((m) => (
               <button
@@ -145,7 +147,7 @@ export function TaskForm({
             ))}
           </div>
         </div>
-        {d.estimatedMinutes === 0 && <p className="mt-1 text-xs text-haze">Without an estimate, the task waits in your Inbox.</p>}
+        {d.estimatedMinutes === 0 && <p className="mt-1 text-xs text-haze">{t("tasks.withoutEstimate")}</p>}
       </div>
 
       <InterestSlider value={d.interest} onChange={(v) => set("interest", v)} />
@@ -157,40 +159,40 @@ export function TaskForm({
           aria-expanded={showMore}
           className="flex w-full items-center justify-between py-3 text-sm text-mist hover:text-paper"
         >
-          More options
+          {t("tasks.moreOptions")}
           <span className={`transition-transform duration-500 ${showMore ? "rotate-45" : ""}`} aria-hidden>
             +
           </span>
         </button>
         {showMore && (
           <div className="animate-rise space-y-7 pb-2 pt-3">
-            <LevelPicker label="Difficulty" value={d.difficulty} onChange={(v: Level) => set("difficulty", v)} low="Light" high="Demanding" />
-            <LevelPicker label="Importance" value={d.importance} onChange={(v: Level) => set("importance", v)} low="Nice to do" high="Essential" />
+            <LevelPicker label={t("tasks.difficulty")} value={d.difficulty} onChange={(v: Level) => set("difficulty", v)} low={t("tasks.light")} high={t("tasks.demanding")} />
+            <LevelPicker label={t("tasks.importance")} value={d.importance} onChange={(v: Level) => set("importance", v)} low={t("tasks.niceToDo")} high={t("tasks.essential")} />
 
             <div>
               <Toggle
                 checked={d.splittable}
                 onChange={(v) => set("splittable", v)}
-                label="Split into sessions"
-                description="Let Nocturne spread this over several stations and days."
+                label={t("tasks.splitIntoSessions")}
+                description={t("tasks.splitDesc")}
               />
               {d.splittable && (
                 <div className="mt-3 grid grid-cols-2 gap-6">
                   <div>
-                    <p className="mb-2 text-xs text-mist">Shortest session</p>
-                    <MinutesInput label="shortest session" value={d.minSessionMinutes} onChange={(v) => set("minSessionMinutes", Math.max(10, v))} step={5} min={10} max={120} />
+                    <p className="mb-2 text-xs text-mist">{t("tasks.shortestSession")}</p>
+                    <MinutesInput label={t("tasks.shortestSession")} value={d.minSessionMinutes} onChange={(v) => set("minSessionMinutes", Math.max(10, v))} step={5} min={10} max={120} />
                   </div>
                   <div>
-                    <p className="mb-2 text-xs text-mist">Longest session</p>
-                    <MinutesInput label="longest session" value={d.maxSessionMinutes} onChange={(v) => set("maxSessionMinutes", Math.max(15, v))} step={5} min={15} max={180} />
+                    <p className="mb-2 text-xs text-mist">{t("tasks.longestSession")}</p>
+                    <MinutesInput label={t("tasks.longestSession")} value={d.maxSessionMinutes} onChange={(v) => set("maxSessionMinutes", Math.max(15, v))} step={5} min={15} max={180} />
                   </div>
                 </div>
               )}
             </div>
 
             <div>
-              <p className="eyebrow">Repeat</p>
-              <div className="mt-3 flex gap-2" role="radiogroup" aria-label="Repeat">
+              <p className="eyebrow">{t("tasks.repeat")}</p>
+              <div className="mt-3 flex gap-2" role="radiogroup" aria-label={t("tasks.repeat")}>
                 {(["none", "daily", "weekly"] as const).map((k) => (
                   <button
                     key={k}
@@ -202,21 +204,22 @@ export function TaskForm({
                         k === "none" ? null : k === "daily" ? { freq: "daily" } : { freq: "weekly", days: weeklyDays.length ? weeklyDays : [dayOfWeek(today)] };
                       set("recurrence", next);
                     }}
-                    className={`rounded-full border px-3.5 py-1.5 text-sm capitalize transition-colors ${
+                    className={`rounded-full border px-3.5 py-1.5 text-sm transition-colors ${
                       recurrenceKind === k ? "border-lamp/60 text-paper" : "border-rule text-mist hover:text-paper"
                     }`}
                   >
-                    {k === "none" ? "Once" : k}
+                    {k === "none" ? t("tasks.once") : k === "daily" ? t("tasks.daily") : t("tasks.weekly")}
                   </button>
                 ))}
               </div>
               {d.recurrence?.freq === "weekly" && (
-                <div className="mt-3 flex gap-1.5" role="group" aria-label="Days of the week">
-                  {WEEKDAY_SHORT.map((label, i) => {
+                <div className="mt-3 flex gap-1.5" role="group" aria-label={t("tasks.dayOfWeek")}>
+                  {[0, 1, 2, 3, 4, 5, 6].map((i) => {
                     const on = weeklyDays.includes(i);
+                    const label = fmt.weekdayOf(i);
                     return (
                       <button
-                        key={label}
+                        key={i}
                         type="button"
                         aria-pressed={on}
                         onClick={() => {
@@ -236,9 +239,9 @@ export function TaskForm({
             </div>
 
             {lines.length > 0 && (
-              <Field label="Line">
+              <Field label={t("tasks.lineField")}>
                 <select className="field" value={d.lineId ?? ""} onChange={(e) => set("lineId", e.target.value || null)}>
-                  <option value="">None</option>
+                  <option value="">{t("common.none")}</option>
                   {lines.map((l) => (
                     <option key={l.id} value={l.id}>
                       {l.title}
@@ -248,7 +251,7 @@ export function TaskForm({
               </Field>
             )}
 
-            <Field label="Notes">
+            <Field label={t("lines.notes")}>
               <textarea
                 className="field min-h-20 resize-y"
                 value={d.description}
@@ -269,7 +272,7 @@ export function TaskForm({
       <div className="flex items-center justify-end gap-3 pt-2">
         {onCancel && (
           <Button variant="ghost" onClick={onCancel}>
-            Cancel
+            {t("common.cancel")}
           </Button>
         )}
         <Button type="submit" variant="primary">

@@ -3,8 +3,9 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { elapsedSeconds, remainingSeconds, routeOf } from "@/core/sessions";
-import { clock, formatCountdown, formatDuration } from "@/core/time";
+import { clock, formatCountdown } from "@/core/time";
 import type { Journey, NocturneData, StudySession } from "@/core/types";
+import { useI18n } from "@/i18n";
 import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
 import { Sheet } from "@/components/ui/Sheet";
@@ -34,6 +35,7 @@ export function Cabin({
   tunnel: boolean;
   onTunnel: (on: boolean) => void;
 }) {
+  const { t, fmt } = useI18n();
   const [revealed, setRevealed] = useState(false);
   const [hintVisible, setHintVisible] = useState(true);
   const [sheet, setSheet] = useState<null | "early" | "more" | "end">(null);
@@ -112,7 +114,7 @@ export function Cabin({
         <time className="font-mono text-xs tracking-widest text-mist tabular">{clock(now)}</time>
         <div className="flex items-center gap-1">
           <SoundControl carriage={journey.selectedCarriage} />
-          <Link href="/" className="rounded-full p-2 text-mist hover:text-paper" aria-label="Back to Tonight (the journey continues)">
+          <Link href="/" className="rounded-full p-2 text-mist hover:text-paper" aria-label={t("common.back")}>
             <Icon name="close" size={18} />
           </Link>
         </div>
@@ -127,25 +129,24 @@ export function Cabin({
           className={`mt-8 font-mono text-[4.5rem] font-light leading-none tracking-tight tabular sm:text-[6rem] ${paused ? "text-mist" : "text-paper"}`}
           role="timer"
           aria-live="off"
-          aria-label={`${formatCountdown(remaining)} remaining`}
+          aria-label={t("journey.countdownRemaining", { countdown: formatCountdown(remaining) })}
         >
           {formatCountdown(remaining)}
         </p>
-        {paused && <p className="eyebrow mt-4 animate-breathe">Paused</p>}
+        {paused && <p className="eyebrow mt-4 animate-breathe">{t("journey.paused")}</p>}
 
         <RouteProgress route={route} activeId={active.id} fraction={fraction} />
 
         <div className="mt-10 max-w-sm space-y-1 text-sm">
           {next ? (
             <p className="truncate text-mist">
-              Next · <span className="text-paper-dim">{nextTask?.title}</span> · {formatDuration(next.plannedMinutes)}
+              {t("journey.next")} · <span className="text-paper-dim">{nextTask?.title}</span> · {fmt.duration(next.plannedMinutes)}
             </p>
           ) : (
-            <p className="text-mist">Final station ahead</p>
+            <p className="text-mist">{t("journey.finalStationAhead")}</p>
           )}
           <p className={`text-haze transition-opacity duration-700 ${showControls ? "opacity-100" : "opacity-0"}`}>
-            {active.stationName} · arriving {clock(active.plannedEnd)}
-            {arrival ? ` · final ${clock(arrival)}` : ""}
+            {arrival ? t("journey.stationArrivingFinal", { station: active.stationName, at: clock(active.plannedEnd), arrival: clock(arrival) }) : `${active.stationName} · arriving ${clock(active.plannedEnd)}`}
           </p>
         </div>
       </main>
@@ -157,29 +158,29 @@ export function Cabin({
         <div className="mx-auto grid max-w-md grid-cols-2 gap-2 sm:grid-cols-4">
           {paused ? (
             <Button variant="primary" onClick={() => resume()} tabIndex={showControls ? 0 : -1}>
-              <Icon name="play" size={15} /> Resume
+              <Icon name="play" size={15} /> {t("common.continue")}
             </Button>
           ) : (
             <Button variant="secondary" onClick={() => { pause(); reveal(); }} tabIndex={showControls ? 0 : -1}>
-              <Icon name="pause" size={15} /> Pause
+              <Icon name="pause" size={15} /> {t("journey.pauseButton")}
             </Button>
           )}
           <Button variant="secondary" onClick={() => setSheet("early")} tabIndex={showControls ? 0 : -1}>
-            Finish early
+            {t("journey.finishEarlyButton")}
           </Button>
           <Button variant="secondary" onClick={() => setSheet("more")} tabIndex={showControls ? 0 : -1}>
-            More time
+            {t("journey.moreTimeButton")}
           </Button>
           <Button variant="secondary" onClick={() => lowFocus()} tabIndex={showControls ? 0 : -1}>
-            Low focus
+            {t("journey.lowFocusButton")}
           </Button>
         </div>
         <div className="mt-3 flex justify-center gap-6 text-xs">
           <button type="button" onClick={() => onTunnel(true)} className="text-haze hover:text-mist" tabIndex={showControls ? 0 : -1}>
-            Enter tunnel
+            {t("journey.enterTunnel")}
           </button>
           <button type="button" onClick={() => setSheet("end")} className="text-haze hover:text-mist" tabIndex={showControls ? 0 : -1}>
-            End tonight&rsquo;s journey
+            {t("journey.endTonightButton")}
           </button>
         </div>
       </footer>
@@ -188,22 +189,22 @@ export function Cabin({
           hintVisible && !showControls && !tunnel ? "opacity-100" : "opacity-0"
         }`}
       >
-        TAP FOR CONTROLS
+        {t("journey.tapForControls")}
       </p>
 
-      <Sheet open={sheet === "early"} onClose={() => setSheet(null)} title="Finished early?" eyebrow={task?.title}>
+      <Sheet open={sheet === "early"} onClose={() => setSheet(null)} title={t("journey.finishedEarly")} eyebrow={task?.title}>
         <div className="grid gap-3">
           <Button variant="secondary" size="lg" onClick={() => { setSheet(null); finishEarly(false); }}>
-            This station&rsquo;s work is done
+            {t("journey.thisStationDone")}
           </Button>
           <Button variant="secondary" size="lg" onClick={() => { setSheet(null); finishEarly(true); }}>
-            The whole task is complete
+            {t("journey.wholeTaskComplete")}
           </Button>
         </div>
-        <p className="mt-5 text-xs leading-relaxed text-haze">The rest of the route moves earlier. Time gained is yours.</p>
+        <p className="mt-5 text-xs leading-relaxed text-haze">{t("journey.laterStationsMoveUp")}</p>
       </Sheet>
 
-      <Sheet open={sheet === "more"} onClose={() => setSheet(null)} title="Need more time?" eyebrow={task?.title}>
+      <Sheet open={sheet === "more"} onClose={() => setSheet(null)} title={t("journey.needMoreTime")} eyebrow={task?.title}>
         <div className="grid grid-cols-3 gap-3">
           {[5, 10, 15].map((m) => (
             <Button key={m} variant="secondary" size="lg" onClick={() => { setSheet(null); needMoreTime(m); }}>
@@ -211,19 +212,16 @@ export function Cabin({
             </Button>
           ))}
         </div>
-        <p className="mt-5 text-xs leading-relaxed text-haze">Later stations shift to make room. Locked stations stay put.</p>
+        <p className="mt-5 text-xs leading-relaxed text-haze">{t("journey.laterStationsShift")}</p>
       </Sheet>
 
-      <Sheet open={sheet === "end"} onClose={() => setSheet(null)} title="End tonight's journey?" eyebrow="Final station">
-        <p className="text-sm leading-relaxed text-mist">
-          Everything you&rsquo;ve done is kept. Unfinished stations return to the planner for another day.
-        </p>
+      <Sheet open={sheet === "end"} onClose={() => setSheet(null)} title={t("journey.endTonightJourney")} eyebrow={t("journey.finalStation")}>
         <div className="mt-8 flex justify-end gap-3">
           <Button variant="ghost" onClick={() => setSheet(null)}>
-            Keep riding
+            {t("journey.keepRiding")}
           </Button>
           <Button variant="primary" onClick={() => { setSheet(null); endJourney(); }}>
-            End journey
+            {t("journey.endJourney")}
           </Button>
         </div>
       </Sheet>
@@ -233,6 +231,7 @@ export function Cabin({
 
 /** ────────●──────── : the whole night at a glance. */
 function RouteProgress({ route, activeId, fraction }: { route: StudySession[]; activeId: string; fraction: number }) {
+  const { t } = useI18n();
   const total = route.reduce((a, s) => a + Math.max(1, s.plannedMinutes), 0);
   let acc = 0;
   let position = 0;
@@ -243,7 +242,7 @@ function RouteProgress({ route, activeId, fraction }: { route: StudySession[]; a
     acc += Math.max(1, s.plannedMinutes);
   }
   return (
-    <div className="relative mt-12 h-3 w-full max-w-sm" role="progressbar" aria-label="Route progress" aria-valuenow={Math.round(position * 100)} aria-valuemin={0} aria-valuemax={100}>
+    <div className="relative mt-12 h-3 w-full max-w-sm" role="progressbar" aria-label={t("journey.routeProgress")} aria-valuenow={Math.round(position * 100)} aria-valuemin={0} aria-valuemax={100}>
       <div className="absolute top-1/2 h-px w-full bg-rule" />
       <div className="absolute top-1/2 h-px bg-paper-dim/60 transition-[width] duration-1000" style={{ width: `${position * 100}%` }} />
       {ticks.map((t, i) => (

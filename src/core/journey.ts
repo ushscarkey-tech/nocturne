@@ -7,6 +7,7 @@
  * optional RouteChange explanation. The UI layer only renders and persists.
  */
 import { newId } from "./ids";
+import { schedulingProfile } from "./learning";
 import { planToday, type PlanTodayOptions } from "./planner";
 import { availabilityForDate, breakAfter } from "./availability";
 import { activeSession, elapsedSeconds, routeOf, sessionsOn, upcomingOn } from "./sessions";
@@ -20,6 +21,7 @@ import type {
   NocturneData,
   ReplanReason,
   RouteChange,
+  SessionEnd,
   StudySession,
   Task,
   Ticket,
@@ -71,7 +73,13 @@ function replan(
   focusFallback: FocusLevel,
 ): { data: NocturneData; change: RouteChange | null } {
   const result = planToday(
-    { tasks: data.tasks, windows: data.windows, sessions: data.sessions, userId: data.profile.id },
+    {
+      tasks: data.tasks,
+      windows: data.windows,
+      sessions: data.sessions,
+      userId: data.profile.id,
+      focusProfile: schedulingProfile(data, opts.now),
+    },
     { ...opts, focus: opts.focus ?? focusFallback },
   );
   return { data: { ...data, sessions: result.sessions }, change: result.change };
@@ -251,6 +259,7 @@ function closeActive(
   data: NocturneData,
   now: Date,
   kind: "complete" | "early" | "early-all" | "partial",
+  endedBy?: SessionEnd,
 ): { data: NocturneData; closed: StudySession | null } {
   const active = activeSession(data.sessions);
   if (!active) return { data, closed: null };
@@ -273,6 +282,7 @@ function closeActive(
   const closed: StudySession = {
     ...active,
     status: kind === "partial" ? "partial" : "done",
+    endedBy: endedBy ?? (kind === "partial" ? "low-focus" : kind),
     completedMinutes: focused,
     creditedMinutes: credited,
     elapsedSeconds: Math.round(focusedSec),
@@ -372,6 +382,7 @@ export function needMoreTime(data: NocturneData, now: Date, minutes: number): En
   const extended: StudySession = {
     ...active,
     plannedMinutes: active.plannedMinutes + minutes,
+    extendedMinutes: active.extendedMinutes + minutes,
     plannedEnd: iso(new Date(new Date(active.plannedEnd).getTime() + minutes * 60_000)),
   };
   const next = { ...data, sessions: replaceSession(data.sessions, extended) };
@@ -489,9 +500,15 @@ export function endJourney(data: NocturneData, now: Date): EngineResult {
   const date = serviceDate(now);
   let next = data;
   const active = activeSession(data.sessions);
-  if (active && elapsedSeconds(active, now) >= 60) next = closeActive(data, now, "partial").data;
+  if (active && elapsedSeconds(active, now) >= 60) next = closeActive(data, now, "partial", "ended").data;
   else if (active) next = { ...next, sessions: replaceSession(next.sessions, { ...active, status: "planned", resumedAt: null }) };
-  next = { ...next, sessions: next.sessions.filter((s) => !(s.date === date && s.status === "planned")) };
+  // Unreached stations stay on record (hidden) so Nocturne can learn what tends to be left behind.
+  next = {
+    ...next,
+    sessions: next.sessions.map((s) =>
+      s.date === date && s.status === "planned" ? { ...s, status: "skipped" as const, locked: false, endedBy: "unreached" as const } : s,
+    ),
+  };
   const journey = journeyFor(next, date);
   if (!journey) return { data: next, change: null };
   return { data: replaceJourney(next, { ...journey, phase: "final", stopEndsAt: null }), change: null };
@@ -525,7 +542,7 @@ export function removeTask(data: NocturneData, taskId: string, now: Date): Engin
   const active = activeSession(next.sessions);
   let journey = journeyFor(next, date);
   if (active?.taskId === taskId) {
-    if (elapsedSeconds(active, now) >= 60) next = closeActive(next, now, "partial").data;
+    if (elapsedSeconds(active, now) >= 60) next = closeActive(next, now, "partial", "removed").data;
     else next = { ...next, sessions: next.sessions.filter((s) => s.id !== active.id) };
   }
   const hasHistory = next.sessions.some((s) => s.taskId === taskId && (s.status === "done" || s.status === "partial"));
@@ -556,7 +573,8 @@ export function continueService(data: NocturneData, now: Date): EngineResult & {
   const date = serviceDate(now);
   const journey = journeyFor(data, date);
   if (!journey) return { data, change: null, added: false };
-  const planned = replan(data, { now, mode: "reoptimize", reason: "optimize" }, journey.focus);
+  const cleared = { ...data, sessions: data.sessions.filter((s) => !(s.date === date && s.endedBy === "unreached")) };
+  const planned = replan(cleared, { now, mode: "reoptimize", reason: "optimize" }, journey.focus);
   const added = upcomingOn(planned.data.sessions, date).length > 0;
   if (!added) return { data, change: null, added: false };
   const reopened: Journey = { ...journey, phase: "stop", completedAt: null, stopEndsAt: null };

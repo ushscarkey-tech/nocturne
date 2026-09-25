@@ -19,7 +19,7 @@ import { createSeedData, createEmptyData } from "../seed";
 import { activeSession, routeOf, sessionsOn, upcomingOn } from "../sessions";
 import { summarizeJourney } from "../stats";
 import { addDays, minutesFrom, serviceDate, toDateKey } from "../time";
-import type { Level, NocturneData, StudySession, StudyWindow, Task } from "../types";
+import { PROFILE_DEFAULTS, type Level, type NocturneData, type StudySession, type StudyWindow, type Task } from "../types";
 
 // Thursday, Sep 24 2026, local time.
 const at = (h: number, m = 0, day = 24) => new Date(2026, 8, day, h, m);
@@ -57,6 +57,7 @@ function task(partial: Partial<Task> & { id: string }): Task {
     minSessionMinutes: 25,
     maxSessionMinutes: 60,
     recurrence: null,
+    userEstimatedMinutes: null,
     status: "active",
     lineId: null,
     createdAt: at(9).toISOString(),
@@ -74,6 +75,7 @@ function data(tasks: Task[], windows = everyEvening, sessions: StudySession[] = 
     createdAt: at(9).toISOString(),
     preferredCarriage: "rain",
     autoTunnel: true,
+    ...PROFILE_DEFAULTS,
   });
   return { ...base, tasks, windows, sessions };
 }
@@ -201,7 +203,7 @@ describe("journey vertical slice", () => {
     expect(closed.completedMinutes).toBe(30);
     expect(d.tasks.find((t) => t.id === "math")!.remainingMinutes).toBe(30);
     expect(r.change?.headline).toBe("Route updated");
-    expect(r.change?.lines.join(" ")).toMatch(/remaining 30m of Math/);
+    expect(r.change?.lines.join(" ")).toMatch(/other 30m of Math/);
     expect(d.journeys[0].phase).toBe("stop");
     // One change when Sharp re-sorted the route at boarding, one for Low Focus.
     expect(d.journeys[0].routeChanges).toBe(2);
@@ -248,7 +250,7 @@ describe("journey vertical slice", () => {
     const r = finishEarly(d, at(20, 25), false);
     const pulled = r.data.sessions.find((s) => s.id === nextBefore.id)!;
     expect(new Date(pulled.plannedStart).getTime()).toBeLessThan(new Date(nextAfter.plannedStart).getTime());
-    expect(r.change?.lines.join(" ")).toMatch(/Ahead of schedule/);
+    expect(r.change?.lines.join(" ")).toMatch(/ahead of plan/);
   });
 
   it("ends early without losing banked progress", () => {

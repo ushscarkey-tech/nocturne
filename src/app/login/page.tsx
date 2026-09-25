@@ -4,9 +4,11 @@ import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/Button";
 import { enterDemo, isSupabaseConfigured, signIn, signUp } from "@/state/session";
+import { useI18n } from "@/i18n";
 
 export default function LoginPage() {
   const router = useRouter();
+  const { t } = useI18n();
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -27,10 +29,10 @@ export default function LoginPage() {
       } else {
         const result = await signUp(name || "Traveller", email, password);
         if (result === "signed-in") router.replace("/");
-        else setMessage("Check your inbox to confirm your email, then sign in.");
+        else setMessage(t("auth.checkInbox"));
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong.");
+      setError(err instanceof Error ? err.message : t("auth.errorDefault"));
     } finally {
       setBusy(false);
     }
@@ -45,20 +47,20 @@ export default function LoginPage() {
     <main className="mx-auto flex min-h-dvh w-full max-w-sm flex-col justify-center px-6 py-16">
       <p className="font-mono text-xs tracking-[0.4em] text-paper-dim">NOCTURNE</p>
       <h1 className="mt-6 font-display text-4xl leading-tight">
-        A planner that doesn&rsquo;t break when your plan does.
+        {t("auth.headline")}
       </h1>
-      <p className="mt-4 text-sm leading-relaxed text-mist">Plan your route. Board the train. Keep moving.</p>
+      <p className="mt-4 text-sm leading-relaxed text-mist">{t("auth.tagline")}</p>
 
       {isSupabaseConfigured ? (
-        <form onSubmit={submit} className="mt-12 space-y-6" aria-label={mode === "signin" ? "Sign in" : "Create account"}>
+        <form onSubmit={submit} className="mt-12 space-y-6" aria-label={mode === "signin" ? t("auth.signInForm") : t("auth.createAccountForm")}>
           {mode === "signup" && (
             <label className="block">
-              <span className="eyebrow">Name</span>
+              <span className="eyebrow">{t("auth.name")}</span>
               <input className="field" value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" />
             </label>
           )}
           <label className="block">
-            <span className="eyebrow">Email</span>
+            <span className="eyebrow">{t("auth.email")}</span>
             <input
               className="field"
               type="email"
@@ -69,7 +71,7 @@ export default function LoginPage() {
             />
           </label>
           <label className="block">
-            <span className="eyebrow">Password</span>
+            <span className="eyebrow">{t("auth.password")}</span>
             <input
               className="field"
               type="password"
@@ -91,27 +93,27 @@ export default function LoginPage() {
             </p>
           )}
           <Button type="submit" variant="primary" size="lg" className="w-full" disabled={busy}>
-            {busy ? "One moment…" : mode === "signin" ? "Sign in" : "Create account"}
+            {busy ? t("auth.signing") : mode === "signin" ? t("auth.signIn") : t("auth.createAccount")}
           </Button>
           <button
             type="button"
             onClick={() => setMode(mode === "signin" ? "signup" : "signin")}
             className="block w-full text-center text-sm text-mist hover:text-paper"
           >
-            {mode === "signin" ? "New here? Create an account" : "Already travelling? Sign in"}
+            {mode === "signin" ? t("auth.newHere") : t("auth.alreadyTravelling")}
           </button>
         </form>
       ) : (
         <p className="mt-12 text-sm leading-relaxed text-mist">
-          Cloud accounts are not configured for this build. Your journey will be saved in this browser.
+          {t("auth.noSupabase")}
         </p>
       )}
 
       <div className="mt-10 border-t border-rule-soft pt-6">
         <Button variant={isSupabaseConfigured ? "ghost" : "primary"} size={isSupabaseConfigured ? "md" : "lg"} className="w-full" onClick={demo}>
-          Explore the demo
+          {t("auth.exploreDemo")}
         </Button>
-        <p className="mt-2 text-center text-xs text-haze">Sample tasks, saved only in this browser.</p>
+        <p className="mt-2 text-center text-xs text-haze">{t("auth.demoNote")}</p>
       </div>
     </main>
   );

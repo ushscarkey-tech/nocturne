@@ -10,6 +10,7 @@ export type DateKey = string;
 export type ISODateTime = string;
 
 export type FocusLevel = "low" | "steady" | "sharp";
+export type Locale = "en" | "ko" | "ja" | "zh";
 export type Level = 1 | 2 | 3 | 4 | 5;
 
 /** `archived` = deleted by the traveller but kept so past journeys stay intact. */
@@ -27,6 +28,13 @@ export interface Profile {
   /** Defaults used by the focus ritual. */
   preferredCarriage: CarriageId;
   autoTunnel: boolean;
+  locale: Locale;
+  /** Set once the first-run setup is finished. */
+  onboardedAt: ISODateTime | null;
+  /** Personalization switches — each can be turned off on its own. */
+  learnFromSessions: boolean;
+  autoAdjustEstimates: boolean;
+  useFocusHistory: boolean;
 }
 
 export interface Task {
@@ -36,8 +44,13 @@ export interface Task {
   description: string;
   /** Last day the work may be done on. `null` means Someday. */
   deadline: DateKey | null;
-  /** Total estimate. For recurring tasks this is the per-occurrence length. */
+  /** Total estimate used for planning. For recurring tasks this is the per-occurrence length. */
   estimatedMinutes: number;
+  /**
+   * The traveller's own estimate when they accepted a calibrated one
+   * (`estimatedMinutes` then holds the adjusted value). Null = unadjusted.
+   */
+  userEstimatedMinutes: number | null;
   remainingMinutes: number;
   interest: Level;
   difficulty: Level;
@@ -71,6 +84,9 @@ export interface StudyWindow {
 
 export type SessionStatus = "planned" | "active" | "done" | "partial" | "skipped";
 
+/** How a station closed — the raw material for learning focus patterns. */
+export type SessionEnd = "complete" | "early" | "early-all" | "low-focus" | "ended" | "removed" | "skipped" | "unreached";
+
 export interface StudySession {
   id: string;
   taskId: string;
@@ -97,6 +113,9 @@ export interface StudySession {
   resumedAt: ISODateTime | null;
   focusBefore: FocusLevel | null;
   focusAfter: FocusLevel | null;
+  endedBy: SessionEnd | null;
+  /** Minutes added with "Need more time". */
+  extendedMinutes: number;
 }
 
 export interface Line {
@@ -113,11 +132,19 @@ export type AmbienceId = "quiet-cabin" | "rain-window" | "tunnel" | "night-rail"
 
 export type JourneyPhase = "boarding" | "cabin" | "stop" | "paused" | "final";
 
+/** A translatable message: the UI renders `key` with `params` in the traveller's language. */
+export interface Message {
+  key: string;
+  params?: Record<string, string | number>;
+}
+
 export interface RouteChange {
   at: ISODateTime;
   reason: ReplanReason;
+  /** English rendering, kept for older records and tests. */
   headline: string;
   lines: string[];
+  messages?: Message[];
 }
 
 export interface FocusMark {
@@ -189,3 +216,31 @@ export interface NocturneData {
 }
 
 export type CollectionName = "tasks" | "windows" | "sessions" | "lines" | "journeys" | "tickets";
+
+export const PROFILE_DEFAULTS = {
+  locale: "en" as Locale,
+  onboardedAt: null,
+  learnFromSessions: true,
+  autoAdjustEstimates: true,
+  useFocusHistory: true,
+};
+
+/** Fill fields added after a record was saved, so old data keeps working. */
+export function normalizeData(data: NocturneData): NocturneData {
+  return {
+    ...data,
+    profile: {
+      ...PROFILE_DEFAULTS,
+      ...data.profile,
+      // Travellers from before the first-run guide existed have already set up.
+      onboardedAt:
+        data.profile.onboardedAt !== undefined
+          ? data.profile.onboardedAt
+          : data.tasks.length > 0 || data.journeys.length > 0
+            ? data.profile.createdAt
+            : null,
+    },
+    tasks: data.tasks.map((t) => ({ ...t, userEstimatedMinutes: t.userEstimatedMinutes ?? null })),
+    sessions: data.sessions.map((s) => ({ ...s, endedBy: s.endedBy ?? null, extendedMinutes: s.extendedMinutes ?? 0 })),
+  };
+}

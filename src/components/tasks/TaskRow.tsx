@@ -3,28 +3,30 @@
 import Link from "next/link";
 import { useState } from "react";
 import { awaitingConfirmation } from "@/core/journey";
-import { formatDuration, relativeDay } from "@/core/time";
-import type { Task } from "@/core/types";
+import type { Task, Locale } from "@/core/types";
 import { Icon } from "@/components/ui/Icon";
 import { taskHref } from "@/lib/paths";
 import { completeTask, reopenTask } from "@/state/actions";
+import { translate, makeFormatters, useI18n } from "@/i18n";
 
-export function taskMeta(task: Task, today: string): string {
+export function taskMeta(task: Task, today: string, locale: Locale): string {
+  const fmt = makeFormatters(locale);
   const parts: string[] = [];
   if (task.recurrence) {
-    parts.push(task.recurrence.freq === "daily" ? "Daily" : "Weekly");
-    parts.push(formatDuration(task.estimatedMinutes));
+    parts.push(task.recurrence.freq === "daily" ? translate(locale, "tasks.daily") : translate(locale, "tasks.weekly"));
+    parts.push(fmt.duration(task.estimatedMinutes));
     return parts.join(" · ");
   }
-  if (task.deadline) parts.push(relativeDay(today, task.deadline));
-  if (task.status === "done") parts.push("Completed");
-  else if (awaitingConfirmation(task)) parts.push("Planned time used · finished?");
-  else if (task.estimatedMinutes > 0) parts.push(`${formatDuration(task.remainingMinutes)} remaining`);
-  else parts.push("Needs an estimate");
+  if (task.deadline) parts.push(fmt.relativeDay(today, task.deadline));
+  if (task.status === "done") parts.push(translate(locale, "tasks.completed"));
+  else if (awaitingConfirmation(task)) parts.push(translate(locale, "tasks.planned"));
+  else if (task.estimatedMinutes > 0) parts.push(translate(locale, "tasks.remaining", { min: Math.round(task.remainingMinutes) }));
+  else parts.push(translate(locale, "tasks.needsEstimate"));
   return parts.join(" · ");
 }
 
 export function TaskRow({ task, today, tonightMinutes }: { task: Task; today: string; tonightMinutes?: number }) {
+  const { t, fmt, locale } = useI18n();
   const [leaving, setLeaving] = useState(false);
   const progress =
     !task.recurrence && task.estimatedMinutes > 0 ? 1 - task.remainingMinutes / task.estimatedMinutes : 0;
@@ -48,7 +50,7 @@ export function TaskRow({ task, today, tonightMinutes }: { task: Task; today: st
         <button
           type="button"
           onClick={toggle}
-          aria-label={done ? `Reopen ${task.title}` : `Mark ${task.title} complete`}
+          aria-label={done ? t("tasks.reopen", { task: task.title }) : t("tasks.mark", { task: task.title })}
           className="-ml-2 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-haze transition-colors hover:text-paper"
         >
           <span
@@ -69,7 +71,7 @@ export function TaskRow({ task, today, tonightMinutes }: { task: Task; today: st
         <div className="min-w-0 flex-1">
           <p className={`truncate ${done ? "text-mist line-through decoration-haze" : "text-paper"}`}>{task.title}</p>
           <p className={`mt-1 truncate text-xs tabular ${overdue ? "text-signal" : awaitingConfirmation(task) ? "text-lamp/90" : "text-mist"}`}>
-            {taskMeta(task, today)}
+            {taskMeta(task, today, locale)}
           </p>
           {progress > 0 && !done && (
             <div className="mt-2.5 h-px w-full max-w-48 bg-rule" aria-hidden>
@@ -78,9 +80,9 @@ export function TaskRow({ task, today, tonightMinutes }: { task: Task; today: st
           )}
         </div>
         {tonightMinutes ? (
-          <span className="shrink-0 font-mono text-xs text-lamp/80 tabular" title="Scheduled tonight">
-            {formatDuration(tonightMinutes)}
-            <span className="hidden sm:inline"> tonight</span>
+          <span className="shrink-0 font-mono text-xs text-lamp/80 tabular" title={t("tasks.scheduleTonight")}>
+            {fmt.duration(tonightMinutes)}
+            <span className="hidden sm:inline"> {t("common.today")}</span>
           </span>
         ) : null}
       </Link>

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, type ReactNode } from "react";
 import { Icon } from "./Icon";
+import { useI18n } from "@/i18n";
 
 /**
  * Accessible modal built on <dialog>: a bottom sheet on phones, a centered
@@ -22,6 +23,7 @@ export function Sheet({
   children: ReactNode;
   wide?: boolean;
 }) {
+  const { t } = useI18n();
   const ref = useRef<HTMLDialogElement>(null);
 
   useEffect(() => {
@@ -53,7 +55,7 @@ export function Sheet({
               type="button"
               onClick={onClose}
               className="-mr-3 flex h-11 w-11 items-center justify-center rounded-full text-mist transition-colors hover:text-paper"
-              aria-label="Close"
+              aria-label={t("shell.close")}
             >
               <Icon name="close" />
             </button>

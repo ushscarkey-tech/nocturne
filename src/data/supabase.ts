@@ -1,5 +1,5 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import type { CollectionName, NocturneData, Profile } from "@/core/types";
+import { normalizeData, type CollectionName, type NocturneData, type Profile } from "@/core/types";
 import { COLLECTIONS, type ChangeSet, type Repository } from "./repository";
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -65,6 +65,11 @@ function profileFromRow(row: Record<string, unknown>): Profile {
     createdAt: new Date(row.created_at as string).toISOString(),
     preferredCarriage: (row.preferred_carriage as Profile["preferredCarriage"]) ?? "rain",
     autoTunnel: (row.auto_tunnel as boolean) ?? true,
+    locale: ((row.locale as Profile["locale"]) ?? "en"),
+    onboardedAt: row.onboarded_at ? new Date(row.onboarded_at as string).toISOString() : null,
+    learnFromSessions: (row.learn_from_sessions as boolean) ?? true,
+    autoAdjustEstimates: (row.auto_adjust_estimates as boolean) ?? true,
+    useFocusHistory: (row.use_focus_history as boolean) ?? true,
   };
 }
 
@@ -92,7 +97,7 @@ export class SupabaseRepository implements Repository {
       }),
     );
     const collections = Object.fromEntries(results) as Pick<NocturneData, CollectionName>;
-    return { profile: profileFromRow(profileRow), ...collections };
+    return normalizeData({ profile: profileFromRow(profileRow), ...collections });
   }
 
   async save(_next: NocturneData, changes: ChangeSet): Promise<void> {
@@ -129,6 +134,11 @@ export class SupabaseRepository implements Repository {
       timezone: p.timezone,
       preferred_carriage: p.preferredCarriage,
       auto_tunnel: p.autoTunnel,
+      locale: p.locale,
+      onboarded_at: p.onboardedAt,
+      learn_from_sessions: p.learnFromSessions,
+      auto_adjust_estimates: p.autoAdjustEstimates,
+      use_focus_history: p.useFocusHistory,
     });
     if (error) throw error;
   }

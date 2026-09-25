@@ -1,5 +1,7 @@
-import { formatShortDate } from "@/core/time";
+"use client";
+
 import type { Line, Task } from "@/core/types";
+import { useI18n } from "@/i18n";
 
 export function lineProgress(tasks: Task[]) {
   const total = tasks.reduce((a, t) => a + (t.recurrence ? 0 : t.estimatedMinutes), 0);
@@ -15,12 +17,13 @@ export function lineTasks(line: Line, tasks: Task[]): Task[] {
 
 /** A long-distance line: origin ─── destination, with stops for each task. */
 export function LineRoute({ line, tasks, today }: { line: Line; tasks: Task[]; today: string }) {
+  const { fmt } = useI18n();
   const p = lineProgress(tasks);
   const origin = tasks.reduce((min, t) => (t.createdAt.slice(0, 10) < min ? t.createdAt.slice(0, 10) : min), line.createdAt.slice(0, 10));
   return (
     <div>
       <div className="flex items-center gap-3 font-mono text-xs text-mist tabular">
-        <span>{formatShortDate(origin < today ? origin : today)}</span>
+        <span>{fmt.shortDate(origin < today ? origin : today)}</span>
         <span className="relative h-px flex-1 bg-rule" aria-hidden>
           <span className="absolute inset-y-0 left-0 bg-lamp/70" style={{ width: `${p.fraction * 100}%` }} />
           <span
@@ -28,7 +31,7 @@ export function LineRoute({ line, tasks, today }: { line: Line; tasks: Task[]; t
             style={{ left: `${p.fraction * 100}%` }}
           />
         </span>
-        <span>{line.targetDate ? formatShortDate(line.targetDate) : "Open"}</span>
+        <span>{line.targetDate ? fmt.shortDate(line.targetDate) : "Open"}</span>
       </div>
       <ol className="mt-5 space-y-2.5">
         {tasks.map((t) => {
@@ -51,7 +54,7 @@ export function LineRoute({ line, tasks, today }: { line: Line; tasks: Task[]; t
               <span className="h-1 w-1 rounded-full bg-lamp" />
             </span>
             <span className="text-paper">{line.title}</span>
-            <span className="font-mono text-xs text-mist">{formatShortDate(line.targetDate)}</span>
+            <span className="font-mono text-xs text-mist">{fmt.shortDate(line.targetDate)}</span>
           </li>
         )}
       </ol>

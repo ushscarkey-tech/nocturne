@@ -15,8 +15,9 @@ npm install
 npm run dev          # http://localhost:3000
 ```
 
-With no configuration, Nocturne runs in **demo mode**: a sample traveller with tasks, two Lines,
-weekday Service Time and a week of past journeys, saved in your browser's local storage.
+With no configuration, Nocturne runs in **demo mode**, saved in your browser's local storage. A first
+visit opens a short guide (`/welcome`): language, name, Service Time and a first task. Sample tasks
+with a week of past journeys can be loaded from the last step or from Settings.
 
 ### Cloud accounts (Supabase)
 
@@ -63,11 +64,15 @@ src/core/        Framework-free domain logic (reusable by a future React Native 
   journey.ts       Journey engine: board, arrive, low focus, finish early, more time,
                    stops, service pause, end, ticket
   stats.ts         Journey summaries, ticket faces, archive statistics
+  quickadd.ts      Natural-language parser for Quick Add (ko / en / ja / zh)
+  learning.ts      Task similarity, estimate calibration, focus pattern (all opt-out)
+  messages.ts      Structured Route-change messages, rendered by the i18n layer
   seed.ts          Demo data relative to "now"
 src/data/        Repository interface, local-storage and Supabase implementations
 src/state/       Zustand store (persists entity diffs), user actions, auth/bootstrap
+src/i18n/        English source strings + Korean, Japanese, Chinese (missing keys fall back to English)
 src/audio/       Procedural Web Audio ambience (no audio files) with crossfading presets
-src/components/  UI: route line and editor, journey scenes, tickets, forms
+src/components/  UI: route line and editor, journey scenes, the 3D platform (three.js), tickets, forms
 src/app/         Next.js App Router pages
 supabase/        SQL migrations
 ```
@@ -100,6 +105,23 @@ supabase/        SQL migrations
   whether it's finished or needs more time instead of silently closing it.
 - **Deleting keeps history** – a task with past journeys is archived so tickets stay intact.
 
+### Quick Add and learning
+
+- **Quick Add** (the round button above the tab bar) reads a sentence such as
+  "다음 주 화요일까지 생명 3시간 정도, 별로 하기 싫어" into title, deadline, time, interest, difficulty,
+  importance, repeat, session size and Line. Nothing is guessed that wasn't said; unclear parts are
+  marked *Check* in the preview, and the full form is always one tap away.
+- **Similar tasks** are grouped by subject and kind of work read from the title
+  ("수학 문제집" ≈ "Math problem set", but not "수학 개념 정리").
+- **Estimate calibration** needs at least 3 finished similar tasks (or 6 stations) with consistent
+  ratios. It only suggests ("Use 80 min / Keep 60 min"); the traveller's own estimate is kept in
+  `user_estimated_minutes` and can be restored.
+- **Focus pattern** needs 10 stations over 5 days in the last 4 weeks. It then gives hard work a
+  small nudge toward hours where it usually gets finished. Deadlines, workload, locked stations and
+  importance always outweigh it; the Route change note says when it moved something.
+- All of it can be switched off in Settings → Personalized scheduling; switched off, the planner
+  behaves exactly as without history.
+
 ### Terminology
 
 | Product concept | Nocturne |
@@ -114,8 +136,14 @@ supabase/        SQL migrations
 | Daily record | Ticket |
 | Long-term project | Line |
 
-## Known limits of v1
+## Languages
+
+English, 한국어, 日本語 and 中文. The language follows the browser on first visit and can be changed
+in the welcome guide or Settings. Korean, Japanese and Chinese use IBM Plex Sans KR / JP,
+Noto Sans SC and serif faces (Gowun Batang, Shippori Mincho, Noto Serif SC) for display type.
+
+## Known limits
 
 - A night's service must end by 04:00.
 - Reminders are browser notifications while Nocturne is open (no push service yet).
-- Natural-language quick add, calendar sync and learned focus patterns are planned for later.
+- No calendar sync yet.

@@ -3,16 +3,18 @@
 import { useEffect } from "react";
 import { useStore } from "@/state/store";
 import { Icon } from "@/components/ui/Icon";
+import { useI18n } from "@/i18n";
 
 /** "Route updated" and other quiet announcements. */
 export function NoticeToast({ placement = "tabs" }: { placement?: "tabs" | "immersive" }) {
+  const { t, tm } = useI18n();
   const notice = useStore((s) => s.notice);
   const dismiss = useStore((s) => s.dismissNotice);
 
   useEffect(() => {
     if (!notice) return;
-    const t = setTimeout(dismiss, notice.tone === "error" ? 12_000 : 9_000);
-    return () => clearTimeout(t);
+    const timer = setTimeout(dismiss, notice.tone === "error" ? 12_000 : 9_000);
+    return () => clearTimeout(timer);
   }, [notice, dismiss]);
 
   return (
@@ -34,14 +36,16 @@ export function NoticeToast({ placement = "tabs" }: { placement?: "tabs" | "imme
               aria-hidden
             />
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium text-paper">{notice.headline}</p>
-              {notice.lines.map((l) => (
-                <p key={l} className="mt-1 text-sm leading-relaxed text-mist">
+              <p className="text-sm font-medium text-paper">
+                {notice.headlineKey ? tm({ key: notice.headlineKey }) : notice.headline}
+              </p>
+              {(notice.messages ? notice.messages.map(tm) : notice.lines).map((l, i) => (
+                <p key={i} className="mt-1 text-sm leading-relaxed text-mist">
                   {l}
                 </p>
               ))}
             </div>
-            <button type="button" onClick={dismiss} className="-m-3 flex h-10 w-10 shrink-0 items-center justify-center text-haze hover:text-paper" aria-label="Dismiss">
+            <button type="button" onClick={dismiss} className="-m-3 flex h-10 w-10 shrink-0 items-center justify-center text-haze hover:text-paper" aria-label={t("shell.dismiss")}>
               <Icon name="close" size={16} />
             </button>
           </div>

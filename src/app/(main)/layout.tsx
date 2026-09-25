@@ -2,6 +2,7 @@ import { DataGate } from "@/components/shell/DataGate";
 import { NoticeToast } from "@/components/shell/NoticeToast";
 import { SyncStatus } from "@/components/shell/SyncStatus";
 import { TabBar } from "@/components/shell/TabBar";
+import { QuickAddButton, QuickAddSheet } from "@/components/quickadd/QuickAdd";
 
 export default function MainLayout({ children }: LayoutProps<"/">) {
   return (
@@ -12,6 +13,8 @@ export default function MainLayout({ children }: LayoutProps<"/">) {
           {children}
         </main>
       </div>
+      <QuickAddButton />
+      <QuickAddSheet />
       <SyncStatus />
       <NoticeToast />
     </DataGate>

@@ -1,0 +1,37 @@
+import type source from "../en/route";
+
+const route: Partial<Record<keyof typeof source, string>> = {
+  "route.stationStop": "정거장 정차 · {min}",
+  "route.servicePaused": "운행 일시 중지 · {at}에 재개",
+  "route.continuedLater": "나중에 계속",
+  "route.completed": "완료됨",
+  "route.now": "지금",
+  "route.removedTask": "제거된 할 일",
+  "route.locked": "고정됨",
+  "route.reorder": "{task} 순서 변경",
+  "route.options": "{task} 옵션",
+  "route.tonightRoute": "오늘 밤 노선",
+  "route.line": "오늘 밤 라인",
+  "route.routeTitle": "노선",
+  "route.noStations": "오늘 밤 정거장이 없어요.",
+  "route.dragToReorder": "끌어서 순서를 바꿔요. 고정된 정거장은 그대로 있어요.",
+  "route.boardTrain": "탑승하기",
+  "route.returnToJourney": "여행으로 돌아가기",
+  "route.optimizeRoute": "노선 최적화",
+  "route.howAreYouTonight": "오늘 밤 어떤 기분인가요?",
+  "route.optimizeHelp": "시작하지 않은 정거장들을 다시 만들어요.",
+  "route.doNext": "다음에 하기",
+  "route.unlockTime": "고정 해제",
+  "route.lockTime": "시간 고정",
+  "route.length": "길이",
+  "route.shortenBy": "{n}분 단축",
+  "route.extendBy": "{n}분 연장",
+  "route.moveToTime": "정해진 시간으로 옮기기",
+  "route.moveAndLock": "옮기고 고정",
+  "route.openTask": "할 일 열기",
+  "route.skipToday": "오늘 건너뛰기",
+  "route.underWay": "이 정거장은 진행 중입니다.",
+  "route.completeRecord": "이 정거장은 완료되었고 기록에 남습니다.",
+};
+
+export default route;

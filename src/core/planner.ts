@@ -13,8 +13,10 @@ import { newId } from "./ids";
 import { chunksFor, packInOrder, packOptimized, type Chunk, type Slot } from "./route";
 import { isClosed, remainingSeconds, remainingWork, sessionsOn, spanOf } from "./sessions";
 import { stationName } from "./stations";
-import { atMinutes, clock, formatDuration, roundUp, serviceDate, serviceMinutes } from "./time";
-import type { DateKey, FocusLevel, ReplanReason, RouteChange, StudySession, StudyWindow, Task } from "./types";
+import { atMinutes, clock, formatHM, roundUp, serviceDate, serviceMinutes } from "./time";
+import { historyNudge, type FocusProfile } from "./learning";
+import type { DateKey, FocusLevel, Message, ReplanReason, RouteChange, StudySession, StudyWindow, Task } from "./types";
+import { msg, renderEnglish } from "./messages";
 
 export type ReplanMode = "reoptimize" | "retime";
 
@@ -23,6 +25,8 @@ export interface PlanTodayInput {
   windows: StudyWindow[];
   sessions: StudySession[];
   userId: string;
+  /** Learned focus pattern; null/undefined = general rules only. */
+  focusProfile?: FocusProfile | null;
 }
 
 export interface PlanTodayOptions {
@@ -97,6 +101,8 @@ function makeSession(base: Partial<StudySession> & Pick<StudySession, "taskId" |
     resumedAt: null,
     focusBefore: null,
     focusAfter: null,
+    endedBy: null,
+    extendedMinutes: 0,
     ...base,
   };
 }
@@ -140,6 +146,7 @@ export function planToday(input: PlanTodayInput, opts: PlanTodayOptions): PlanTo
 
   let slots: Slot[];
   let overflow: Chunk[];
+  let historyNote: Message | null = null;
 
   if (mode === "retime") {
     const byId = new Map(movable.map((s) => [s.id, s]));
@@ -192,7 +199,26 @@ export function planToday(input: PlanTodayInput, opts: PlanTodayOptions): PlanTo
       const t = tasksById.get(taskId);
       if (t) chunks.push(...chunksFor(t, minutes, focus));
     }
-    ({ slots, overflow } = packOptimized(chunks, free, { date: today, focus, tasks: tasksById, previousTaskId }, minSessionFor));
+    const ctx = { date: today, focus, tasks: tasksById, previousTaskId };
+    const profile = input.focusProfile ?? null;
+    if (profile) {
+      ({ slots, overflow } = packOptimized(chunks, free, { ...ctx, history: (t, m) => historyNudge(profile, t, m) }, minSessionFor));
+      // Say so when history, not the general rules, moved demanding work earlier.
+      if (profile.bestHardWindow && reason !== "initial") {
+        const plain = packOptimized(chunks, free, ctx, minSessionFor).slots;
+        for (const slot of slots) {
+          const t = tasksById.get(slot.taskId);
+          if (!t || t.difficulty < 4) continue;
+          const without = plain.find((x) => x.taskId === slot.taskId);
+          if (without && without.start - slot.start >= 20) {
+            historyNote = msg("change.history", { at: formatHM(profile.bestHardWindow[0] * 60), task: t.title });
+          }
+          break;
+        }
+      }
+    } else {
+      ({ slots, overflow } = packOptimized(chunks, free, ctx, minSessionFor));
+    }
   }
 
   // Reuse existing station ids where possible so the UI can animate moves.
@@ -223,7 +249,7 @@ export function planToday(input: PlanTodayInput, opts: PlanTodayOptions): PlanTo
   const newPlanned = sessionsOn(next, today).filter((s) => isMovable(s, today));
   const deferred = mergeOverflow(overflow);
   const change =
-    reason === "initial" ? null : describeChange(oldMovable, newPlanned, sessionsOn(next, today), tasksById, opts, deferred);
+    reason === "initial" ? null : describeChange(oldMovable, newPlanned, sessionsOn(next, today), tasksById, opts, deferred, historyNote);
   return { sessions: next, change, deferred };
 }
 
@@ -247,8 +273,8 @@ function minutesByTask(list: StudySession[]): Map<string, number> {
 }
 
 /**
- * Plain-language explanation of what moved: why first, then the one detail
- * that matters, then the arrival. Never framed as failure.
+ * What moved and why: the reason first, then the one detail that matters,
+ * then the arrival. Short, and never framed as failure.
  */
 export function describeChange(
   before: StudySession[],
@@ -257,66 +283,68 @@ export function describeChange(
   tasks: Map<string, Task>,
   opts: PlanTodayOptions,
   deferred: { taskId: string; minutes: number }[],
+  historyNote: Message | null = null,
 ): RouteChange | null {
-  const title = (id: string) => tasks.get(id)?.title ?? "A task";
+  const title = (id: string) => tasks.get(id)?.title ?? "—";
   const oldMin = minutesByTask(before);
   const newMin = minutesByTask(after);
   const next = after[0];
-  const reasons: string[] = [];
-  const details: string[] = [];
+  const reasons: Message[] = [];
+  const details: Message[] = [];
 
   const reordered = before.map((s) => s.taskId).join() !== after.map((s) => s.taskId).join();
   const nextChanged = !!next && next.taskId !== before[0]?.taskId;
 
   switch (opts.reason) {
     case "low-focus":
-      if (next) reasons.push(`Lighter work first while your focus recovers — ${title(next.taskId)} is next.`);
+      if (next) reasons.push(msg("change.lowFocus", { task: title(next.taskId) }));
       break;
     case "signal-change":
     case "boarding":
-      if (nextChanged && next && opts.focus === "sharp") reasons.push(`Sharp focus: ${title(next.taskId)} moves up while it's easiest.`);
-      else if (nextChanged && next && opts.focus === "low") reasons.push(`Shorter, lighter stations for now — ${title(next.taskId)} is next.`);
-      else if (reordered) reasons.push("Stations re-balanced for how you feel.");
+      if (nextChanged && next && opts.focus === "sharp") reasons.push(msg("change.signalSharp", { task: title(next.taskId) }));
+      else if (nextChanged && next && opts.focus === "low") reasons.push(msg("change.signalLow", { task: title(next.taskId) }));
+      else if (reordered) reasons.push(msg("change.rebalanced"));
       break;
     case "late-start":
-      if (next) reasons.push(`Departure moved to ${clock(next.plannedStart)}; the route re-formed around it.`);
+      if (next) reasons.push(msg("change.lateStart", { at: clock(next.plannedStart) }));
       break;
     case "finish-early":
-      reasons.push("Finished early — the rest of the route moves up.");
+      reasons.push(msg("change.finishEarly"));
       break;
     case "more-time":
-      reasons.push("Taking the time it needs — later stations shift to make room.");
+      reasons.push(msg("change.moreTime"));
       break;
     case "skip":
-      reasons.push("Skipped for tonight; it goes back to the planner for another day.");
+      reasons.push(msg("change.skip"));
       break;
     default:
-      if (nextChanged && next && before.length > 0 && opts.reason !== "reorder") reasons.push(`${title(next.taskId)} is now the next station.`);
+      if (nextChanged && next && before.length > 0 && opts.reason !== "reorder") reasons.push(msg("change.next", { task: title(next.taskId) }));
   }
+  if (historyNote) reasons.unshift(historyNote);
 
   if (opts.returnedWork && opts.returnedWork.minutes >= 5) {
     const { taskId, minutes } = opts.returnedWork;
     const placed = after.find((s) => s.taskId === taskId);
     details.push(
       placed
-        ? `The remaining ${formatDuration(minutes)} of ${title(taskId)} moves to ${clock(placed.plannedStart)}.`
-        : `The remaining ${formatDuration(minutes)} of ${title(taskId)} continues on another day.`,
+        ? msg("change.returned", { task: title(taskId), min: minutes, at: clock(placed.plannedStart) })
+        : msg("change.returnedLater", { task: title(taskId), min: minutes }),
     );
   }
   for (const d of deferred) {
     if (d.minutes < 5 || d.taskId === opts.returnedWork?.taskId) continue;
     const t = tasks.get(d.taskId);
-    details.push(t && isRecurring(t) ? `${title(d.taskId)} rests for tonight.` : `${title(d.taskId)} · ${formatDuration(d.minutes)} moves to a later day.`);
+    details.push(t && isRecurring(t) ? msg("change.rests", { task: title(d.taskId) }) : msg("change.deferred", { task: title(d.taskId), min: d.minutes }));
   }
   for (const [taskId, minutes] of newMin) {
     if ((oldMin.get(taskId) ?? 0) === 0 && before.length > 0 && taskId !== opts.returnedWork?.taskId) {
       const first = after.find((s) => s.taskId === taskId)!;
-      details.push(`${title(taskId)} · ${formatDuration(minutes)} joins at ${clock(first.plannedStart)}.`);
+      details.push(msg("change.joins", { task: title(taskId), min: minutes, at: clock(first.plannedStart) }));
     }
   }
   for (const [taskId, minutes] of oldMin) {
     if (!newMin.has(taskId) && !deferred.some((d) => d.taskId === taskId) && tasks.get(taskId)?.status === "active" && opts.reason !== "skip") {
-      details.push(`${title(taskId)} · ${formatDuration(minutes)} moves to a later day.`);
+      details.push(msg("change.deferred", { task: title(taskId), min: minutes }));
     }
   }
 
@@ -325,18 +353,22 @@ export function describeChange(
   const shift = beforeArrival !== null && afterArrival !== null ? (afterArrival - beforeArrival) / 60_000 : 0;
   if (reasons.length === 0 && details.length === 0 && Math.abs(shift) < 5) return null;
 
-  let arrival: string | null = null;
+  let arrival: Message | null = null;
   if (afterArrival !== null) {
     const at = clock(new Date(afterArrival));
-    if (Math.abs(shift) < 5) arrival = `Expected arrival stays ${at}.`;
-    else if (shift < 0) arrival = `Ahead of schedule · arriving ${at}.`;
-    else arrival = `Expected arrival is now ${at}.`;
+    arrival = Math.abs(shift) < 5 ? msg("arrival.stays", { at }) : shift < 0 ? msg("arrival.ahead", { at }) : msg("arrival.later", { at });
   } else if (before.length > 0) {
-    arrival = "No further stations tonight.";
+    arrival = msg("arrival.none");
   }
 
-  const lines = [...reasons.slice(0, 1), ...details.slice(0, reasons.length ? 1 : 2), ...(arrival ? [arrival] : [])];
-  return { at: opts.now.toISOString(), reason: opts.reason, headline: "Route updated", lines };
+  const messages = [...reasons.slice(0, 1), ...details.slice(0, reasons.length ? 1 : 2), ...(arrival ? [arrival] : [])];
+  return {
+    at: opts.now.toISOString(),
+    reason: opts.reason,
+    headline: renderEnglish(msg("change.headline")),
+    lines: messages.map(renderEnglish),
+    messages,
+  };
 }
 
 /** Future-days forecast consistent with the persisted route for today. */

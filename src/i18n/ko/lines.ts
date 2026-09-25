@@ -1,0 +1,36 @@
+import type source from "../en/lines";
+
+const lines: Partial<Record<keyof typeof source, string>> = {
+  "lines.longDistance": "장거리",
+  "lines.title": "라인",
+  "lines.newLine": "새 라인",
+  "lines.aLongTermGoal": "장기 목표",
+  "lines.createLine": "라인 만들기",
+  "lines.noLines": "아직 라인이 없어요.",
+  "lines.tasksSummary": "{n}개 할 일 · {time}/{total} 남음",
+  "lines.noTargetDate": "목표 날짜 없음",
+  "lines.progress": "진행도",
+  "lines.workload": "작업량",
+  "lines.remaining": "남음",
+  "lines.tasksOnThisLine": "이 라인의 할 일",
+  "lines.attach": "연결",
+  "lines.attachTasks": "할 일 연결",
+  "lines.newTask": "새 할 일",
+  "lines.editLine": "라인 편집",
+  "lines.deleteQuestion": "이 라인을 삭제할까요?",
+  "lines.deleteInfo": "할 일들은 남아요.",
+  "lines.keepIt": "유지",
+  "lines.deleteLine": "라인 삭제",
+  "lines.noAttach": "모든 진행 중인 할 일이 이미 이 라인에 있어요.",
+  "lines.onThisLine": "이 라인에",
+  "lines.detach": "분리",
+  "lines.attachEmpty": "기존 할 일을 연결하거나 새것을 추가하세요.",
+  "lines.lineName": "이름",
+  "lines.targetDate": "목표 날짜",
+  "lines.targetDateHint": "시험, 발표 또는 목표 날짜.",
+  "lines.notes": "노트",
+  "lines.nameRequired": "라인에 이름을 지어주세요.",
+  "lines.back": "라인",
+};
+
+export default lines;

@@ -17,6 +17,7 @@ import { useRef, useState } from "react";
 import { useFlip } from "@/lib/hooks";
 import type { RouteItem } from "@/lib/route-view";
 import { Icon } from "@/components/ui/Icon";
+import { useI18n } from "@/i18n";
 import { RouteRow, routeSignature } from "./RouteLine";
 
 type StationItem = Extract<RouteItem, { kind: "station" }>;
@@ -118,6 +119,7 @@ function SortableStation({
   last: boolean;
   onOpen: (item: StationItem) => void;
 }) {
+  const { t } = useI18n();
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({
     id: item.session.id,
   });
@@ -141,7 +143,7 @@ function SortableStation({
             ref={setActivatorNodeRef}
             {...attributes}
             {...listeners}
-            aria-label={`Reorder ${item.task?.title ?? "station"}`}
+            aria-label={t("route.reorder", { task: item.task?.title ?? "station" })}
             className="flex h-11 w-10 cursor-grab touch-none items-center justify-center rounded-lg text-haze transition-colors hover:text-paper active:cursor-grabbing"
           >
             <Icon name="grip" size={18} />
@@ -153,11 +155,12 @@ function SortableStation({
 }
 
 function MoreButton({ item, onOpen }: { item: StationItem; onOpen: (item: StationItem) => void }) {
+  const { t } = useI18n();
   return (
     <button
       type="button"
       onClick={() => onOpen(item)}
-      aria-label={`Options for ${item.task?.title ?? "station"}`}
+      aria-label={t("route.options", { task: item.task?.title ?? "station" })}
       className="flex h-11 w-10 items-center justify-center rounded-lg text-haze transition-colors hover:text-paper"
     >
       <Icon name="dots" size={18} />

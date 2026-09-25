@@ -8,11 +8,13 @@ import { CARRIAGE_AMBIENCE, journeyFor } from "@/core/journey";
 import { activeSession, sessionsOn, upcomingOn } from "@/core/sessions";
 import { serviceDate } from "@/core/time";
 import type { CarriageId } from "@/core/types";
+import { useI18n } from "@/i18n";
 import { ButtonLink } from "@/components/ui/Button";
 import { Boarding } from "@/components/journey/Boarding";
 import { Cabin } from "@/components/journey/Cabin";
 import { FinalStation } from "@/components/journey/FinalStation";
 import { NightScene, type SceneMode } from "@/components/journey/NightScene";
+import { PlatformScene } from "@/components/scene/PlatformScene";
 import { ServicePaused, StationStop } from "@/components/journey/Platform";
 import { useNow } from "@/lib/hooks";
 import { useData } from "@/state/store";
@@ -103,7 +105,21 @@ export default function JourneyPage() {
 
   return (
     <div className="relative isolate min-h-dvh overflow-hidden" onPointerDown={resumeSound}>
-      <NightScene mode={scene} carriage={carriage} stationName={boardName} />
+      {phase === "boarding" || phase === "final" ? (
+        <>
+          {/* Standing on the platform: before the train leaves, and at the end of the line. */}
+          <PlatformScene
+            className="fixed inset-0 -z-10"
+            fade={false}
+            mood={phase === "final" ? "final" : "waiting"}
+            rain={carriage === "rain"}
+            stationName={boardName}
+          />
+          <div className="pointer-events-none fixed inset-0 -z-10 bg-[linear-gradient(180deg,rgba(4,6,10,0.35)_0%,rgba(4,6,10,0.7)_55%,rgba(4,6,10,0.92)_100%)]" />
+        </>
+      ) : (
+        <NightScene mode={scene} carriage={carriage} stationName={boardName} />
+      )}
       <div key={phase} className={phase === "cabin" ? "animate-sway" : undefined}>
         {content}
       </div>
@@ -112,20 +128,21 @@ export default function JourneyPage() {
 }
 
 function NoService() {
+  const { t } = useI18n();
   return (
     <div className="mx-auto flex min-h-dvh max-w-sm flex-col items-center justify-center gap-6 px-6 text-center">
-      <p className="eyebrow">No departures</p>
-      <p className="font-display text-3xl">There are no stations left on tonight&rsquo;s route.</p>
+      <p className="eyebrow">{t("journey.noDepartures")}</p>
+      <p className="font-display text-3xl">{t("journey.noStationsLeft")}</p>
       <div className="flex gap-3">
         <ButtonLink href="/tasks" variant="secondary">
-          Review tasks
+          {t("journey.reviewTasks")}
         </ButtonLink>
         <ButtonLink href="/service" variant="ghost">
-          Service Time
+          {t("journey.serviceTime")}
         </ButtonLink>
       </div>
       <Link href="/" className="py-2 text-sm text-mist hover:text-paper">
-        Back to Tonight
+        {t("common.back")}
       </Link>
     </div>
   );

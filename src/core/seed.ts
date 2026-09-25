@@ -7,6 +7,8 @@ import { newId } from "./ids";
 import { planToday } from "./planner";
 import { boardingDetails, stationName } from "./stations";
 import { addDays, atMinutes, parseHM, serviceDate } from "./time";
+import { PROFILE_DEFAULTS, type Locale } from "./types";
+import { SEED_TEXT } from "./seed-text";
 import type {
   CarriageId,
   Journey,
@@ -48,7 +50,8 @@ export function defaultWindows(userId: string): StudyWindow[] {
   return out;
 }
 
-export function createSeedData(now: Date, profileBase?: Partial<Profile>): NocturneData {
+export function createSeedData(now: Date, profileBase?: Partial<Profile>, locale: Locale = "en"): NocturneData {
+  const L = SEED_TEXT[locale];
   const today = serviceDate(now);
   const userId = profileBase?.id ?? newId();
   const stamp = (daysAgo: number) => atMinutes(addDays(today, -daysAgo), 12 * 60).toISOString();
@@ -60,23 +63,25 @@ export function createSeedData(now: Date, profileBase?: Partial<Profile>): Noctu
     createdAt: stamp(10),
     preferredCarriage: "rain",
     autoTunnel: true,
-    ...profileBase,
-  };
+    ...PROFILE_DEFAULTS,
+    onboardedAt: stamp(10),
+    ...(profileBase as Partial<Profile>),
+  } as Profile;
 
   const lines: Line[] = [
     {
       id: newId(),
       userId,
-      title: "Biology Midterm",
-      description: "Ecology, photosynthesis and cellular respiration.",
+      title: L.bioLine,
+      description: L.bioLineDesc,
       targetDate: addDays(today, 17),
       createdAt: stamp(9),
     },
     {
       id: newId(),
       userId,
-      title: "Research Presentation",
-      description: "Report and slides for the science fair.",
+      title: L.researchLine,
+      description: L.researchLineDesc,
       targetDate: addDays(today, 20),
       createdAt: stamp(8),
     },
@@ -97,6 +102,7 @@ export function createSeedData(now: Date, profileBase?: Partial<Profile>): Noctu
     minSessionMinutes: 25,
     maxSessionMinutes: 60,
     recurrence: null,
+    userEstimatedMinutes: null,
     status: "active",
     lineId: null,
     createdAt: stamp(7),
@@ -106,19 +112,19 @@ export function createSeedData(now: Date, profileBase?: Partial<Profile>): Noctu
   });
 
   const seeds = [
-    task({ key: "math", title: "Mathematics problem set", description: "Chapter 4 — differentiation, problems 1–40.", deadline: addDays(today, 2), estimatedMinutes: 180, remainingMinutes: 150, interest: 2, difficulty: 4, importance: 5 }),
-    task({ key: "physics", title: "Physics workbook", description: "Kinematics review pages 58–91.", deadline: addDays(today, 4), estimatedMinutes: 180, remainingMinutes: 110, interest: 2, difficulty: 4, importance: 4 }),
-    task({ key: "bio", title: "Biology memorization", description: "Ecosystem vocabulary and energy flow diagrams.", deadline: addDays(today, 5), estimatedMinutes: 240, remainingMinutes: 240, interest: 3, difficulty: 2, importance: 4, lineId: bio.id, maxSessionMinutes: 45 }),
-    task({ key: "report", title: "Science report", description: "Draft the results and discussion sections.", deadline: addDays(today, 6), estimatedMinutes: 150, remainingMinutes: 150, interest: 4, difficulty: 3, importance: 3, lineId: research.id }),
-    task({ key: "vocab", title: "English vocabulary", description: "30 words from the daily list.", estimatedMinutes: 30, remainingMinutes: 30, interest: 3, difficulty: 1, importance: 3, recurrence: { freq: "daily" }, maxSessionMinutes: 30, minSessionMinutes: 15 }),
-    task({ key: "photo", title: "Photosynthesis review", deadline: addDays(today, 10), estimatedMinutes: 120, remainingMinutes: 120, interest: 4, difficulty: 3, importance: 4, lineId: bio.id }),
-    task({ key: "resp", title: "Cellular respiration", deadline: addDays(today, 14), estimatedMinutes: 120, remainingMinutes: 120, interest: 3, difficulty: 4, importance: 4, lineId: bio.id }),
-    task({ key: "slides", title: "Presentation slides", deadline: addDays(today, 18), estimatedMinutes: 180, remainingMinutes: 180, interest: 4, difficulty: 2, importance: 3, lineId: research.id }),
-    task({ key: "popeco", title: "Population ecology", deadline: addDays(today, -2), estimatedMinutes: 100, remainingMinutes: 0, interest: 3, difficulty: 3, importance: 4, lineId: bio.id, status: "done", completedAt: stamp(3) }),
-    task({ key: "community", title: "Community ecology", deadline: addDays(today, -1), estimatedMinutes: 90, remainingMinutes: 0, interest: 4, difficulty: 2, importance: 4, lineId: bio.id, status: "done", completedAt: stamp(1) }),
-    task({ key: "chem", title: "Chemistry lab notes", deadline: addDays(today, -3), estimatedMinutes: 80, remainingMinutes: 0, interest: 3, difficulty: 2, importance: 3, status: "done", completedAt: stamp(4) }),
-    task({ key: "book", title: "Read “The Selfish Gene”", description: "For fun, a chapter at a time.", estimatedMinutes: 240, remainingMinutes: 240, interest: 5, difficulty: 2, importance: 2 }),
-    task({ key: "essay", title: "History essay outline", status: "inbox", estimatedMinutes: 0, remainingMinutes: 0, createdAt: stamp(0) }),
+    task({ key: "math", title: L.math, description: L.mathDesc, deadline: addDays(today, 2), estimatedMinutes: 180, remainingMinutes: 150, interest: 2, difficulty: 4, importance: 5 }),
+    task({ key: "physics", title: L.physics, description: L.physicsDesc, deadline: addDays(today, 4), estimatedMinutes: 180, remainingMinutes: 110, interest: 2, difficulty: 4, importance: 4 }),
+    task({ key: "bio", title: L.bio, description: L.bioDesc, deadline: addDays(today, 5), estimatedMinutes: 240, remainingMinutes: 240, interest: 3, difficulty: 2, importance: 4, lineId: bio.id, maxSessionMinutes: 45 }),
+    task({ key: "report", title: L.report, description: L.reportDesc, deadline: addDays(today, 6), estimatedMinutes: 150, remainingMinutes: 150, interest: 4, difficulty: 3, importance: 3, lineId: research.id }),
+    task({ key: "vocab", title: L.vocab, description: L.vocabDesc, estimatedMinutes: 30, remainingMinutes: 30, interest: 3, difficulty: 1, importance: 3, recurrence: { freq: "daily" }, maxSessionMinutes: 30, minSessionMinutes: 15 }),
+    task({ key: "photo", title: L.photo, deadline: addDays(today, 10), estimatedMinutes: 120, remainingMinutes: 120, interest: 4, difficulty: 3, importance: 4, lineId: bio.id }),
+    task({ key: "resp", title: L.resp, deadline: addDays(today, 14), estimatedMinutes: 120, remainingMinutes: 120, interest: 3, difficulty: 4, importance: 4, lineId: bio.id }),
+    task({ key: "slides", title: L.slides, deadline: addDays(today, 18), estimatedMinutes: 180, remainingMinutes: 180, interest: 4, difficulty: 2, importance: 3, lineId: research.id }),
+    task({ key: "popeco", title: L.popeco, deadline: addDays(today, -2), estimatedMinutes: 100, remainingMinutes: 0, interest: 3, difficulty: 3, importance: 4, lineId: bio.id, status: "done", completedAt: stamp(3) }),
+    task({ key: "community", title: L.community, deadline: addDays(today, -1), estimatedMinutes: 90, remainingMinutes: 0, interest: 4, difficulty: 2, importance: 4, lineId: bio.id, status: "done", completedAt: stamp(1) }),
+    task({ key: "chem", title: L.chem, deadline: addDays(today, -3), estimatedMinutes: 80, remainingMinutes: 0, interest: 3, difficulty: 2, importance: 3, status: "done", completedAt: stamp(4) }),
+    task({ key: "book", title: L.book, description: L.bookDesc, estimatedMinutes: 240, remainingMinutes: 240, interest: 5, difficulty: 2, importance: 2 }),
+    task({ key: "essay", title: L.essay, status: "inbox", estimatedMinutes: 0, remainingMinutes: 0, createdAt: stamp(0) }),
   ];
   const byKey = Object.fromEntries(seeds.map((t) => [t.key, t.id]));
   const tasks: Task[] = seeds.map((seed) => {
@@ -184,6 +190,8 @@ export function createSeedData(now: Date, profileBase?: Partial<Profile>): Noctu
         resumedAt: null,
         focusBefore: day.focus[0],
         focusAfter: day.focus[day.focus.length - 1],
+        endedBy: status === "partial" ? "low-focus" : "complete",
+        extendedMinutes: Math.max(0, actual - planned),
       };
     });
     sessions.push(...daySessions);

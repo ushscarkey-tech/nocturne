@@ -1,0 +1,37 @@
+import type source from "../en/route";
+
+const route: Partial<Record<keyof typeof source, string>> = {
+  "route.boardTrain": "電車に乗る",
+  "route.completeRecord": "この駅は完了し、記録に残ります。",
+  "route.completed": "完了",
+  "route.continuedLater": "後で続く",
+  "route.doNext": "次にする",
+  "route.dragToReorder": "ドラッグして並び替える。固定した駅は変わりません。",
+  "route.extendBy": "{n}分長くする",
+  "route.howAreYouTonight": "今夜はどう?",
+  "route.length": "長さ",
+  "route.line": "今夜のライン",
+  "route.lockTime": "時間を固定",
+  "route.locked": "固定",
+  "route.moveAndLock": "移動して固定",
+  "route.moveToTime": "決まった時間に移動",
+  "route.noStations": "今夜の駅がありません。",
+  "route.now": "今",
+  "route.openTask": "タスクを開く",
+  "route.optimizeHelp": "まだ始まっていない駅を再構築します。",
+  "route.optimizeRoute": "ルートを最適化",
+  "route.options": "{task}のオプション",
+  "route.removedTask": "削除されたタスク",
+  "route.reorder": "{task}を並び替える",
+  "route.returnToJourney": "旅に戻る",
+  "route.routeTitle": "ルート",
+  "route.servicePaused": "運行一時停止・{at}に再開",
+  "route.shortenBy": "{n}分短くする",
+  "route.skipToday": "今日はスキップ",
+  "route.stationStop": "停車・{min}",
+  "route.tonightRoute": "今夜のルート",
+  "route.underWay": "この駅は進行中です。",
+  "route.unlockTime": "固定を解く",
+};
+
+export default route;

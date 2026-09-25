@@ -1,10 +1,17 @@
 import type { Metadata, Viewport } from "next";
-import { IBM_Plex_Mono, Inter, Instrument_Serif } from "next/font/google";
+import { IBM_Plex_Mono, Instrument_Serif, Inter } from "next/font/google";
+import { LocaleSync } from "@/components/shell/LocaleSync";
 import "./globals.css";
 
 const inter = Inter({ variable: "--font-inter", subsets: ["latin"] });
 const plexMono = IBM_Plex_Mono({ variable: "--font-plex-mono", subsets: ["latin"], weight: ["400", "500"] });
 const instrument = Instrument_Serif({ variable: "--font-instrument", subsets: ["latin"], weight: "400", style: ["normal", "italic"] });
+const fontVars = [inter, plexMono, instrument].map((f) => f.variable).join(" ");
+
+// Korean, Japanese and Chinese faces come from Google Fonts at runtime; the
+// browser downloads only the glyph ranges a page actually uses.
+const CJK_FONTS =
+  "https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500&family=Gowun+Batang:wght@400;700&family=IBM+Plex+Sans+JP:wght@400;500&family=Shippori+Mincho:wght@400;500&family=Noto+Sans+SC:wght@400;500&family=Noto+Serif+SC:wght@400;500&display=swap";
 
 export const metadata: Metadata = {
   title: { default: "Nocturne", template: "%s · Nocturne" },
@@ -13,7 +20,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#090d18",
+  themeColor: "#070a10",
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
@@ -21,8 +28,16 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" className={`${inter.variable} ${plexMono.variable} ${instrument.variable} antialiased`}>
-      <body>{children}</body>
+    <html lang="en" className={`${fontVars} antialiased`} suppressHydrationWarning>
+      <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
+        <link rel="stylesheet" href={CJK_FONTS} />
+      </head>
+      <body>
+        <LocaleSync />
+        {children}
+      </body>
     </html>
   );
 }

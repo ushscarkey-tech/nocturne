@@ -1,7 +1,9 @@
 "use client";
 
-import { createEmptyData, createSeedData, defaultWindows } from "@/core/seed";
-import type { NocturneData } from "@/core/types";
+import { newId } from "@/core/ids";
+import { createEmptyData, defaultWindows } from "@/core/seed";
+import { detectLocale } from "@/i18n";
+import { PROFILE_DEFAULTS, type NocturneData } from "@/core/types";
 import { LocalRepository } from "@/data/local";
 import { getSupabase, isSupabaseConfigured, SupabaseRepository } from "@/data/supabase";
 import { ensureToday } from "./actions";
@@ -60,6 +62,8 @@ async function doBootstrap(): Promise<BootResult> {
           createdAt: new Date().toISOString(),
           preferredCarriage: "rain",
           autoTunnel: true,
+          ...PROFILE_DEFAULTS,
+          locale: detectLocale(),
         });
         await repo.replaceAll(data);
       } else if (data.windows.length === 0 && data.tasks.length === 0 && data.journeys.length === 0) {
@@ -74,7 +78,17 @@ async function doBootstrap(): Promise<BootResult> {
       store.begin("demo", repo);
       let data = await repo.load();
       if (!data) {
-        data = createSeedData(new Date());
+        // A first visit starts empty; the welcome guide sets things up.
+        data = createEmptyData({
+          id: newId(),
+          name: "",
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          createdAt: new Date().toISOString(),
+          preferredCarriage: "rain",
+          autoTunnel: true,
+          ...PROFILE_DEFAULTS,
+          locale: detectLocale(),
+        });
         await repo.replaceAll(data);
       }
       useStore.getState().ready(data);

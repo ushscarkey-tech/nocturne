@@ -10,12 +10,15 @@ import { arrive, depart, ensureToday } from "@/state/actions";
 import { bootstrap } from "@/state/session";
 import { useStore } from "@/state/store";
 import { Button } from "@/components/ui/Button";
+import { useI18n } from "@/i18n";
 
 /** Loads the traveller's data (or sends them to sign in) before rendering. */
-export function DataGate({ children }: { children: ReactNode }) {
+export function DataGate({ children, onboarding = false }: { children: ReactNode; onboarding?: boolean }) {
   const status = useStore((s) => s.status);
+  const onboarded = useStore((s) => !!s.data?.profile.onboardedAt);
   const error = useStore((s) => s.error);
   const router = useRouter();
+  const { t } = useI18n();
 
   useEffect(() => {
     if (status !== "idle") return;
@@ -24,23 +27,29 @@ export function DataGate({ children }: { children: ReactNode }) {
     });
   }, [status, router]);
 
+  // Newcomers go through the welcome guide first.
+  const needsWelcome = status === "ready" && !onboarded && !onboarding;
+  useEffect(() => {
+    if (needsWelcome) router.replace("/welcome");
+  }, [needsWelcome, router]);
+
   if (status === "error") {
     return (
       <div className="flex min-h-dvh flex-col items-center justify-center gap-6 px-8 text-center">
-        <p className="eyebrow">Signal lost</p>
+        <p className="eyebrow">{t("shell.signalLost")}</p>
         <p className="max-w-sm text-mist">{error}</p>
         <Button variant="secondary" onClick={() => useStore.getState().reset()}>
-          Try again
+          {t("common.continue")}
         </Button>
       </div>
     );
   }
 
-  if (status !== "ready") {
+  if (status !== "ready" || needsWelcome) {
     return (
       <div className="flex min-h-dvh flex-col items-center justify-center gap-5" role="status" aria-live="polite">
         <span className="h-1.5 w-1.5 animate-breathe rounded-full bg-lamp" aria-hidden />
-        <p className="eyebrow">Preparing your route</p>
+        <p className="eyebrow">{t("shell.preparingRoute")}</p>
       </div>
     );
   }
