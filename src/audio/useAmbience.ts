@@ -1,0 +1,98 @@
+"use client";
+
+import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
+import { DEFAULT_MIX, getAmbience, type MixLevels, type PresetId } from "./engine";
+
+const MIX_KEY = "nocturne:mix";
+
+type Listener = () => void;
+const listeners = new Set<Listener>();
+let enabled = false;
+let mix: MixLevels = DEFAULT_MIX;
+let mixLoaded = false;
+
+function emit() {
+  listeners.forEach((l) => l());
+}
+
+function loadMix(): MixLevels {
+  if (mixLoaded) return mix;
+  mixLoaded = true;
+  try {
+    const raw = window.localStorage.getItem(MIX_KEY);
+    if (raw) mix = { ...DEFAULT_MIX, ...(JSON.parse(raw) as Partial<MixLevels>) };
+  } catch {
+    /* ignore */
+  }
+  getAmbience().setMix(mix);
+  return mix;
+}
+
+export const ambience = {
+  /** Call from a user gesture (e.g. Board) so the browser allows audio. */
+  async enable(preset: PresetId) {
+    loadMix();
+    enabled = await getAmbience().start(preset);
+    emit();
+    return enabled;
+  },
+  disable() {
+    getAmbience().stop();
+    enabled = false;
+    emit();
+  },
+  setPreset(preset: PresetId, fadeSeconds?: number) {
+    getAmbience().setPreset(preset, fadeSeconds);
+  },
+  setMix(next: MixLevels) {
+    mix = next;
+    getAmbience().setMix(next);
+    try {
+      window.localStorage.setItem(MIX_KEY, JSON.stringify(next));
+    } catch {
+      /* ignore */
+    }
+    emit();
+  },
+};
+
+function subscribe(l: Listener) {
+  listeners.add(l);
+  return () => listeners.delete(l);
+}
+
+export function useAmbienceState(): { enabled: boolean; mix: MixLevels } {
+  const on = useSyncExternalStore(subscribe, () => enabled, () => false);
+  const levels = useSyncExternalStore(
+    subscribe,
+    () => (typeof window === "undefined" ? DEFAULT_MIX : loadMix()),
+    () => DEFAULT_MIX,
+  );
+  return { enabled: on, mix: levels };
+}
+
+/**
+ * Follow a scene's preset while sound is enabled. Changes crossfade; the
+ * engine is only started by an explicit gesture.
+ */
+export function useScenePreset(preset: PresetId, fadeSeconds = 5) {
+  const { enabled: on } = useAmbienceState();
+  useEffect(() => {
+    if (on) ambience.setPreset(preset, fadeSeconds);
+  }, [on, preset, fadeSeconds]);
+}
+
+export function useSoundToggle(preset: PresetId) {
+  const { enabled: on } = useAmbienceState();
+  const [pending, setPending] = useState(false);
+  const toggle = useCallback(async () => {
+    if (on) {
+      ambience.disable();
+      return;
+    }
+    setPending(true);
+    await ambience.enable(preset);
+    setPending(false);
+  }, [on, preset]);
+  return { enabled: on, pending, toggle };
+}

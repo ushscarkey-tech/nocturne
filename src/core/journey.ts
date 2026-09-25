@@ -222,7 +222,8 @@ function closeActive(
 ): { data: NocturneData; closed: StudySession | null } {
   const active = activeSession(data.sessions);
   if (!active) return { data, closed: null };
-  const focusedSec = elapsedSeconds(active, now);
+  const rawSec = elapsedSeconds(active, now);
+  const focusedSec = kind === "complete" ? Math.min(rawSec, active.plannedMinutes * 60) : rawSec;
   const focused = Math.round(focusedSec / 60);
   let credited: number;
   switch (kind) {
@@ -266,13 +267,61 @@ function closeActive(
   return { data: next, closed };
 }
 
-/** The station's time ran out: arrive and step onto the platform. */
+/**
+ * The station's time ran out: arrive and step onto the platform. If the app
+ * was closed, the station closes at the moment it was due, not when noticed.
+ */
 export function arrive(data: NocturneData, now: Date): EngineResult {
-  const { data: closedData, closed } = closeActive(data, now, "complete");
+  const active = activeSession(data.sessions);
+  if (!active) return { data, change: null };
+  const overrun = elapsedSeconds(active, now) - active.plannedMinutes * 60;
+  const due = overrun > 0 ? new Date(now.getTime() - overrun * 1000) : now;
+  const { data: closedData, closed } = closeActive(data, due, "complete");
   if (!closed) return { data, change: null };
   const journey = journeyFor(closedData, closed.date);
   if (!journey) return { data: closedData, change: null };
-  return { data: replaceJourney(closedData, afterStation(closedData, journey, now)), change: null };
+  return { data: replaceJourney(closedData, afterStation(closedData, journey, due)), change: null };
+}
+
+/**
+ * Close anything left open on earlier days (the app was closed mid-journey):
+ * running stations are banked as partial, journeys move to Final Station.
+ */
+export function settleStale(data: NocturneData, now: Date): NocturneData {
+  const today = toDateKey(now);
+  let next = data;
+  const stale = data.sessions.filter((s) => s.status === "active" && s.date < today);
+  for (const s of stale) {
+    const end = new Date(Math.min(now.getTime(), new Date(s.plannedEnd).getTime()));
+    const focusedSec = Math.min(elapsedSeconds(s, end), s.plannedMinutes * 60);
+    const credited = Math.round((s.workMinutes * focusedSec) / Math.max(60, s.plannedMinutes * 60));
+    next = {
+      ...next,
+      tasks: creditTask(next.tasks, s.taskId, credited, now),
+      sessions: replaceSession(next.sessions, {
+        ...s,
+        status: credited >= s.workMinutes ? "done" : "partial",
+        completedMinutes: Math.round(focusedSec / 60),
+        creditedMinutes: credited,
+        elapsedSeconds: Math.round(focusedSec),
+        resumedAt: null,
+        actualEnd: iso(end),
+      }),
+    };
+  }
+  const openJourneys = next.journeys.filter((j) => j.date < today && j.phase !== "final" && j.startedAt);
+  for (const j of openJourneys) {
+    const day = sessionsOn(next.sessions, j.date).filter((s) => s.status === "done" || s.status === "partial");
+    next = replaceJourney(next, {
+      ...j,
+      phase: "final",
+      stopEndsAt: null,
+      focusedMinutes: day.reduce((a, s) => a + s.completedMinutes, 0),
+      stationsCompleted: day.filter((s) => s.status === "done").length,
+      completedAt: j.completedAt ?? day[day.length - 1]?.actualEnd ?? j.startedAt,
+    });
+  }
+  return next;
 }
 
 export function finishEarly(data: NocturneData, now: Date, wholeTask: boolean): EngineResult {
@@ -399,11 +448,17 @@ export function resumeService(data: NocturneData, now: Date, focus: FocusLevel):
   return { data: departed.data, change: planned.change };
 }
 
-/** End the night: close any running station and move to Final Station. */
+/**
+ * End the night: bank any running station, and hand every station that was
+ * not reached back to the planner so its work flows to later days.
+ */
 export function endJourney(data: NocturneData, now: Date): EngineResult {
   const date = toDateKey(now);
   let next = data;
-  if (activeSession(data.sessions)) next = closeActive(data, now, "partial").data;
+  const active = activeSession(data.sessions);
+  if (active && elapsedSeconds(active, now) >= 60) next = closeActive(data, now, "partial").data;
+  else if (active) next = { ...next, sessions: replaceSession(next.sessions, { ...active, status: "planned", resumedAt: null }) };
+  next = { ...next, sessions: next.sessions.filter((s) => !(s.date === date && s.status === "planned")) };
   const journey = journeyFor(next, date);
   if (!journey) return { data: next, change: null };
   return { data: replaceJourney(next, { ...journey, phase: "final", stopEndsAt: null }), change: null };

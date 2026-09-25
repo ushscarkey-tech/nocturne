@@ -258,3 +258,20 @@ describe("seed data", () => {
     expect(f.conflicts).toHaveLength(0);
   });
 });
+
+describe("ending early", () => {
+  it("returns unreached stations to the planner and never calls it time gained", () => {
+    const d0 = data([
+      task({ id: "a", estimatedMinutes: 60, deadline: addDays(TODAY, 3) }),
+      task({ id: "b", estimatedMinutes: 60, deadline: addDays(TODAY, 1) }),
+    ]);
+    let d: NocturneData = { ...d0, sessions: planToday({ ...d0, userId: "u" }, { now: at(19), focus: "steady", mode: "reoptimize", reason: "initial" }).sessions };
+    d = board(d, { focus: "steady", carriage: "moon" }, at(19, 40)).data;
+    d = endJourney(d, at(20)).data;
+    expect(sessionsOn(d.sessions, TODAY).some((s) => s.status === "planned")).toBe(false);
+    const f = allocate({ tasks: d.tasks, windows: d.windows, sessions: d.sessions, now: at(20, 5), keepTodayPlan: true });
+    const later = f.days.slice(1).reduce((sum, day) => sum + (day.allocations.a ?? 0) + (day.allocations.b ?? 0), 0);
+    expect(later).toBeGreaterThan(0);
+    expect(summarizeJourney(d, d.journeys[0]).delayMinutes).toBeGreaterThanOrEqual(0);
+  });
+});

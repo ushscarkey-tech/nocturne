@@ -1,26 +1,163 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+/* ---------------------------------------------------------------------------
+ * Nocturne design tokens
+ * A nearly empty long-distance train at 11 PM: deep navy, warm paper text,
+ * one restrained lamp-amber accent.
+ * ------------------------------------------------------------------------- */
+@theme {
+  --color-night-950: #05080f;
+  --color-night-900: #090d18;
+  --color-night-850: #0d1321;
+  --color-night-800: #121a2b;
+  --color-night-700: #1a2338;
+  --color-rule: #222b41;
+  --color-rule-soft: #182033;
+  --color-paper: #ece4d4;
+  --color-paper-dim: #cbc3b3;
+  --color-mist: #8e94a6;
+  --color-haze: #5c637a;
+  --color-lamp: #e0b068;
+  --color-lamp-dim: #a8834f;
+  --color-signal: #c98a7a;
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, "SFMono-Regular", monospace;
+  --font-display: var(--font-instrument), "Iowan Old Style", Georgia, serif;
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+  --ease-glide: cubic-bezier(0.22, 1, 0.36, 1);
+
+  --animate-rise: rise 700ms var(--ease-glide) both;
+  --animate-fade: fade 900ms var(--ease-glide) both;
+  --animate-breathe: breathe 5s ease-in-out infinite;
+
+  @keyframes rise {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: none; }
+  }
+  @keyframes fade {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  @keyframes breathe {
+    0%, 100% { opacity: 0.55; }
+    50% { opacity: 1; }
   }
 }
 
+:root {
+  color-scheme: dark;
+}
+
+html {
+  background: var(--color-night-900);
+  -webkit-tap-highlight-color: transparent;
+}
+
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background:
+    radial-gradient(120% 60% at 50% -10%, rgba(38, 52, 86, 0.45), transparent 60%),
+    var(--color-night-900);
+  background-attachment: fixed;
+  color: var(--color-paper);
+  font-family: var(--font-sans);
+  font-feature-settings: "cv11", "ss01";
+  min-height: 100dvh;
+}
+
+::selection {
+  background: rgba(224, 176, 104, 0.3);
+}
+
+:focus-visible {
+  outline: 1.5px solid var(--color-lamp);
+  outline-offset: 3px;
+  border-radius: 6px;
+}
+
+@layer components {
+  .eyebrow {
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--color-mist);
+  }
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+  .field {
+    width: 100%;
+    background: transparent;
+    border: 0;
+    border-bottom: 1px solid var(--color-rule);
+    padding: 0.6rem 0;
+    color: var(--color-paper);
+    transition: border-color 300ms var(--ease-glide);
+  }
+  .field:focus {
+    outline: none;
+    border-color: var(--color-lamp-dim);
+  }
+  .field::placeholder {
+    color: var(--color-haze);
+  }
+  .field[type="date"],
+  .field[type="time"] {
+    color-scheme: dark;
+  }
+  select.field {
+    appearance: none;
+  }
+  select.field option {
+    background: var(--color-night-850);
+  }
+}
+
+/* Native range input styled as a quiet rail. */
+input[type="range"].rail {
+  appearance: none;
+  width: 100%;
+  height: 28px;
+  background: transparent;
+}
+input[type="range"].rail::-webkit-slider-runnable-track {
+  height: 1px;
+  background: linear-gradient(90deg, var(--color-haze), var(--color-lamp-dim));
+}
+input[type="range"].rail::-moz-range-track {
+  height: 1px;
+  background: linear-gradient(90deg, var(--color-haze), var(--color-lamp-dim));
+}
+input[type="range"].rail::-webkit-slider-thumb {
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  margin-top: -7.5px;
+  border-radius: 999px;
+  background: var(--color-night-900);
+  border: 1.5px solid var(--color-lamp);
+  box-shadow: 0 0 12px rgba(224, 176, 104, 0.35);
+}
+input[type="range"].rail::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  background: var(--color-night-900);
+  border: 1.5px solid var(--color-lamp);
+}
+
+dialog::backdrop {
+  background: rgba(3, 5, 10, 0.72);
+  backdrop-filter: blur(2px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+  }
 }

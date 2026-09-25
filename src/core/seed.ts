@@ -121,7 +121,11 @@ export function createSeedData(now: Date, profileBase?: Partial<Profile>): Noctu
     task({ key: "essay", title: "History essay outline", status: "inbox", estimatedMinutes: 0, remainingMinutes: 0, createdAt: stamp(0) }),
   ];
   const byKey = Object.fromEntries(seeds.map((t) => [t.key, t.id]));
-  const tasks: Task[] = seeds.map(({ key: _key, ...t }) => t);
+  const tasks: Task[] = seeds.map((seed) => {
+    const t: Task & { key?: string } = { ...seed };
+    delete t.key;
+    return t;
+  });
 
   const windows = defaultWindows(userId);
   // A one-off extra window this weekend, to show exceptions.

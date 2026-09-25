@@ -27,10 +27,13 @@ export function summarizeJourney(data: NocturneData, journey: Journey): JourneyS
   const departure = done[0]?.actualStart ?? journey.startedAt;
   const lastEnd = done.length ? done[done.length - 1].actualEnd : null;
   const arrival = lastEnd ?? journey.completedAt;
-  const delay =
+  const rawDelay =
     arrival && journey.plannedArrival
       ? Math.round((new Date(arrival).getTime() - new Date(journey.plannedArrival).getTime()) / 60_000)
       : 0;
+  // Stopping early is not "ahead of schedule": only a finished route gains time.
+  const routeFinished = stations.every((s) => s.status === "done") && stations.length >= journey.stationsPlanned;
+  const delay = rawDelay < 0 && !routeFinished ? 0 : rawDelay;
   const plannedMinutes = journey.plannedMinutes || stations.reduce((sum, s) => sum + s.workMinutes, 0);
   const completedWork = done.reduce((sum, s) => sum + s.creditedMinutes, 0);
   return {
