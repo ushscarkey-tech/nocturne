@@ -44,6 +44,13 @@ const quickadd: Partial<Record<keyof typeof source, string>> = {
   "quickadd.yourEstimate": "自分の見積もり",
   "quickadd.inUse": "現在",
   "quickadd.revert": "{min}に戻す",
+  "quickadd.feelTitle": "どんな仕事ですか?",
+  "quickadd.feelStep": "2 / 2",
+  "quickadd.feelFromSimilar": "似たような仕事（{task}）から埋め込まれました。違うところを変えてください。",
+  "quickadd.feelFromText": "あなたが書いたことから読みました。",
+  "quickadd.feelWhy": "Nocturneは夜の順序を決めるのに使用しています。フォーカスが低い時は軽くて魅力的な仕事から、クリアな時は難しく重要な仕事から。",
+  "quickadd.save": "保存",
+  "quickadd.skip": "スキップ",
 };
 
 export default quickadd;

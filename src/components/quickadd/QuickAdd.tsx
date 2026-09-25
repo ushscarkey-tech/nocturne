@@ -137,7 +137,8 @@ export function QuickAddBody({ initialText, onDone, askFeel = true }: { initialT
     e?.preventDefault();
     if (!text.trim() && !v.title.trim()) return;
     const task = createTask(toDraft());
-    useStore.getState().notify({
+    // The welcome guide shows its own summary; no toast there.
+    if (askFeel) useStore.getState().notify({
       headline: task.status === "inbox" ? t("quickadd.addedInbox") : t("quickadd.added"),
       lines: [task.title],
       tone: "info",

@@ -136,6 +136,17 @@ const scene = {
   "scene.arrival.recalc": "Whenever the night changes — a late start, low focus, a new task — the route and this table are worked out again.",
   "scene.arrival.moreTime": "More Service Time",
   "scene.arrival.adjust": "Resolve",
+  "scene.coach1Title": "Tonight's departure board",
+  "scene.coach1": "This is tonight's study order. Each row is a station: one block of one task. Names like BLUE HOUR are just what the blocks are called.",
+  "scene.coach2Title": "When it starts",
+  "scene.coach2": "The first station leaves at this time. The line below says whether everything will be done before its deadline.",
+  "scene.coach3Title": "Then just board",
+  "scene.coach3": "Press Board when it's time. A timer runs, and the next station comes when this one ends. If the night changes, the plan adjusts itself.",
+  "scene.coachNext": "Next",
+  "scene.coachDone": "Start",
+  "scene.coachSkip": "Skip",
+  "scene.coachStep": "{n} / {total}",
+  "scene.quickBoard": "Board now",
 } as const;
 
 export default scene;

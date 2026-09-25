@@ -21,6 +21,20 @@ const onboarding: Partial<Record<keyof typeof source, string>> = {
   "onboarding.sample": "浏览示例任务",
   "onboarding.next": "下一步",
   "onboarding.step": "{n} / {total}",
+  "onboarding.howTitle": "就这三件事",
+  "onboarding.how1": "写下需要做的事",
+  "onboarding.how1d": "只需要截止时间和大概花多长时间。",
+  "onboarding.how2": "告诉什么时候可以学习",
+  "onboarding.how2d": "比如傍晚 19:40 到 23:30。Nocturne 只在这个时间内规划。",
+  "onboarding.how3": "按上车然后跟着做",
+  "onboarding.how3d": "今晚的工作一次出现一个。如果晚间偏离，计划会自己重做。",
+  "onboarding.metaphor": "讲的是一列夜间列车：一个学习块是一个车站，傍晚的计划是路线。",
+  "onboarding.whenHint": "Nocturne 只在这些小时内规划。随时可以改变。",
+  "onboarding.firstTaskHint": "只需截止时间和时间，比如 \"周五前完成数学练习册，2小时\"。",
+  "onboarding.readyTitle": "全部准备好",
+  "onboarding.readyService": "学习时间 · {time}",
+  "onboarding.readyTasks": "任务 · {n}",
+  "onboarding.readyNext": "在下一个屏幕上，时间到了按上车。就是这样。",
 };
 
 export default onboarding;

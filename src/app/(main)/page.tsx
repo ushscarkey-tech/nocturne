@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { availabilityForDate } from "@/core/availability";
 import { awaitingConfirmation, journeyFor } from "@/core/journey";
 import { remainingSeconds, routeOf } from "@/core/sessions";
@@ -18,7 +18,8 @@ import { PlatformScene } from "@/components/scene/PlatformScene";
 import { ConflictNotice } from "@/components/tonight/ConflictNotice";
 import { DepartureBoard, RecentChangeDetail } from "@/components/tonight/DepartureBoard";
 import { ArrivalLine, ArrivalSheet, useArrivals } from "@/components/tonight/ArrivalForecast";
-import { useGlossary, useStationHint } from "@/components/help/Glossary";
+import { useGlossary } from "@/components/help/Glossary";
+import { Coach } from "@/components/tonight/Coach";
 import { useNow } from "@/lib/hooks";
 import { taskHref, ticketHref } from "@/lib/paths";
 import { routeItems, routeSummary } from "@/lib/route-view";
@@ -45,7 +46,9 @@ export default function TonightPage() {
   const { conflict, forecast } = useConflict(data, now);
   const arrivals = useArrivals(data, forecast, today);
   const [panel, setPanel] = useState<Panel>(null);
-  const [showHint, dismissHint] = useStationHint();
+  const boardRef = useRef<HTMLDivElement>(null);
+  const departRef = useRef<HTMLDivElement>(null);
+  const boardButtonRef = useRef<HTMLDivElement>(null);
   const ticket = journey ? data.tickets.find((x) => x.journeyId === journey.id) : undefined;
   const tasksById = new Map(data.tasks.map((task) => [task.id, task]));
 
@@ -101,7 +104,7 @@ export default function TonightPage() {
 
       {/* The departure board hanging over the platform. */}
       {route.length > 0 && (
-        <div className="mt-7 w-full px-6 md:max-w-2xl md:px-10">
+        <div ref={boardRef} className="mt-7 w-full px-6 md:max-w-2xl md:px-10">
           <DepartureBoard data={data} now={now} forecast={forecast} onOpen={() => setPanel("route")} className="animate-enter" style={{ animationDelay: "550ms" }} />
         </div>
       )}
@@ -132,7 +135,7 @@ export default function TonightPage() {
             <p className="mt-3 font-display text-[2.1rem] leading-tight">{t("tonight.complete")}</p>
           </>
         ) : summary.next && nextTask ? (
-          <>
+          <div ref={departRef}>
             <p className="eyebrow animate-enter" style={{ animationDelay: "700ms" }}>{t("scene.departure")}</p>
             <p className="mt-1 animate-enter font-mono text-[clamp(4.25rem,21vw,6.5rem)] font-extralight leading-none tracking-tight text-lamp tabular" style={{ animationDelay: "900ms" }}>
               <FlipText text={departsNow ? t("tonight.now") : clock(departsAt!)} />
@@ -146,20 +149,8 @@ export default function TonightPage() {
                 </>
               )}
             </p>
-            {showHint && (
-              <div className="mt-3 max-w-md animate-enter border-l border-lamp/40 pl-3 text-xs leading-relaxed text-mist" style={{ animationDelay: "2300ms" }}>
-                <p>{t("scene.stationHint", { station: summary.next.stationName })}</p>
-                <p className="mt-1.5 flex gap-4">
-                  <button type="button" className="min-h-8 text-paper-dim underline decoration-rule underline-offset-4 hover:text-paper" onClick={() => useGlossary.getState().show("station")}>
-                    {t("scene.seeTerms")}
-                  </button>
-                  <button type="button" className="min-h-8 text-haze hover:text-mist" onClick={dismissHint}>
-                    {t("scene.gotIt")}
-                  </button>
-                </p>
-              </div>
-            )}
-          </>
+            <ArrivalLine summary={arrivals} onOpen={() => setPanel("arrival")} className="mt-3 animate-enter" style={{ animationDelay: "1300ms" }} />
+          </div>
         ) : (
           <EmptyState
             isEmptyAccount={isEmptyAccount}
@@ -169,7 +160,7 @@ export default function TonightPage() {
           />
         )}
 
-        {!isEmptyAccount && (
+        {!isEmptyAccount && (riding || ended || !summary.next) && (
           <ArrivalLine summary={arrivals} onOpen={() => setPanel("arrival")} className="mt-3 animate-enter" style={{ animationDelay: "1300ms" }} />
         )}
 
@@ -185,7 +176,7 @@ export default function TonightPage() {
           </div>
         )}
 
-        <div className="mt-5 animate-enter" style={{ animationDelay: "1750ms" }}>
+        <div ref={boardButtonRef} className="mt-5 animate-enter" style={{ animationDelay: "1750ms" }}>
           {riding ? (
             <ButtonLink href="/journey" variant="primary" size="lg" className="w-full">
               {t("scene.returnToTrain")}
@@ -201,6 +192,16 @@ export default function TonightPage() {
           ) : null}
         </div>
       </section>
+
+      {!riding && !ended && summary.next && nextTask && (
+        <Coach
+          steps={[
+            { target: boardRef, title: t("scene.coach1Title"), body: t("scene.coach1") },
+            { target: departRef, title: t("scene.coach2Title"), body: t("scene.coach2") },
+            { target: boardButtonRef, title: t("scene.coach3Title"), body: t("scene.coach3") },
+          ]}
+        />
+      )}
 
       <Sheet open={panel === "route"} onClose={() => setPanel(null)} title={t("scene.routeSheet")} eyebrow={fmt.longDate(today)}>
         <RecentChangeDetail data={data} now={now} forecast={forecast} />

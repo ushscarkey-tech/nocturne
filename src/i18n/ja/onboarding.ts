@@ -21,6 +21,20 @@ const onboarding: Partial<Record<keyof typeof source, string>> = {
   "onboarding.step": "{n}/{total}",
   "onboarding.weekdays": "平日",
   "onboarding.whenQ": "いつ勉強しますか?",
+  "onboarding.howTitle": "3つのことだけ",
+  "onboarding.how1": "やることを書く",
+  "onboarding.how1d": "期限とだいたいかかる時間があればいい。",
+  "onboarding.how2": "勉強できる時間を伝える",
+  "onboarding.how2d": "たとえば19:40～23:30。その時間の中でだけ計画する。",
+  "onboarding.how3": "乗車を押して従う",
+  "onboarding.how3d": "今夜やることが1つずつ出てくる。夜が変わると、計画は自分で直る。",
+  "onboarding.metaphor": "夜間列車に例えて見ています。1つの勉強ブロックが駅で、夜の計画がルートです。",
+  "onboarding.whenHint": "この時間の中だけで計画します。いつでも変えられます。",
+  "onboarding.firstTaskHint": "期限と時間があればいい。例：「数学の問題集を金曜までに、2時間」。",
+  "onboarding.readyTitle": "準備できました",
+  "onboarding.readyService": "勉強時間 · {time}",
+  "onboarding.readyTasks": "タスク · {n}",
+  "onboarding.readyNext": "次の画面で時間になったら乗車を押すだけ。それだけです。",
 };
 
 export default onboarding;

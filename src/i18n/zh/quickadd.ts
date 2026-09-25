@@ -44,6 +44,13 @@ const quickadd: Partial<Record<keyof typeof source, string>> = {
   "quickadd.keep": "保留 {min}",
   "quickadd.inUse": "当前",
   "quickadd.revert": "改回 {min}",
+  "quickadd.feelTitle": "这是什么类型的任务？",
+  "quickadd.feelStep": "2 / 2",
+  "quickadd.feelFromSimilar": "从类似的工作（{task}）填充。改变任何不对的地方。",
+  "quickadd.feelFromText": "从你写的内容中获取。",
+  "quickadd.feelWhy": "Nocturne 用这些来排序晚间：专注度低时是轻松、有吸引力的工作；专注度高时是困难、重要的工作。",
+  "quickadd.save": "保存",
+  "quickadd.skip": "跳过",
 };
 
 export default quickadd;

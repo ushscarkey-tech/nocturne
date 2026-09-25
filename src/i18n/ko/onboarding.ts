@@ -21,6 +21,20 @@ const onboarding: Partial<Record<keyof typeof source, string>> = {
   "onboarding.sample": "샘플 할 일로 둘러보기",
   "onboarding.next": "다음",
   "onboarding.step": "{n}/{total}",
+  "onboarding.howTitle": "딱 세 가지만 하면 돼요",
+  "onboarding.how1": "할 일을 적어요",
+  "onboarding.how1d": "마감일과 대충 걸리는 시간만 있으면 돼요.",
+  "onboarding.how2": "공부할 수 있는 시간을 알려 줘요",
+  "onboarding.how2d": "예를 들어 저녁 19:40–23:30. 그 시간 안에서만 계획해요.",
+  "onboarding.how3": "탑승을 누르고 따라가요",
+  "onboarding.how3d": "오늘 할 일이 하나씩 나와요. 밤이 틀어지면 계획이 알아서 다시 짜여요.",
+  "onboarding.metaphor": "밤기차에 빗대어 보여 줘요. 공부 한 구간이 정거장, 오늘 저녁 계획이 노선이에요.",
+  "onboarding.whenHint": "이 시간 안에서만 계획해요. 언제든 바꿀 수 있어요.",
+  "onboarding.firstTaskHint": "마감일과 시간만 적으면 돼요. 예: 금요일까지 수학 문제집 2시간",
+  "onboarding.readyTitle": "준비됐어요",
+  "onboarding.readyService": "공부 시간 · {time}",
+  "onboarding.readyTasks": "할 일 · {n}개",
+  "onboarding.readyNext": "다음 화면에서 시간이 되면 탑승만 누르세요. 그게 전부예요.",
 };
 
 export default onboarding;

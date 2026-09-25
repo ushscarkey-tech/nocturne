@@ -42,12 +42,15 @@ export function TicketMachine({
   carriage,
   onCarriage,
   onTaken,
+  onQuickBoard,
 }: {
   data: NocturneData;
   now: Date;
   carriage: CarriageId;
   onCarriage: (c: CarriageId) => void;
   onTaken: (choice: { focus: FocusLevel; carriage: CarriageId }) => void;
+  /** Skip the ticket and the doors: board straight away. */
+  onQuickBoard?: () => void;
 }) {
   const { t, fmt } = useI18n();
   const reduced = usePrefersReducedMotion();
@@ -173,7 +176,13 @@ export function TicketMachine({
           <Icon name="close" />
         </Link>
         <p className="font-mono text-[0.625rem] tracking-[0.3em] text-haze">{t("scene.machine").toUpperCase()} · N-{details.platform}</p>
-        <span className="w-9" />
+        {onQuickBoard && !printing ? (
+          <button type="button" onClick={onQuickBoard} className="-mr-2 min-h-11 px-2 text-xs text-mist underline decoration-rule underline-offset-4 hover:text-paper">
+            {t("scene.quickBoard")}
+          </button>
+        ) : (
+          <span className="w-9" />
+        )}
       </header>
 
       {/* The machine. It softens into the background once the ticket is out. */}

@@ -19,6 +19,20 @@ const onboarding = {
   "onboarding.sample": "Look around with sample tasks",
   "onboarding.next": "Next",
   "onboarding.step": "{n} / {total}",
+  "onboarding.howTitle": "Three things, that's all",
+  "onboarding.how1": "Write what you need to do",
+  "onboarding.how1d": "Just the deadline and roughly how long it takes.",
+  "onboarding.how2": "Say when you can study",
+  "onboarding.how2d": "Evenings, say 19:40 to 23:30. Nocturne only plans inside that time.",
+  "onboarding.how3": "Press Board and follow",
+  "onboarding.how3d": "Tonight's work comes one piece at a time. If the night goes off course, the plan redoes itself.",
+  "onboarding.metaphor": "It's told as a night train: one study block is a station, the evening's plan is the route.",
+  "onboarding.whenHint": "Nocturne plans only inside these hours. You can change them any time.",
+  "onboarding.firstTaskHint": "Deadline and time are enough, e.g. \"Math workbook by Friday, 2 hours\".",
+  "onboarding.readyTitle": "All set",
+  "onboarding.readyService": "Study time · {time}",
+  "onboarding.readyTasks": "Tasks · {n}",
+  "onboarding.readyNext": "On the next screen, press Board when it's time. That's it.",
 } as const;
 
 export default onboarding;

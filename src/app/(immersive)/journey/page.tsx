@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import type { PresetId } from "@/audio/engine";
-import { sfx } from "@/audio/sfx";
+import { sfx, soundAllowed } from "@/audio/sfx";
 import { ambience, soundWanted, useAmbienceState, useScenePreset } from "@/audio/useAmbience";
 import { CARRIAGE_AMBIENCE, journeyFor } from "@/core/journey";
 import { activeSession, routeOf, sessionsOn, upcomingOn } from "@/core/sessions";
@@ -156,6 +156,14 @@ export default function JourneyPage() {
         onTaken={(c) => {
           setChoice(c);
           setAtDoors(true);
+        }}
+        onQuickBoard={() => {
+          void sfx.unlock();
+          if (soundAllowed()) void ambience.enable(CARRIAGE_AMBIENCE[machineCarriage]);
+          setCarriage(machineCarriage);
+          setDeparting(true);
+          board("steady", machineCarriage);
+          pullOut();
         }}
       />
     ) : upcoming.length === 0 && !atDoors ? (

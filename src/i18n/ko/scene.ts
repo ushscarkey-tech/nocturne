@@ -131,6 +131,17 @@ const scene: Partial<Record<keyof typeof source, string>> = {
   "scene.arrival.recalc": "늦은 출발, 흐린 집중, 새 할 일… 밤이 틀어질 때마다 노선과 이 표를 다시 계산해요.",
   "scene.arrival.moreTime": "운행 시간 늘리기",
   "scene.arrival.adjust": "조정하기",
+  "scene.coach1Title": "출발 안내판",
+  "scene.coach1": "오늘 밤 공부 순서예요. 한 줄이 정거장 하나, 할 일 하나를 공부하는 구간이에요. BLUE HOUR 같은 이름은 구간에 붙은 이름일 뿐이에요.",
+  "scene.coach2Title": "언제 시작하나요",
+  "scene.coach2": "첫 정거장이 이 시간에 출발해요. 아래 줄은 모든 할 일이 마감 전에 끝나는지 알려 줘요.",
+  "scene.coach3Title": "그다음엔 탑승만",
+  "scene.coach3": "시간이 되면 탑승을 누르세요. 타이머가 돌고, 끝나면 다음 정거장으로 넘어가요. 밤이 틀어져도 계획이 알아서 맞춰요.",
+  "scene.coachNext": "다음",
+  "scene.coachDone": "시작하기",
+  "scene.coachSkip": "건너뛰기",
+  "scene.coachStep": "{n} / {total}",
+  "scene.quickBoard": "바로 탑승",
 };
 
 export default scene;

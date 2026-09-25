@@ -18,21 +18,19 @@ const PRESETS: Preset[] = [
   { id: "late", label: "onboarding.presetLate", windows: [{ start: "21:00", end: "00:30" }] },
 ];
 
-const STEPS = 5;
+const STEPS = 4;
 
-/** First run: language, a few quiet lines, name, study hours, one task. */
+/** First run, kept short: language, how it works, study hours, one task, done. */
 export default function WelcomePage() {
   const data = useData();
   const router = useRouter();
   const { t, locale } = useI18n();
   const [step, setStep] = useState(0);
-  const [name, setName] = useState(data.profile.name);
   const [preset, setPreset] = useState<string | null>("split");
   const [everyDay, setEveryDay] = useState(false);
 
   function next() {
-    if (step === 2 && name.trim() !== data.profile.name) updateProfile({ name: name.trim() });
-    if (step === 3) {
+    if (step === 2) {
       const p = PRESETS.find((x) => x.id === preset);
       if (p) {
         const days = everyDay ? [0, 1, 2, 3, 4, 5, 6] : [1, 2, 3, 4, 5];
@@ -41,6 +39,10 @@ export default function WelcomePage() {
     }
     setStep((s) => Math.min(STEPS, s + 1));
   }
+
+  const weekly = data.windows.filter((w) => w.enabled && w.kind === "available" && w.recurring);
+  const serviceText = [...new Set(weekly.map((w) => `${w.startTime}–${w.endTime}`))].join(" · ");
+  const taskCount = data.tasks.filter((x) => x.status !== "archived").length;
 
   function finish() {
     finishOnboarding();
@@ -97,33 +99,31 @@ export default function WelcomePage() {
 
           {step === 1 && (
             <Panel>
-              <div className="space-y-5 font-display text-3xl leading-snug">
-                <p>{t("onboarding.introA")}</p>
-                <p className="text-paper-dim">{t("onboarding.introB")}</p>
-                <p className="text-mist">{t("onboarding.introC")}</p>
-              </div>
+              <h1 className="font-display text-3xl leading-snug">{t("onboarding.howTitle")}</h1>
+              {/* Three stops on one line: the whole app. */}
+              <ol className="relative mt-8 space-y-6">
+                <span className="absolute bottom-3 left-[0.3rem] top-3 w-px bg-paper/15" aria-hidden />
+                {(["1", "2", "3"] as const).map((n, i) => (
+                  <li key={n} className="relative flex animate-enter gap-4 pl-0" style={{ animationDelay: `${250 + i * 220}ms` }}>
+                    <span className={`relative mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full border ${i === 2 ? "border-lamp bg-lamp shadow-[0_0_10px_rgba(224,176,104,0.5)]" : "border-paper/60 bg-night-900"}`} aria-hidden />
+                    <span>
+                      <span className="block text-paper">{t(`onboarding.how${n}` as MessageKey)}</span>
+                      <span className="mt-0.5 block text-sm leading-relaxed text-mist">{t(`onboarding.how${n}d` as MessageKey)}</span>
+                    </span>
+                  </li>
+                ))}
+              </ol>
+              <p className="mt-8 animate-enter text-xs leading-relaxed text-haze" style={{ animationDelay: "1000ms" }}>
+                {t("onboarding.metaphor")}
+              </p>
             </Panel>
           )}
 
           {step === 2 && (
             <Panel>
-              <h1 className="font-display text-3xl">{t("onboarding.nameQ")}</h1>
-              <input
-                className="field mt-8 text-lg"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder={t("onboarding.namePlaceholder")}
-                autoComplete="given-name"
-                enterKeyHint="next"
-                onKeyDown={(e) => e.key === "Enter" && next()}
-              />
-            </Panel>
-          )}
-
-          {step === 3 && (
-            <Panel>
               <h1 className="font-display text-3xl">{t("onboarding.whenQ")}</h1>
-              <div className="mt-8 divide-y divide-rule-soft border-y border-rule-soft" role="radiogroup" aria-label={t("onboarding.whenQ")}>
+              <p className="mt-2 text-sm text-mist">{t("onboarding.whenHint")}</p>
+              <div className="mt-6 divide-y divide-rule-soft border-y border-rule-soft" role="radiogroup" aria-label={t("onboarding.whenQ")}>
                 {PRESETS.map((p) => (
                   <button
                     key={p.id}
@@ -165,30 +165,37 @@ export default function WelcomePage() {
             </Panel>
           )}
 
-          {step === 4 && (
+          {step === 3 && (
             <Panel>
-              <h1 className="mb-6 font-display text-3xl">{t("onboarding.firstTaskQ")}</h1>
-              <QuickAddBody initialText="" onDone={() => setStep(5)} askFeel={false} />
-              <button type="button" onClick={() => setStep(5)} className="mt-4 min-h-11 text-sm text-mist hover:text-paper">
+              <h1 className="font-display text-3xl">{t("onboarding.firstTaskQ")}</h1>
+              <p className="mb-6 mt-2 text-sm text-mist">{t("onboarding.firstTaskHint")}</p>
+              <QuickAddBody initialText="" onDone={() => setStep(4)} askFeel={false} />
+              <button type="button" onClick={() => setStep(4)} className="mt-4 min-h-11 text-sm text-mist hover:text-paper">
                 {t("onboarding.skip")}
               </button>
             </Panel>
           )}
 
-          {step === 5 && (
+          {step === 4 && (
             <Panel>
-              <h1 className="font-display text-4xl">{t("onboarding.readyQ")}</h1>
-              {data.profile.name && <p className="mt-2 text-mist">{data.profile.name}</p>}
+              <h1 className="font-display text-4xl">{t("onboarding.readyTitle")}</h1>
+              <ul className="mt-6 space-y-2 font-mono text-sm tabular text-paper-dim">
+                {serviceText && <li className="animate-enter" style={{ animationDelay: "250ms" }}>{t("onboarding.readyService", { time: serviceText })}</li>}
+                <li className="animate-enter" style={{ animationDelay: "400ms" }}>{t("onboarding.readyTasks", { n: taskCount })}</li>
+              </ul>
+              <p className="mt-6 animate-enter text-sm leading-relaxed text-mist" style={{ animationDelay: "600ms" }}>
+                {t("onboarding.readyNext")}
+              </p>
             </Panel>
           )}
         </div>
 
-        {step < 4 && (
+        {step < 3 && (
           <Button variant="primary" size="lg" className="w-full" onClick={next}>
             {t("onboarding.next")}
           </Button>
         )}
-        {step === 5 && (
+        {step === 4 && (
           <div className="space-y-2">
             <Button variant="primary" size="lg" className="w-full" onClick={finish}>
               {t("onboarding.start")}
