@@ -4,12 +4,15 @@ import { useEffect } from "react";
 import { useStore } from "@/state/store";
 import { Icon } from "@/components/ui/Icon";
 import { useI18n } from "@/i18n";
+import { isRouteChange } from "@/components/journey/SignalChange";
 
 /** "Route updated" and other quiet announcements. */
 export function NoticeToast({ placement = "tabs" }: { placement?: "tabs" | "immersive" }) {
   const { t, tm } = useI18n();
-  const notice = useStore((s) => s.notice);
+  const stored = useStore((s) => s.notice);
   const dismiss = useStore((s) => s.dismissNotice);
+  // On the train, route changes are shown in the scene (SignalChange).
+  const notice = placement === "immersive" && isRouteChange(stored) ? null : stored;
 
   useEffect(() => {
     if (!notice) return;

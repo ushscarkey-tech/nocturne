@@ -15,7 +15,7 @@ const CHANNELS = [
   { key: "focus", labelKey: "journey.focusNoise", hintKey: "journey.focusNoiseHint" },
 ] as const;
 
-/** Sound on/off and the three-channel ambient mixer. */
+/** Sound on/off, the effects level and the three-channel ambient mixer. */
 export function SoundControl({ carriage }: { carriage: CarriageId }) {
   const { t } = useI18n();
   const { enabled, mix } = useAmbienceState();
@@ -40,7 +40,11 @@ export function SoundControl({ carriage }: { carriage: CarriageId }) {
           >
             {enabled ? t("journey.turnSoundOff") : t("journey.turnSoundOn")}
           </Button>
-          {[{ key: "master", labelKey: "journey.volume", hintKey: "" } as const, ...CHANNELS].map((c) => (
+          {[
+            { key: "master", labelKey: "journey.volume", hintKey: "" } as const,
+            { key: "effects", labelKey: "settings.soundEffects", hintKey: "settings.soundEffectsHint" } as const,
+            ...CHANNELS,
+          ].map((c) => (
             <label key={c.key} className="block">
               <span className="flex items-baseline justify-between">
                 <span className="text-sm text-paper">{t(c.labelKey as MessageKey)}</span>

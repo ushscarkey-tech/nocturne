@@ -48,7 +48,19 @@ const archive: Partial<Record<keyof typeof source, string>> = {
   "archive.statDelay": "지연",
   "archive.statAheadOfSchedule": "예정보다 일찍",
   "archive.statCarriage": "객차",
-  "archive.statSeat": "좌석"
+  "archive.statSeat": "좌석",
+  "archive.statistics": "통계",
+  "archive.walletLabel": "월별 승차권",
+  "archive.newerMonth": "다음 달",
+  "archive.olderMonth": "이전 달",
+  "archive.showMonth": "{month} 보기",
+  "archive.ticketCountOne": "승차권 1장",
+  "archive.ticketCount": "승차권 {n}장",
+  "archive.nextTicket": "다음 승차권",
+  "archive.spreadTickets": "펼쳐 보기",
+  "archive.stackTickets": "다시 모으기",
+  "archive.noTicketsHint": "하룻밤을 마치면 그날의 승차권이 여기에 남아요.",
+  "archive.journeyDetails": "여정 자세히",
 };
 
 export default archive;

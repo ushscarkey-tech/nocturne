@@ -48,7 +48,19 @@ const archive: Partial<Record<keyof typeof source, string>> = {
   "archive.statDelay": "延迟",
   "archive.statAheadOfSchedule": "提前",
   "archive.statCarriage": "车厢",
-  "archive.statSeat": "座位"
+  "archive.statSeat": "座位",
+  "archive.statistics": "统计",
+  "archive.walletLabel": "按月份的车票",
+  "archive.newerMonth": "后一个月",
+  "archive.olderMonth": "前一个月",
+  "archive.showMonth": "查看{month}",
+  "archive.ticketCountOne": "1 张车票",
+  "archive.ticketCount": "{n} 张车票",
+  "archive.nextTicket": "下一张车票",
+  "archive.spreadTickets": "展开",
+  "archive.stackTickets": "叠起",
+  "archive.noTicketsHint": "走完一晚，那晚的车票会留在这里。",
+  "archive.journeyDetails": "旅程详情",
 };
 
 export default archive;

@@ -35,6 +35,8 @@ const settings: Partial<Record<keyof typeof source, string>> = {
   "settings.resetBody": "此浏览器中的一切替换为示例数据。",
   "settings.sampleBody": "你的任务、线路、行程和车票替换为示例数据。",
   "settings.replace": "替换",
+  "settings.soundEffects": "音效",
+  "settings.soundEffectsHint": "售票机、车门、提示音",
 };
 
 export default settings;

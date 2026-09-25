@@ -34,6 +34,8 @@ const settings: Partial<Record<keyof typeof source, string>> = {
   "settings.serviceTime": "運行時間",
   "settings.signIn": "ログイン",
   "settings.signOut": "ログアウト",
+  "settings.soundEffects": "効果音",
+  "settings.soundEffectsHint": "券売機、ドア、チャイム",
   "settings.title": "設定",
 };
 

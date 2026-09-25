@@ -1,5 +1,7 @@
+import { routeOf } from "./sessions";
+import { boardingDetails, seeded } from "./stations";
 import { addDays, clock, diffDays, parseDateKey, serviceDate } from "./time";
-import type { DateKey, FocusLevel, Journey, NocturneData, StudySession } from "./types";
+import type { CarriageId, DateKey, FocusLevel, Journey, NocturneData, StudySession } from "./types";
 
 const closed = (s: StudySession) => s.status === "done" || s.status === "partial";
 
@@ -129,7 +131,16 @@ export function archiveStats(data: NocturneData, today: DateKey): ArchiveStats {
 
 /** Ticket face values derived from a journey. */
 export interface TicketFace {
+  /** "boarding": printed before the night starts; "journey": the record after it. */
+  kind: "boarding" | "journey";
   serial: string;
+  /** Line code: month-day + platform, e.g. "NL-0925-04". */
+  routeCode: string;
+  /** First and last station names of the night. */
+  from: string;
+  to: string;
+  /** Stable long serial, e.g. "N0925·0417·83". */
+  serialLong: string;
   dateLabel: string;
   departure: string;
   arrival: string;
@@ -139,7 +150,7 @@ export interface TicketFace {
   seat: string;
   car: string;
   platform: string;
-  status: "ROUTE COMPLETE" | "PARTIAL ROUTE" | "SHORT JOURNEY";
+  status: "ROUTE COMPLETE" | "PARTIAL ROUTE" | "SHORT JOURNEY" | "VALID TONIGHT";
   /** Share of planned work completed, 0..100. */
   completion: number;
   /** 0..1 values that drive subtle per-ticket variation. */
@@ -148,16 +159,43 @@ export interface TicketFace {
 }
 
 const CARRIAGE_LABEL = { quiet: "QUIET CAR", rain: "RAIN CAR", tunnel: "TUNNEL CAR", moon: "MOON CAR" } as const;
+const MONTHS_UPPER = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
+const pad2 = (n: number) => String(n).padStart(2, "0");
+
+/** Ticket identity shared by the boarding pass and the night's ticket (both derive from the date). */
+function ticketIdentity(date: DateKey, platform: string) {
+  const d = parseDateKey(date);
+  const md = `${pad2(d.getMonth() + 1)}${pad2(d.getDate())}`;
+  const rand = seeded(`ticket:${date}`);
+  const block = String(Math.floor(rand() * 10_000)).padStart(4, "0");
+  const check = pad2(Math.floor(rand() * 100));
+  return {
+    serial: md,
+    dateLabel: `${MONTHS_UPPER[d.getMonth()]} ${pad2(d.getDate())} ${d.getFullYear()}`,
+    routeCode: `NL-${md}-${platform.padStart(2, "0")}`,
+    serialLong: `N${md}·${block}·${check}`,
+    day: d.getDate(),
+  };
+}
+
+function endpoints(stations: StudySession[]): { from: string; to: string } {
+  const from = stations[0]?.stationName || "NOCTURNE";
+  const to = stations[stations.length - 1]?.stationName || "NOCTURNE";
+  return { from, to };
+}
 
 export function ticketFace(data: NocturneData, journey: Journey): TicketFace {
   const s = summarizeJourney(data, journey);
-  const d = parseDateKey(journey.date);
-  const months = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
+  const id = ticketIdentity(journey.date, journey.platform);
   const status: TicketFace["status"] =
     s.completionRate >= 0.9 ? "ROUTE COMPLETE" : s.completionRate >= 0.5 ? "PARTIAL ROUTE" : "SHORT JOURNEY";
   return {
-    serial: `${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}`,
-    dateLabel: `${months[d.getMonth()]} ${String(d.getDate()).padStart(2, "0")} ${d.getFullYear()}`,
+    kind: "journey",
+    serial: id.serial,
+    routeCode: id.routeCode,
+    ...endpoints(s.stations),
+    serialLong: id.serialLong,
+    dateLabel: id.dateLabel,
     departure: s.departure ? clock(s.departure) : "--:--",
     arrival: s.arrival ? clock(s.arrival) : "--:--",
     stops: s.stationsTotal,
@@ -168,8 +206,54 @@ export function ticketFace(data: NocturneData, journey: Journey): TicketFace {
     platform: journey.platform,
     status,
     completion: Math.round(s.completionRate * 100),
-    hueShift: ((s.focusedMinutes * 7 + d.getDate() * 13) % 100) / 100,
+    hueShift: ((s.focusedMinutes * 7 + id.day * 13) % 100) / 100,
     stationMarks: s.stations.map((x) => (x.status === "done" ? "done" : x.status === "partial" ? "partial" : "open")),
+  };
+}
+
+/**
+ * Printable rows of a ticket, in print order. Rows before `split` sit above
+ * the perforation. The Ticket component renders exactly these rows.
+ */
+export type TicketRowId = "header" | "date" | "times" | "route" | "grid1" | "grid2" | "gridSm" | "stub" | "code";
+
+export function ticketRows(size: "sm" | "md" | "lg" = "lg"): { rows: TicketRowId[]; split: number } {
+  if (size === "sm") return { rows: ["header", "times", "route", "gridSm", "stub", "code"], split: 4 };
+  return { rows: ["header", "date", "times", "route", "grid1", "grid2", "stub", "code"], split: 6 };
+}
+
+/** How many rows the printer lays down for a ticket (drives the Ticket `printed` prop). */
+export function ticketRowCount(face: TicketFace, size: "sm" | "md" | "lg" = "lg"): number {
+  void face;
+  return ticketRows(size).rows.length;
+}
+
+/** The boarding pass printed before tonight's journey starts: planned figures only. */
+export function boardingTicketFace(data: NocturneData, date: DateKey, carriage: CarriageId): TicketFace {
+  const route = routeOf(data.sessions, date);
+  const details = boardingDetails(date);
+  const id = ticketIdentity(date, details.platform);
+  const planned = route.reduce((sum, s) => sum + s.workMinutes, 0);
+  const last = route[route.length - 1];
+  return {
+    kind: "boarding",
+    serial: id.serial,
+    routeCode: id.routeCode,
+    ...endpoints(route),
+    serialLong: id.serialLong,
+    dateLabel: id.dateLabel,
+    departure: route[0] ? clock(route[0].plannedStart) : "--:--",
+    arrival: last ? clock(last.plannedEnd) : "--:--",
+    stops: route.length,
+    focused: planned,
+    carriage: CARRIAGE_LABEL[carriage],
+    seat: details.seat,
+    car: details.car,
+    platform: details.platform,
+    status: "VALID TONIGHT",
+    completion: 0,
+    hueShift: ((planned * 7 + id.day * 13) % 100) / 100,
+    stationMarks: route.map(() => "open"),
   };
 }
 

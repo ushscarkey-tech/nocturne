@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { usePathname } from "next/navigation";
 import { create } from "zustand";
 import { calibrate } from "@/core/learning";
 import { parseQuickAdd, type ParsedTask, type QuickField } from "@/core/quickadd";
@@ -27,6 +28,9 @@ export const useQuickAdd = create<{ open: boolean; text: string; show: (text?: s
 export function QuickAddButton() {
   const { t } = useI18n();
   const show = useQuickAdd((s) => s.show);
+  const pathname = usePathname();
+  // The Tonight scene carries its own "+" in the top bar.
+  if (pathname === "/") return null;
   return (
     <button
       type="button"

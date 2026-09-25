@@ -35,6 +35,8 @@ const settings: Partial<Record<keyof typeof source, string>> = {
   "settings.resetBody": "이 브라우저의 모든 것을 샘플 데이터로 바꿔요.",
   "settings.sampleBody": "할 일, 라인, 여행, 승차권을 샘플 데이터로 바꿔요.",
   "settings.replace": "바꾸기",
+  "settings.soundEffects": "효과음",
+  "settings.soundEffectsHint": "발권기, 문, 안내음",
 };
 
 export default settings;

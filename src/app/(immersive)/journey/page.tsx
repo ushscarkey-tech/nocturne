@@ -1,26 +1,37 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { PresetId } from "@/audio/engine";
+import { sfx } from "@/audio/sfx";
 import { ambience, soundWanted, useAmbienceState, useScenePreset } from "@/audio/useAmbience";
 import { CARRIAGE_AMBIENCE, journeyFor } from "@/core/journey";
-import { activeSession, sessionsOn, upcomingOn } from "@/core/sessions";
-import { serviceDate } from "@/core/time";
-import type { CarriageId } from "@/core/types";
+import { activeSession, routeOf, sessionsOn, upcomingOn } from "@/core/sessions";
+import { boardingTicketFace } from "@/core/stats";
+import { clock, serviceDate } from "@/core/time";
+import type { CarriageId, FocusLevel, JourneyPhase } from "@/core/types";
 import { useI18n } from "@/i18n";
 import { ButtonLink } from "@/components/ui/Button";
-import { Boarding } from "@/components/journey/Boarding";
+import { BoardingDoors } from "@/components/journey/BoardingDoors";
 import { Cabin } from "@/components/journey/Cabin";
 import { FinalStation } from "@/components/journey/FinalStation";
 import { NightScene, type SceneMode } from "@/components/journey/NightScene";
-import { PlatformScene } from "@/components/scene/PlatformScene";
 import { ServicePaused, StationStop } from "@/components/journey/Platform";
+import { SignalChange } from "@/components/journey/SignalChange";
+import { TicketMachine } from "@/components/journey/TicketMachine";
+import { PlatformScene } from "@/components/scene/PlatformScene";
 import { useNow } from "@/lib/hooks";
-import { useData } from "@/state/store";
+import { board, setCarriage } from "@/state/actions";
+import { useData, useStore } from "@/state/store";
 
 type TunnelStage = "off" | "rumble" | "deep";
+type Phase = JourneyPhase;
 
+/**
+ * One continuous journey: the ticket machine on the platform, the carriage
+ * door, pulling out, the window, stations, the end of the line. Scenes hand
+ * over to each other instead of pages replacing pages.
+ */
 export default function JourneyPage() {
   const data = useData();
   const now = useNow(1000);
@@ -29,13 +40,50 @@ export default function JourneyPage() {
   const active = activeSession(data.sessions);
   const [tunnel, setTunnel] = useState(false);
   const [stage, setStage] = useState<TunnelStage>("off");
-  const [boardingCarriage, setBoardingCarriage] = useState<CarriageId>(journey?.selectedCarriage ?? data.profile.preferredCarriage);
+  const [machineCarriage, setMachineCarriage] = useState<CarriageId>(journey?.selectedCarriage ?? data.profile.preferredCarriage);
+  const [choice, setChoice] = useState<{ focus: FocusLevel; carriage: CarriageId } | null>(null);
+  const [atDoors, setAtDoors] = useState(false);
+  const [departing, setDeparting] = useState(false);
   const { enabled: soundOn } = useAmbienceState();
 
   const started = !!journey?.startedAt;
-  const phase = !started ? "boarding" : journey!.phase;
-  const carriage = started ? journey!.selectedCarriage : boardingCarriage;
+  const phase: Phase = !started ? "boarding" : journey!.phase;
+  const carriage = started ? journey!.selectedCarriage : (choice?.carriage ?? machineCarriage);
   const inTunnel = phase === "cabin" && tunnel && !!active?.resumedAt;
+
+  // Remember how we got here, so arrivals and departures can be staged.
+  const [seen, setSeen] = useState<{ phase: Phase; arrival: { kind: Phase; at: number } | null; departure: number }>({
+    phase,
+    arrival: null,
+    departure: 0,
+  });
+  if (seen.phase !== phase) {
+    const arrived = seen.phase === "cabin" && (phase === "stop" || phase === "final" || phase === "paused");
+    const leaving = (seen.phase === "stop" || seen.phase === "paused") && phase === "cabin";
+    setSeen({
+      phase,
+      arrival: arrived ? { kind: phase, at: now.getTime() } : seen.arrival,
+      departure: leaving ? seen.departure + 1 : seen.departure,
+    });
+  }
+  const arriving = !!seen.arrival && seen.arrival.kind === phase && now.getTime() - seen.arrival.at < 8000;
+
+  // Braking, then the platform chime.
+  const arrivalAt = seen.arrival?.at;
+  useEffect(() => {
+    if (!arrivalAt) return;
+    sfx.play("brake", { volume: 0.9 });
+    const chime = setTimeout(() => sfx.play("arrival", { volume: 0.75 }), 2700);
+    return () => clearTimeout(chime);
+  }, [arrivalAt]);
+
+  // Leaving a station: doors, then a short melody.
+  useEffect(() => {
+    if (!seen.departure) return;
+    sfx.play("doorLock", { volume: 0.8 });
+    const melody = setTimeout(() => sfx.play("departure", { volume: 0.55 }), 800);
+    return () => clearTimeout(melody);
+  }, [seen.departure]);
 
   // Tunnel sound deepens in two steps: rail → low rumble → tunnel hum.
   useEffect(() => {
@@ -51,21 +99,20 @@ export default function JourneyPage() {
     };
   }, [inTunnel]);
 
-  const onPlatform = phase === "stop" || phase === "paused" || phase === "boarding" || (phase === "cabin" && !active);
-  const scene: SceneMode = phase === "final" ? "still" : onPlatform ? "platform" : inTunnel ? "tunnel" : "night";
+  const onPlatform = phase === "stop" || phase === "paused" || (phase === "cabin" && !active);
+  const scene: SceneMode = phase === "final" ? "still" : departing || onPlatform ? "platform" : inTunnel ? "tunnel" : "night";
+  const platformPreset: PresetId = carriage === "rain" ? "platform-rain" : "platform";
   const preset: PresetId =
-    phase === "final"
-      ? "silence"
-      : onPlatform
-        ? carriage === "rain"
-          ? "platform-rain"
-          : "platform"
+    phase === "boarding" || phase === "final" || onPlatform
+      ? platformPreset
+      : departing
+        ? "quiet-cabin"
         : stage === "deep"
           ? "tunnel"
           : stage === "rumble"
             ? "rumble"
             : CARRIAGE_AMBIENCE[carriage];
-  useScenePreset(preset, stage === "deep" ? 9 : 5);
+  useScenePreset(preset, departing ? 3 : stage === "deep" ? 9 : 6);
 
   // The name board on the platform: where we just arrived, or tonight's platform.
   const lastStation = sessionsOn(data.sessions, today)
@@ -73,56 +120,91 @@ export default function JourneyPage() {
     .pop()?.stationName;
   const boardName = lastStation ?? (journey ? `PLATFORM ${journey.platform}` : "NOCTURNE");
 
-  // The night ends in silence (the preference to have sound is kept).
-  useEffect(() => {
-    if (phase !== "final") return;
-    const t = setTimeout(() => ambience.disable(false), 6000);
-    return () => clearTimeout(t);
-  }, [phase]);
-
   // Browsers need a gesture to resume audio after a reload: the first tap does it.
   function resumeSound() {
-    if (!soundOn && started && phase !== "final" && soundWanted()) void ambience.enable(preset);
+    void sfx.unlock();
+    if (!soundOn && started && soundWanted()) void ambience.enable(preset);
   }
+
+  // Pulling out: doors lock, a melody, then the platform starts to slide.
+  const pulling = useRef<ReturnType<typeof setTimeout>[]>([]);
+  useEffect(() => () => pulling.current.forEach(clearTimeout), []);
+  function pullOut() {
+    const d = useStore.getState().data;
+    // Boarded before Service Time: the train waits at the platform instead.
+    if (!d || journeyFor(d, serviceDate(new Date()))?.phase !== "cabin") {
+      setDeparting(false);
+      return;
+    }
+    const at = (ms: number, fn: () => void) => pulling.current.push(setTimeout(fn, ms));
+    at(600, () => sfx.play("doorLock", { volume: 0.8 }));
+    at(1500, () => sfx.play("departure", { volume: 0.55 }));
+    at(4200, () => setDeparting(false));
+  }
+
+  const route = routeOf(data.sessions, today);
+  const upcoming = upcomingOn(data.sessions, today);
 
   let content: React.ReactNode;
   if (phase === "boarding") {
-    content =
-      upcomingOn(data.sessions, today).length > 0 ? (
-        <Boarding data={data} now={now} carriage={boardingCarriage} onCarriage={setBoardingCarriage} />
-      ) : (
-        <NoService />
-      );
+    content = upcoming.length > 0 && !atDoors ? (
+      <TicketMachine
+        data={data}
+        now={now}
+        carriage={machineCarriage}
+        onCarriage={setMachineCarriage}
+        onTaken={(c) => {
+          setChoice(c);
+          setAtDoors(true);
+        }}
+      />
+    ) : upcoming.length === 0 && !atDoors ? (
+      <NoService />
+    ) : null;
   } else if (phase === "cabin" && active) {
-    content = <Cabin data={data} journey={journey!} active={active} now={now} tunnel={inTunnel} onTunnel={setTunnel} />;
+    content = <Cabin data={data} journey={journey!} active={active} now={now} tunnel={inTunnel} onTunnel={setTunnel} departing={departing} />;
   } else if (phase === "stop" || (phase === "cabin" && !active)) {
-    content = <StationStop data={data} journey={journey!} now={now} />;
+    content = <StationStop data={data} journey={journey!} now={now} arriving={arriving} />;
   } else if (phase === "paused") {
     content = <ServicePaused data={data} journey={journey!} now={now} />;
   } else {
-    content = <FinalStation data={data} journey={journey!} now={now} />;
+    content = <FinalStation data={data} journey={journey!} now={now} arriving={arriving} />;
   }
 
+  const first = route.find((s) => s.status === "planned");
+
   return (
-    <div className="relative isolate min-h-dvh overflow-hidden" onPointerDown={resumeSound}>
-      {phase === "boarding" || phase === "final" ? (
+    <div className="relative isolate h-dvh overflow-hidden" onPointerDown={resumeSound}>
+      {phase === "boarding" ? (
         <>
-          {/* Standing on the platform: before the train leaves, and at the end of the line. */}
-          <PlatformScene
-            className="fixed inset-0 -z-10"
-            fade={false}
-            mood={phase === "final" ? "final" : "waiting"}
-            rain={carriage === "rain"}
-            stationName={boardName}
-          />
-          <div className="pointer-events-none fixed inset-0 -z-10 bg-[linear-gradient(180deg,rgba(4,6,10,0.35)_0%,rgba(4,6,10,0.7)_55%,rgba(4,6,10,0.92)_100%)]" />
+          {/* Standing on the platform, at the ticket machine. */}
+          <PlatformScene className="fixed inset-0 -z-10" fade={false} mood="waiting" rain={carriage === "rain"} stationName={boardName} />
+          <div className="pointer-events-none fixed inset-0 -z-10 bg-[linear-gradient(180deg,rgba(4,6,10,0.55)_0%,rgba(4,6,10,0.78)_50%,rgba(4,6,10,0.94)_100%)]" />
         </>
       ) : (
-        <NightScene mode={scene} carriage={carriage} stationName={boardName} />
+        <NightScene mode={scene} carriage={carriage} stationName={boardName} terminal={phase === "final"} />
       )}
-      <div key={phase} className={phase === "cabin" ? "animate-sway" : undefined}>
+      <div key={phase} className="h-full animate-fade">
         {content}
       </div>
+      {atDoors && choice && (
+        <BoardingDoors
+          face={boardingTicketFace(data, today, choice.carriage)}
+          carriage={choice.carriage}
+          departure={first ? clock(first.plannedStart) : "--:--"}
+          destination={route[route.length - 1]?.stationName ?? "NOCTURNE"}
+          onOpen={() => {
+            setCarriage(choice.carriage);
+            setDeparting(true);
+            board(choice.focus, choice.carriage);
+          }}
+          onInside={() => {
+            setAtDoors(false);
+            pullOut();
+          }}
+        />
+      )}
+      <SignalChange />
     </div>
   );
 }
@@ -130,7 +212,7 @@ export default function JourneyPage() {
 function NoService() {
   const { t } = useI18n();
   return (
-    <div className="mx-auto flex min-h-dvh max-w-sm flex-col items-center justify-center gap-6 px-6 text-center">
+    <div className="mx-auto flex h-dvh max-w-sm flex-col items-center justify-center gap-6 px-6 text-center">
       <p className="eyebrow">{t("journey.noDepartures")}</p>
       <p className="font-display text-3xl">{t("journey.noStationsLeft")}</p>
       <div className="flex gap-3">

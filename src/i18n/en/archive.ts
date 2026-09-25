@@ -47,6 +47,18 @@ const archive = {
   "archive.statCarriage": "Carriage",
   "archive.statSeat": "Seat",
   "archive.ticketLabel": "Ticket {date}, {departure} to {arrival}, {stops} stops, {focused} focused, {completion}% of planned work, {status}",
+  "archive.statistics": "Statistics",
+  "archive.walletLabel": "Tickets by month",
+  "archive.newerMonth": "Newer month",
+  "archive.olderMonth": "Older month",
+  "archive.showMonth": "Show {month}",
+  "archive.ticketCountOne": "1 ticket",
+  "archive.ticketCount": "{n} tickets",
+  "archive.nextTicket": "Next ticket",
+  "archive.spreadTickets": "Spread out",
+  "archive.stackTickets": "Stack them",
+  "archive.noTicketsHint": "Finish a night and its ticket is kept here.",
+  "archive.journeyDetails": "Journey details",
 } as const;
 
 export default archive;

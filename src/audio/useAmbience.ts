@@ -33,12 +33,21 @@ function emit() {
   listeners.forEach((l) => l());
 }
 
-function loadMix(): MixLevels {
+/** The traveller's stored mix, merged over defaults (older mixes lack `effects`). */
+export function loadMix(): MixLevels {
   if (mixLoaded) return mix;
   mixLoaded = true;
   try {
     const raw = window.localStorage.getItem(MIX_KEY);
-    if (raw) mix = { ...DEFAULT_MIX, ...(JSON.parse(raw) as Partial<MixLevels>) };
+    if (raw) {
+      const stored = JSON.parse(raw) as Partial<Record<keyof MixLevels, unknown>> | null;
+      const next = { ...DEFAULT_MIX };
+      for (const key of Object.keys(DEFAULT_MIX) as (keyof MixLevels)[]) {
+        const v = stored?.[key];
+        if (typeof v === "number" && Number.isFinite(v)) next[key] = v;
+      }
+      mix = next;
+    }
   } catch {
     /* ignore */
   }
@@ -63,6 +72,10 @@ export const ambience = {
   },
   setPreset(preset: PresetId, fadeSeconds?: number) {
     getAmbience().setPreset(preset, fadeSeconds);
+  },
+  /** Lower the ambience to `amount` × its level for `seconds`, then restore it. */
+  duck(amount: number, seconds: number) {
+    getAmbience().duck(amount, seconds);
   },
   setMix(next: MixLevels) {
     mix = next;

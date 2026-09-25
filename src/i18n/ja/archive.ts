@@ -49,6 +49,18 @@ const archive: Partial<Record<keyof typeof source, string>> = {
   "archive.ticketNotFound": "この乗車券は見つかりません。",
   "archive.title": "記録",
   "archive.vsLastWeek": "先週より{change}%",
+  "archive.statistics": "統計",
+  "archive.walletLabel": "月ごとの乗車券",
+  "archive.newerMonth": "次の月",
+  "archive.olderMonth": "前の月",
+  "archive.showMonth": "{month}を表示",
+  "archive.ticketCountOne": "乗車券 1枚",
+  "archive.ticketCount": "乗車券 {n}枚",
+  "archive.nextTicket": "次の乗車券",
+  "archive.spreadTickets": "広げる",
+  "archive.stackTickets": "重ねる",
+  "archive.noTicketsHint": "ひと晩を終えると、その夜の乗車券がここに残ります。",
+  "archive.journeyDetails": "旅の詳細",
 };
 
 export default archive;

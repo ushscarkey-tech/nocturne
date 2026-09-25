@@ -33,6 +33,8 @@ const settings = {
   "settings.resetBody": "Everything in this browser is replaced with sample data.",
   "settings.sampleBody": "Your tasks, lines, journeys and tickets are replaced with sample data.",
   "settings.replace": "Replace",
+  "settings.soundEffects": "Effects",
+  "settings.soundEffectsHint": "Ticket machine, doors, chimes",
 } as const;
 
 export default settings;

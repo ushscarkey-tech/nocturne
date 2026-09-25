@@ -60,6 +60,65 @@
     0%, 100% { opacity: 0.55; }
     50% { opacity: 1; }
   }
+
+  /* Scenes: slow, quiet, never bouncy. */
+  --animate-scene-in: scene-in 1400ms var(--ease-glide) both;
+  --animate-flip: flip 260ms cubic-bezier(0.4, 0, 0.2, 1) both;
+  --animate-led: led 7s steps(1) infinite;
+  --animate-drift: drift 11s ease-in-out infinite;
+  --animate-jitter: jitter 180ms linear infinite;
+  --animate-hint: hint 2.8s ease-in-out infinite;
+
+  @keyframes scene-in {
+    from { opacity: 0; transform: scale(1.015); filter: blur(3px); }
+    to { opacity: 1; transform: none; filter: none; }
+  }
+  @keyframes flip {
+    from { transform: rotateX(-88deg); opacity: 0.2; }
+    to { transform: none; opacity: 1; }
+  }
+  /* An old status lamp that very occasionally stutters. */
+  @keyframes led {
+    0%, 71%, 73%, 100% { opacity: 1; }
+    72% { opacity: 0.35; }
+  }
+  /* The cabin never quite stops moving. */
+  @keyframes drift {
+    0%, 100% { transform: translate3d(0, 0, 0); }
+    30% { transform: translate3d(0.4px, 0.7px, 0); }
+    60% { transform: translate3d(-0.3px, -0.4px, 0); }
+  }
+  /* Paper pushed out by a printer mechanism. */
+  @keyframes jitter {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(0.35px); }
+    75% { transform: translateX(-0.35px); }
+  }
+  /* A ticket taken in hand, brought up to the eyes. */
+  @keyframes lift {
+    from { opacity: 0.4; transform: translateY(22vh) scale(0.78) rotate(-2deg); }
+    to { opacity: 1; transform: none; }
+  }
+  @keyframes redraw {
+    from { transform: scaleX(0); }
+    to { transform: scaleX(1); }
+  }
+  @keyframes hint {
+    0%, 100% { transform: translateY(0); opacity: 0.35; }
+    50% { transform: translateY(-4px); opacity: 0.8; }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .motion-safe-only {
+    animation: none !important;
+    transition: none !important;
+  }
+  /* Scenes still hand over, but as a short plain fade. */
+  .animate-scene-in,
+  .animate-rise {
+    animation: fade 300ms ease-out both !important;
+  }
 }
 
 :root {

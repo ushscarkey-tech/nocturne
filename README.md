@@ -119,6 +119,16 @@ supabase/        SQL migrations
   whether it's finished or needs more time instead of silently closing it.
 - **Deleting keeps history** – a task with past journeys is archived so tickets stay intact.
 
+### Scenes
+
+The main moments are scenes, not scrolling pages: Tonight (an empty platform, the departure time,
+BOARD), the ticket machine (confirm the route, how you feel, a carriage; the ticket prints and you
+take it), the carriage door, pulling out, the window (with the Tunnel), station stops with a lit
+name board, route changes shown as a signal change on the line, and the final station, where the
+night's ticket prints line by line and goes into the Archive's ticket book. Sound effects are
+synthesised like the ambience and follow the Effects slider; with Reduce Motion every scene falls
+back to a short fade.
+
 ### Quick Add and learning
 
 - **Quick Add** (the round button above the tab bar) reads a sentence such as

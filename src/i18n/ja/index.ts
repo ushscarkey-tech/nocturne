@@ -16,6 +16,7 @@ import onboarding from "./onboarding";
 import insights from "./insights";
 import tasksPage from "./tasksPage";
 import notify from "./notify";
+import scene from "./scene";
 
 const messages = {
   ...core,
@@ -36,6 +37,7 @@ const messages = {
   ...insights,
   ...tasksPage,
   ...notify,
+  ...scene,
 };
 
 export default messages;
