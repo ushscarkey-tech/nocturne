@@ -29,6 +29,10 @@ const lines = {
   "lines.notes": "Notes",
   "lines.nameRequired": "Name the line.",
   "lines.back": "Lines",
+  "lines.open": "Open",
+  "lines.statusDone": "done",
+  "lines.statusInProgress": "in progress",
+  "lines.statusNotStarted": "not started",
 } as const;
 
 export default lines;

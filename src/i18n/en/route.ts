@@ -30,6 +30,7 @@ const route = {
   "route.skipToday": "Skip today",
   "route.underWay": "This station is under way.",
   "route.completeRecord": "This station is complete and stays on the record.",
+  "route.dragInstructions": "To move a station, press space or enter to pick it up, use the arrow keys, then press space or enter again to drop it.",
 } as const;
 
 export default route;

@@ -35,6 +35,7 @@ export function RouteEditor({
   onReorder: (orderedIds: string[]) => void;
   onOpen: (item: StationItem) => void;
 }) {
+  const { t } = useI18n();
   const [dragging, setDragging] = useState<string | null>(null);
   // The frame after a drop is already in place; don't animate it again.
   const [settling, setSettling] = useState(false);
@@ -78,12 +79,12 @@ export function RouteEditor({
       onDragCancel={() => setDragging(null)}
       accessibility={{
         screenReaderInstructions: {
-          draggable: "To reorder a station, press space or enter to pick it up, use the arrow keys to move it, and press space or enter again to drop it.",
+          draggable: t("route.dragInstructions"),
         },
       }}
     >
       <SortableContext items={movable} strategy={verticalListSortingStrategy}>
-        <ol ref={listRef} className="relative" aria-label="Tonight's route">
+        <ol ref={listRef} className="relative" aria-label={t("route.tonightRoute")}>
           {visible.map((item, i) => {
             const first = i === 0;
             const last = i === visible.length - 1;

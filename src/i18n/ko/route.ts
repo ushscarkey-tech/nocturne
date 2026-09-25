@@ -32,6 +32,7 @@ const route: Partial<Record<keyof typeof source, string>> = {
   "route.skipToday": "오늘 건너뛰기",
   "route.underWay": "이 정거장은 진행 중입니다.",
   "route.completeRecord": "이 정거장은 완료되었고 기록에 남습니다.",
+  "route.dragInstructions": "정거장을 옮기려면 스페이스나 엔터로 집고, 화살표 키로 움직인 뒤, 다시 스페이스나 엔터로 내려놓으세요.",
 };
 
 export default route;

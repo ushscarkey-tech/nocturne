@@ -37,7 +37,7 @@ export default function RoutePage() {
   return (
     <div className="animate-fade">
       <Link href="/" className="inline-flex items-center gap-1 text-sm text-mist hover:text-paper">
-        <Icon name="back" size={16} /> Tonight
+        <Icon name="back" size={16} /> {t("shell.tonight")}
       </Link>
 
       <header className="mt-8 flex flex-wrap items-end justify-between gap-6">
@@ -48,7 +48,7 @@ export default function RoutePage() {
             <p className="mt-4 font-mono text-sm tabular text-paper-dim">
               {clock(summary.departure)} <span className="text-haze">→</span> {clock(summary.arrival)}
               <span className="ml-3 text-mist">
-                {summary.stations} stations · {fmt.duration(summary.plannedMinutes)}
+                {t("common.nStations", { n: summary.stations })} · {fmt.duration(summary.plannedMinutes)}
               </span>
             </p>
           )}

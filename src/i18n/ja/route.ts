@@ -32,6 +32,7 @@ const route: Partial<Record<keyof typeof source, string>> = {
   "route.tonightRoute": "今夜のルート",
   "route.underWay": "この駅は進行中です。",
   "route.unlockTime": "固定を解く",
+  "route.dragInstructions": "駅を動かすには、スペースかEnterで持ち上げ、矢印キーで移動し、もう一度スペースかEnterで置きます。",
 };
 
 export default route;

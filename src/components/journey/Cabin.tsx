@@ -208,7 +208,7 @@ export function Cabin({
         <div className="grid grid-cols-3 gap-3">
           {[5, 10, 15].map((m) => (
             <Button key={m} variant="secondary" size="lg" onClick={() => { setSheet(null); needMoreTime(m); }}>
-              +{m} min
+              +{fmt.duration(m)}
             </Button>
           ))}
         </div>

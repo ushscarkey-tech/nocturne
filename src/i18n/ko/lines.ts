@@ -31,6 +31,10 @@ const lines: Partial<Record<keyof typeof source, string>> = {
   "lines.notes": "노트",
   "lines.nameRequired": "라인에 이름을 지어주세요.",
   "lines.back": "라인",
+  "lines.open": "기한 없음",
+  "lines.statusDone": "완료",
+  "lines.statusInProgress": "진행 중",
+  "lines.statusNotStarted": "시작 전",
 };
 
 export default lines;

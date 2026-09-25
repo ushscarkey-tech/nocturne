@@ -9,6 +9,7 @@ const shell = {
   "shell.notSaved": "Not saved · {error}",
   "shell.dismiss": "Dismiss",
   "shell.close": "Close",
+  "shell.primaryNav": "Main",
 } as const;
 
 export default shell;

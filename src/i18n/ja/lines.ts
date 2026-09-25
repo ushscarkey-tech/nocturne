@@ -31,6 +31,10 @@ const lines: Partial<Record<keyof typeof source, string>> = {
   "lines.tasksSummary": "{n}タスク・残り{time}/{total}",
   "lines.title": "ライン",
   "lines.workload": "ワークロード",
+  "lines.open": "期限なし",
+  "lines.statusDone": "完了",
+  "lines.statusInProgress": "進行中",
+  "lines.statusNotStarted": "未着手",
 };
 
 export default lines;

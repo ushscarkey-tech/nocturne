@@ -11,6 +11,7 @@ const shell: Partial<Record<keyof typeof source, string>> = {
   "shell.notSaved": "저장하지 못함 · {error}",
   "shell.dismiss": "닫기",
   "shell.close": "닫기",
+  "shell.primaryNav": "주 메뉴",
 };
 
 export default shell;

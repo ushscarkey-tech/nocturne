@@ -9,7 +9,7 @@ import { CARRIAGES } from "@/components/journey/Boarding";
 import { Icon } from "@/components/ui/Icon";
 import { Ticket } from "@/components/ticket/Ticket";
 import { useData } from "@/state/store";
-import { useI18n } from "@/i18n";
+import { useI18n, type MessageKey } from "@/i18n";
 
 export default function TicketPage() {
   return (
@@ -62,7 +62,7 @@ function TicketDetail() {
         <Stat label={t("archive.statRouteChanges")} value={String(journey.routeChanges)} />
         <Stat label={t("archive.statDelay")} value={delayed ? fmt.duration(delayed) : "—"} />
         <Stat label={t("archive.statAheadOfSchedule")} value={gained ? fmt.duration(gained) : "—"} />
-        <Stat label={t("archive.statCarriage")} value={CARRIAGES.find((c) => c.id === journey.selectedCarriage)?.name ?? ""} />
+        <Stat label={t("archive.statCarriage")} value={t((CARRIAGES.find((c) => c.id === journey.selectedCarriage)?.nameKey ?? "journey.quietCar") as MessageKey)} />
         <Stat label={t("archive.statSeat")} value={t("archive.carSeat", { car: journey.car, seat: journey.seat })} />
       </dl>
 

@@ -11,6 +11,7 @@ const shell: Partial<Record<keyof typeof source, string>> = {
   "shell.notSaved": "未保存 · {error}",
   "shell.dismiss": "关闭",
   "shell.close": "关闭",
+  "shell.primaryNav": "主菜单",
 };
 
 export default shell;

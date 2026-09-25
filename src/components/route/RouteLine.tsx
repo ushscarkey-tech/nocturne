@@ -27,10 +27,11 @@ export function RouteLine({
   renderActions?: (item: Extract<RouteItem, { kind: "station" }>) => ReactNode;
   highlightId?: string | null;
 }) {
+  const { t } = useI18n();
   const ref = useRef<HTMLOListElement>(null);
   useFlip(ref, routeSignature(items));
   return (
-    <ol ref={ref} className="relative" aria-label="Route">
+    <ol ref={ref} className="relative" aria-label={t("route.routeTitle")}>
       {items.map((item, i) => (
         <RouteRow
           key={item.kind === "station" ? item.session.id : item.key}
@@ -66,7 +67,7 @@ export function RouteRow({
   const { t, fmt } = useI18n();
   if (item.kind === "stop") {
     return (
-      <li data-flip={item.key} className="grid grid-cols-[3.25rem_1.5rem_1fr]" aria-label={`Station stop, ${fmt.duration(item.minutes)}`}>
+      <li data-flip={item.key} className="grid grid-cols-[3.25rem_1.5rem_1fr]" aria-label={t("route.stationStop", { min: item.minutes })}>
         <span />
         <Rail first={first} last={last}>
           <span className="h-2 w-2 rounded-full border border-haze bg-night-900" />

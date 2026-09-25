@@ -34,7 +34,7 @@ export function TabBar() {
   });
   return (
     <nav
-      aria-label="Primary"
+      aria-label={t("shell.primaryNav")}
       className="fixed inset-x-0 bottom-0 z-30 border-t border-rule-soft bg-night-900/85 pb-[env(safe-area-inset-bottom)] backdrop-blur-md md:inset-y-0 md:left-0 md:right-auto md:w-56 md:border-r md:border-t-0 md:bg-transparent md:pb-0 md:backdrop-blur-none"
     >
       <div className="hidden px-7 pb-10 pt-9 md:block">

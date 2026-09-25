@@ -32,6 +32,7 @@ const route: Partial<Record<keyof typeof source, string>> = {
   "route.skipToday": "今天跳过",
   "route.underWay": "此站正在进行。",
   "route.completeRecord": "此站已完成并保留记录。",
+  "route.dragInstructions": "要移动站点，按空格或回车拿起，用方向键移动，再按空格或回车放下。",
 };
 
 export default route;

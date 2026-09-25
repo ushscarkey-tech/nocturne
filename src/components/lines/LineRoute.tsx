@@ -17,7 +17,7 @@ export function lineTasks(line: Line, tasks: Task[]): Task[] {
 
 /** A long-distance line: origin ─── destination, with stops for each task. */
 export function LineRoute({ line, tasks, today }: { line: Line; tasks: Task[]; today: string }) {
-  const { fmt } = useI18n();
+  const { t: tr, fmt } = useI18n();
   const p = lineProgress(tasks);
   const origin = tasks.reduce((min, t) => (t.createdAt.slice(0, 10) < min ? t.createdAt.slice(0, 10) : min), line.createdAt.slice(0, 10));
   return (
@@ -31,7 +31,7 @@ export function LineRoute({ line, tasks, today }: { line: Line; tasks: Task[]; t
             style={{ left: `${p.fraction * 100}%` }}
           />
         </span>
-        <span>{line.targetDate ? fmt.shortDate(line.targetDate) : "Open"}</span>
+        <span>{line.targetDate ? fmt.shortDate(line.targetDate) : tr("lines.open")}</span>
       </div>
       <ol className="mt-5 space-y-2.5">
         {tasks.map((t) => {
@@ -44,7 +44,7 @@ export function LineRoute({ line, tasks, today }: { line: Line; tasks: Task[]; t
                 aria-hidden
               />
               <span className={done ? "text-mist" : "text-paper-dim"}>{t.title}</span>
-              <span className="sr-only">{done ? "done" : started ? "in progress" : "not started"}</span>
+              <span className="sr-only">{tr(done ? "lines.statusDone" : started ? "lines.statusInProgress" : "lines.statusNotStarted")}</span>
             </li>
           );
         })}

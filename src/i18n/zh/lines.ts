@@ -31,6 +31,10 @@ const lines: Partial<Record<keyof typeof source, string>> = {
   "lines.notes": "备注",
   "lines.nameRequired": "给线路起个名字。",
   "lines.back": "线路",
+  "lines.open": "无期限",
+  "lines.statusDone": "已完成",
+  "lines.statusInProgress": "进行中",
+  "lines.statusNotStarted": "未开始",
 };
 
 export default lines;

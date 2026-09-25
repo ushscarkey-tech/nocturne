@@ -20,7 +20,7 @@ const archive: Partial<Record<keyof typeof source, string>> = {
   "archive.finishEarly": "정거장이 {pct}% 일찍 끝나요",
   "archive.estimatesClose": "예상이 거의 맞아요",
   "archive.averageDelay": "평균 지연",
-  "archive.onTime": "시간맞춤",
+  "archive.onTime": "정시 도착",
   "archive.laterThanPlanned": "계획보다 뒤",
   "archive.aheadOfSchedule": "예정보다 앞섬",
   "archive.arrivals": "도착",

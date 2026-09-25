@@ -11,6 +11,7 @@ const shell: Partial<Record<keyof typeof source, string>> = {
   "shell.signalLost": "信号喪失",
   "shell.tasks": "タスク",
   "shell.tonight": "今夜",
+  "shell.primaryNav": "メインメニュー",
 };
 
 export default shell;
