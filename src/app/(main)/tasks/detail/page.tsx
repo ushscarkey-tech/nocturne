@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import { scheduleFor } from "@/core/allocate";
 import { clock, formatDuration, formatShortDate, relativeDay, toDateKey } from "@/core/time";
@@ -27,8 +27,8 @@ export default function TaskDetailPage() {
 }
 
 function TaskDetail() {
-  const { id } = useParams<{ id: string }>();
   const params = useSearchParams();
+  const id = params.get("id") ?? "";
   const router = useRouter();
   const data = useData();
   const now = useNow(60_000);

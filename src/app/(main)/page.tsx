@@ -13,6 +13,7 @@ import { routeItems, routeSummary } from "@/lib/route-view";
 import { useConflict } from "@/lib/use-planner";
 import { loadSampleData } from "@/state/actions";
 import { useData } from "@/state/store";
+import { ticketHref } from "@/lib/paths";
 
 export default function TonightPage() {
   const data = useData();
@@ -85,7 +86,7 @@ export default function TonightPage() {
             Return to Journey
           </ButtonLink>
         ) : ended ? (
-          <ButtonLink href={ticket ? `/archive/${journey!.id}` : "/journey"} variant="primary" size="lg">
+          <ButtonLink href={ticket ? ticketHref(journey!.id) : "/journey"} variant="primary" size="lg">
             {ticket ? "View tonight's ticket" : "Issue Ticket"}
           </ButtonLink>
         ) : summary.next ? (

@@ -14,6 +14,7 @@ import { useNow } from "@/lib/hooks";
 import { routeItems, routeSummary, type RouteItem } from "@/lib/route-view";
 import { doNow, moveSessionTo, optimizeRoute, reorderRoute, resizeSession, skipToday, toggleLock } from "@/state/actions";
 import { useData } from "@/state/store";
+import { taskHref } from "@/lib/paths";
 
 type StationItem = Extract<RouteItem, { kind: "station" }>;
 
@@ -167,7 +168,7 @@ function StationSheet({ item, onClose }: { item: StationItem; onClose: () => voi
           </div>
 
           <div className="flex items-center justify-between border-t border-rule-soft pt-6">
-            <Link href={`/tasks/${s.taskId}`} className="text-sm text-mist hover:text-paper">
+            <Link href={taskHref(s.taskId)} className="text-sm text-mist hover:text-paper">
               Open task
             </Link>
             <Button variant="ghost" onClick={act(() => skipToday(s.id), true)}>
@@ -180,7 +181,7 @@ function StationSheet({ item, onClose }: { item: StationItem; onClose: () => voi
           <p className="text-sm text-mist">
             {s.status === "active" ? "This station is under way." : "This station is complete and stays on the record."}
           </p>
-          <Link href={`/tasks/${s.taskId}`} className="text-sm text-paper underline decoration-rule underline-offset-4">
+          <Link href={taskHref(s.taskId)} className="text-sm text-paper underline decoration-rule underline-offset-4">
             Open task
           </Link>
         </div>

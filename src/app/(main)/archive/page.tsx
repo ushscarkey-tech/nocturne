@@ -6,6 +6,7 @@ import { archiveStats, focusByDay, ticketFace } from "@/core/stats";
 import { formatDuration, formatHM, parseDateKey, toDateKey, WEEKDAY_SHORT } from "@/core/time";
 import { Ticket } from "@/components/ticket/Ticket";
 import { useData } from "@/state/store";
+import { ticketHref } from "@/lib/paths";
 
 export default function ArchivePage() {
   const data = useData();
@@ -43,7 +44,7 @@ export default function ArchivePage() {
               const ticket = data.tickets.find((t) => t.journeyId === j.id)!;
               return (
                 <li key={j.id} className="w-40 shrink-0 snap-start md:w-auto">
-                  <Link href={`/archive/${j.id}`} className="block transition-transform duration-700 ease-[var(--ease-glide)] hover:-translate-y-1" aria-label={`Open ticket for ${j.date}`}>
+                  <Link href={ticketHref(j.id)} className="block transition-transform duration-700 ease-[var(--ease-glide)] hover:-translate-y-1" aria-label={`Open ticket for ${j.date}`}>
                     <Ticket face={ticketFace(data, j)} style={ticket.ticketStyle} size="sm" />
                   </Link>
                 </li>

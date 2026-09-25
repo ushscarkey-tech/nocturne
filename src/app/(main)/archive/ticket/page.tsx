@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useParams, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { summarizeJourney, ticketFace } from "@/core/stats";
 import { clock, formatDuration, formatLongDate } from "@/core/time";
@@ -19,8 +19,9 @@ export default function TicketPage() {
 }
 
 function TicketDetail() {
-  const { id } = useParams<{ id: string }>();
-  const issued = useSearchParams().get("issued") === "1";
+  const params = useSearchParams();
+  const id = params.get("id") ?? "";
+  const issued = params.get("issued") === "1";
   const data = useData();
   const journey = data.journeys.find((j) => j.id === id);
   const ticket = data.tickets.find((t) => t.journeyId === id);

@@ -8,6 +8,7 @@ import type { Journey, NocturneData } from "@/core/types";
 import { Button, ButtonLink } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
 import { issueTicket } from "@/state/actions";
+import { ticketHref } from "@/lib/paths";
 
 const FOCUS_WORD = { low: "Low", steady: "Steady", sharp: "Sharp" } as const;
 
@@ -87,7 +88,7 @@ export function FinalStation({ data, journey }: { data: NocturneData; journey: J
       </main>
       <div className="mx-auto w-full max-w-md">
         {ticket ? (
-          <ButtonLink href={`/archive/${journey.id}`} variant="primary" size="lg" className="w-full">
+          <ButtonLink href={ticketHref(journey.id)} variant="primary" size="lg" className="w-full">
             View ticket
           </ButtonLink>
         ) : (
@@ -97,7 +98,7 @@ export function FinalStation({ data, journey }: { data: NocturneData; journey: J
             className="w-full"
             onClick={() => {
               issueTicket(journey.id);
-              router.push(`/archive/${journey.id}?issued=1`);
+              router.push(ticketHref(journey.id, true));
             }}
           >
             Issue Ticket

@@ -27,6 +27,21 @@ weekday Service Time and a week of past journeys, saved in your browser's local 
 3. Restart the dev server. `/login` now offers email/password sign-up and sign-in; "Explore the
    demo" remains available.
 
+### GitHub Pages
+
+Nocturne builds to static files (`output: "export"`), so it can be hosted on GitHub Pages.
+`.github/workflows/deploy-pages.yml` builds and deploys on every push to the default branch.
+The site is served at `https://<owner>.github.io/<repo>/`; the workflow passes that sub-path to the
+build as `NEXT_PUBLIC_BASE_PATH`. To try the export locally:
+
+```bash
+NEXT_PUBLIC_BASE_PATH=/nocturne npm run build   # writes ./out
+```
+
+Repository settings → Pages → Source must be **GitHub Actions**. To turn on cloud accounts in the
+deployed site, add `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` as
+repository secrets.
+
 ### Checks
 
 ```bash

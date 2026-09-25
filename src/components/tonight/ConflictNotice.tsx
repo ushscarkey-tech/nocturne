@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { Conflict } from "@/core/allocate";
 import { formatDuration, formatShortDate } from "@/core/time";
 import type { Task } from "@/core/types";
+import { taskHref } from "@/lib/paths";
 
 /** "Route conflict": not enough Service Time before a deadline. Never hidden, never blaming. */
 export function ConflictNotice({ conflict, tasks }: { conflict: Conflict; tasks: Task[] }) {
@@ -40,21 +41,21 @@ export function ConflictNotice({ conflict, tasks }: { conflict: Conflict; tasks:
         </li>
         {soonest && (
           <li>
-            <Link className="text-paper underline decoration-rule underline-offset-4 hover:decoration-lamp" href={`/tasks/${soonest.id}?edit=deadline`}>
+            <Link className="text-paper underline decoration-rule underline-offset-4 hover:decoration-lamp" href={taskHref(soonest.id, "deadline")}>
               Change deadline
             </Link>
           </li>
         )}
         {largest && (
           <li>
-            <Link className="text-paper underline decoration-rule underline-offset-4 hover:decoration-lamp" href={`/tasks/${largest.id}?edit=estimate`}>
+            <Link className="text-paper underline decoration-rule underline-offset-4 hover:decoration-lamp" href={taskHref(largest.id, "estimate")}>
               Reduce workload
             </Link>
           </li>
         )}
         {lowest && involved.length > 1 && (
           <li>
-            <Link className="text-paper underline decoration-rule underline-offset-4 hover:decoration-lamp" href={`/tasks/${lowest.id}?edit=deadline`}>
+            <Link className="text-paper underline decoration-rule underline-offset-4 hover:decoration-lamp" href={taskHref(lowest.id, "deadline")}>
               Delay {lowest.title}
             </Link>
           </li>

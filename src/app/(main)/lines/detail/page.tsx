@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useState } from "react";
 import { formatDuration, formatLongDate, toDateKey } from "@/core/time";
 import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
@@ -15,7 +15,15 @@ import { attachTask, createTask, deleteLine, saveLine } from "@/state/actions";
 import { useData } from "@/state/store";
 
 export default function LineDetailPage() {
-  const { id } = useParams<{ id: string }>();
+  return (
+    <Suspense>
+      <LineDetail />
+    </Suspense>
+  );
+}
+
+function LineDetail() {
+  const id = useSearchParams().get("id") ?? "";
   const router = useRouter();
   const data = useData();
   const [sheet, setSheet] = useState<null | "edit" | "attach" | "task" | "delete">(null);

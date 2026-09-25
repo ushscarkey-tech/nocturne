@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { formatDuration, relativeDay } from "@/core/time";
 import type { Task } from "@/core/types";
+import { taskHref } from "@/lib/paths";
 
 export function taskMeta(task: Task, today: string): string {
   const parts: string[] = [];
@@ -23,7 +24,7 @@ export function TaskRow({ task, today, tonightMinutes }: { task: Task; today: st
   return (
     <li>
       <Link
-        href={`/tasks/${task.id}`}
+        href={taskHref(task.id)}
         className="group -mx-3 flex items-center justify-between gap-4 rounded-xl px-3 py-4 transition-colors duration-500 hover:bg-white/[0.02]"
       >
         <div className="min-w-0 flex-1">

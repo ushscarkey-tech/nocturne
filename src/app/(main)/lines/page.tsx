@@ -10,6 +10,7 @@ import { LineForm } from "@/components/lines/LineForm";
 import { Sheet } from "@/components/ui/Sheet";
 import { saveLine } from "@/state/actions";
 import { useData } from "@/state/store";
+import { lineHref } from "@/lib/paths";
 
 export default function LinesPage() {
   const data = useData();
@@ -42,7 +43,7 @@ export default function LinesPage() {
           const p = lineProgress(tasks);
           return (
             <li key={line.id}>
-              <Link href={`/lines/${line.id}`} className="group block">
+              <Link href={lineHref(line.id)} className="group block">
                 <div className="flex items-baseline justify-between gap-4">
                   <h2 className="font-mono text-sm tracking-[0.25em] text-paper transition-colors group-hover:text-lamp">
                     {line.title.toUpperCase()}
