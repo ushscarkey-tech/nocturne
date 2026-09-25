@@ -69,7 +69,7 @@ export default function TonightPage() {
   const waiting = data.tasks.filter(awaitingConfirmation);
 
   return (
-    <div className="relative flex h-full flex-col">
+    <div className="relative isolate flex h-full flex-col">
       {/* An empty platform at night. */}
       <PlatformScene className="absolute inset-0 -z-10" fade={false} stationName={next?.stationName ?? "NOCTURNE"} />
       <div className="pointer-events-none absolute inset-0 -z-10 bg-[linear-gradient(180deg,rgba(4,6,10,0.72)_0%,rgba(4,6,10,0.05)_22%,rgba(4,6,10,0)_40%,rgba(4,6,10,0.78)_70%,rgba(4,6,10,0.96)_100%)]" />

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import { create } from "zustand";
 import { useSettledFocus } from "@/lib/hooks";
@@ -9,12 +9,12 @@ import { parseQuickAdd, type ParsedTask, type QuickField } from "@/core/quickadd
 import { addDays, serviceDate } from "@/core/time";
 import type { Level, Recurrence } from "@/core/types";
 import { Button } from "@/components/ui/Button";
-import { InterestSlider, LevelPicker, MinutesInput, Toggle } from "@/components/ui/controls";
+import { MinutesInput, Toggle } from "@/components/ui/controls";
 import { Icon } from "@/components/ui/Icon";
 import { Sheet } from "@/components/ui/Sheet";
 import { feelPreset, useFeelStep } from "./FeelSheet";
 import { TaskForm, draftFrom } from "@/components/tasks/TaskForm";
-import { useI18n, type MessageKey } from "@/i18n";
+import { useI18n } from "@/i18n";
 import { createTask, type TaskDraft } from "@/state/actions";
 import { useData, useStore } from "@/state/store";
 
@@ -165,8 +165,6 @@ export function QuickAddBody({ initialText, onDone, askFeel = true }: { initialT
     );
   }
 
-  const levelWord = (n: Level | null) => (n ? t(`quickadd.level.${n}` as MessageKey) : t("quickadd.notSet"));
-  const interestWord = (n: Level | null) => (n ? t(`common.interest.${n}` as MessageKey) : t("quickadd.notSet"));
   const repeatWord = (r: Recurrence | null) =>
     !r ? t("quickadd.notSet") : r.freq === "daily" ? t("quickadd.daily") : `${t("quickadd.weekly")} · ${r.days.map((d) => fmt.weekdayOf(d)).join(" ")}`;
   const splitWord =
