@@ -19,14 +19,28 @@ With no configuration, Nocturne runs in **demo mode**, saved in your browser's l
 visit opens a short guide (`/welcome`): language, name, Service Time and a first task. Sample tasks
 with a week of past journeys can be loaded from the last step or from Settings.
 
-### Cloud accounts (Supabase)
+### Cloud accounts (optional)
 
-1. Create a Supabase project and run the files in `supabase/migrations/` in order
-   (via `supabase db push` or the SQL editor). They create the tables, row level security policies,
-   a trigger that creates a profile on sign-up, and allow archived tasks and late-night windows.
-2. Copy `.env.example` to `.env.local` and fill in the project URL and publishable (anon) key.
-3. Restart the dev server. `/login` now offers email/password sign-up and sign-in; "Explore the
-   demo" remains available.
+Without keys, everything stays in the browser. With keys, `/login` offers email/password accounts,
+and data syncs across devices. A browser's existing data moves into the account on first sign-in.
+
+**Firebase** (used when its keys are set)
+
+1. Create a Firebase project. In *Authentication*, enable **Email/Password**.
+2. Create a *Firestore* database and publish the rules in `firestore.rules`
+   (each traveller can read and write only `users/{uid}/…`).
+3. In *Authentication → Settings → Authorized domains*, add the site's domain
+   (e.g. `<owner>.github.io`).
+4. Register a Web app and put its `apiKey`, `authDomain`, `projectId` and `appId` into `.env.local`
+   (see `.env.example`), or into the Pages workflow for the deployed site.
+
+Firestore keeps an offline cache, so changes made without a connection are sent later.
+
+**Supabase** (alternative)
+
+1. Run the files in `supabase/migrations/` in order. They create the tables, row level security
+   policies and a trigger that creates a profile on sign-up.
+2. Set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`.
 
 ### GitHub Pages
 
@@ -39,9 +53,9 @@ build as `NEXT_PUBLIC_BASE_PATH`. To try the export locally:
 NEXT_PUBLIC_BASE_PATH=/nocturne npm run build   # writes ./out
 ```
 
-Repository settings → Pages → Source must be **GitHub Actions**. To turn on cloud accounts in the
-deployed site, add `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` as
-repository secrets.
+Repository settings → Pages → Source must be **GitHub Actions**. Cloud keys for the deployed site
+are read from the workflow's `env` (Firebase web config is public by design; access is guarded by
+the Firestore rules).
 
 ### Checks
 
@@ -68,7 +82,7 @@ src/core/        Framework-free domain logic (reusable by a future React Native 
   learning.ts      Task similarity, estimate calibration, focus pattern (all opt-out)
   messages.ts      Structured Route-change messages, rendered by the i18n layer
   seed.ts          Demo data relative to "now"
-src/data/        Repository interface, local-storage and Supabase implementations
+src/data/        Repository interface: local storage, Firebase (Firestore) and Supabase
 src/state/       Zustand store (persists entity diffs), user actions, auth/bootstrap
 src/i18n/        English source strings + Korean, Japanese, Chinese (missing keys fall back to English)
 src/audio/       Procedural Web Audio ambience (no audio files) with crossfading presets

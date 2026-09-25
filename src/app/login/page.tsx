@@ -3,8 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/Button";
-import { enterDemo, isSupabaseConfigured, signIn, signUp } from "@/state/session";
-import { useI18n } from "@/i18n";
+import { enterDemo, isCloudConfigured, signIn, signUp } from "@/state/session";
+import { useI18n, type MessageKey } from "@/i18n";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -32,7 +32,8 @@ export default function LoginPage() {
         else setMessage(t("auth.checkInbox"));
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : t("auth.errorDefault"));
+      const text = err instanceof Error ? err.message : "auth.errorDefault";
+      setError(text.startsWith("auth.") ? t(text as MessageKey) : text);
     } finally {
       setBusy(false);
     }
@@ -51,7 +52,7 @@ export default function LoginPage() {
       </h1>
       <p className="mt-4 text-sm leading-relaxed text-mist">{t("auth.tagline")}</p>
 
-      {isSupabaseConfigured ? (
+      {isCloudConfigured ? (
         <form onSubmit={submit} className="mt-12 space-y-6" aria-label={mode === "signin" ? t("auth.signInForm") : t("auth.createAccountForm")}>
           {mode === "signup" && (
             <label className="block">
@@ -110,10 +111,10 @@ export default function LoginPage() {
       )}
 
       <div className="mt-10 border-t border-rule-soft pt-6">
-        <Button variant={isSupabaseConfigured ? "ghost" : "primary"} size={isSupabaseConfigured ? "md" : "lg"} className="w-full" onClick={demo}>
+        <Button variant={isCloudConfigured ? "ghost" : "primary"} size={isCloudConfigured ? "md" : "lg"} className="w-full" onClick={demo}>
           {t("auth.exploreDemo")}
         </Button>
-        <p className="mt-2 text-center text-xs text-haze">{t("auth.demoNote")}</p>
+        {isCloudConfigured && <p className="mt-2 text-center text-xs text-haze">{t("auth.demoNote")}</p>}
       </div>
     </main>
   );

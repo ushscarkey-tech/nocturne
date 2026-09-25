@@ -16,8 +16,14 @@ const auth: Partial<Record<keyof typeof source, string>> = {
   "auth.newHere": "처음이세요? 계정을 만들어요",
   "auth.alreadyTravelling": "이미 여행 중이세요? 로그인",
   "auth.noSupabase": "이 브라우저에 저장돼요.",
-  "auth.exploreDemo": "데모 둘러보기",
-  "auth.demoNote": "샘플 할 일, 이 브라우저에만 저장.",
+  "auth.exploreDemo": "계정 없이 계속",
+  "auth.demoNote": "이 브라우저에만 저장돼요.",
+  "auth.errorCredentials": "이메일이나 비밀번호가 맞지 않아요.",
+  "auth.errorEmail": "이메일 주소를 확인해 주세요.",
+  "auth.errorEmailInUse": "이미 가입된 이메일이에요. 로그인해 주세요.",
+  "auth.errorWeakPassword": "6자 이상으로 정해 주세요.",
+  "auth.errorTooMany": "시도가 너무 많아요. 잠시 후에 다시.",
+  "auth.errorNetwork": "연결이 없어요. 온라인일 때 다시 해 주세요.",
 };
 
 export default auth;

@@ -1,6 +1,7 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { normalizeData, type CollectionName, type NocturneData, type Profile } from "@/core/types";
 import { COLLECTIONS, type ChangeSet, type Repository } from "./repository";
+import type { CloudBackend } from "./cloud";
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -143,3 +144,27 @@ export class SupabaseRepository implements Repository {
     if (error) throw error;
   }
 }
+
+export const supabaseBackend: CloudBackend = {
+  kind: "supabase",
+  async currentUser() {
+    const { data } = await getSupabase().auth.getSession();
+    const u = data.session?.user;
+    return u ? { id: u.id, email: u.email ?? null, name: (u.user_metadata?.name as string | undefined) ?? null } : null;
+  },
+  async signIn(email, password) {
+    const { error } = await getSupabase().auth.signInWithPassword({ email, password });
+    if (error) throw error;
+  },
+  async signUp(name, email, password) {
+    const { data, error } = await getSupabase().auth.signUp({ email, password, options: { data: { name } } });
+    if (error) throw error;
+    return data.session ? "signed-in" : "confirm-email";
+  },
+  async signOut() {
+    await getSupabase().auth.signOut();
+  },
+  repository(userId) {
+    return new SupabaseRepository(userId);
+  },
+};

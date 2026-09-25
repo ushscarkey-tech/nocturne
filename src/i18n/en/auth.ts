@@ -14,8 +14,14 @@ const auth = {
   "auth.newHere": "New here? Create an account",
   "auth.alreadyTravelling": "Already travelling? Sign in",
   "auth.noSupabase": "Saved in this browser.",
-  "auth.exploreDemo": "Explore the demo",
-  "auth.demoNote": "Sample tasks, saved only in this browser.",
+  "auth.exploreDemo": "Continue without an account",
+  "auth.demoNote": "Saved only in this browser.",
+  "auth.errorCredentials": "Email or password doesn’t match.",
+  "auth.errorEmail": "Check the email address.",
+  "auth.errorEmailInUse": "That email already has an account. Sign in instead.",
+  "auth.errorWeakPassword": "Use at least 6 characters.",
+  "auth.errorTooMany": "Too many tries. Wait a moment.",
+  "auth.errorNetwork": "No connection. Try again when online.",
 } as const;
 
 export default auth;

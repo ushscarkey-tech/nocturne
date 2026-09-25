@@ -11,7 +11,7 @@ import { Sheet } from "@/components/ui/Sheet";
 import { LOCALES, rememberLocale, useI18n, type MessageKey } from "@/i18n";
 import { notificationsEnabled, notificationsSupported, requestNotifications } from "@/lib/notify";
 import { loadSampleData, updateProfile } from "@/state/actions";
-import { isSupabaseConfigured, resetDemo, signOut } from "@/state/session";
+import { isCloudConfigured, resetDemo, signOut } from "@/state/session";
 import { useData, useStore } from "@/state/store";
 
 const CARRIAGES: CarriageId[] = ["quiet", "rain", "tunnel", "moon"];
@@ -165,7 +165,7 @@ export default function SettingsPage() {
               <Button variant="secondary" onClick={() => setConfirm("reset")}>
                 {t("settings.resetDemo")}
               </Button>
-              {isSupabaseConfigured && (
+              {isCloudConfigured && (
                 <Button
                   variant="ghost"
                   onClick={async () => {

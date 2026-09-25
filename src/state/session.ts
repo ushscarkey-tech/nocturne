@@ -3,9 +3,10 @@
 import { newId } from "@/core/ids";
 import { createEmptyData, defaultWindows } from "@/core/seed";
 import { detectLocale } from "@/i18n";
+import { COLLECTIONS } from "@/data/repository";
 import { PROFILE_DEFAULTS, type NocturneData } from "@/core/types";
+import { getCloud, isCloudConfigured } from "@/data/cloud";
 import { LocalRepository } from "@/data/local";
-import { getSupabase, isSupabaseConfigured, SupabaseRepository } from "@/data/supabase";
 import { ensureToday } from "./actions";
 import { useStore } from "./store";
 
@@ -45,19 +46,20 @@ export function bootstrap(): Promise<BootResult> {
 async function doBootstrap(): Promise<BootResult> {
   const store = useStore.getState();
   try {
-    const useCloud = isSupabaseConfigured && readMode() !== "demo";
+    const useCloud = isCloudConfigured && readMode() !== "demo";
     if (useCloud) {
-      const { data: auth } = await getSupabase().auth.getSession();
-      const user = auth.session?.user;
+      const cloud = await getCloud();
+      const user = await cloud.currentUser();
       if (!user) return "login";
-      const repo = new SupabaseRepository(user.id);
+      const repo = cloud.repository(user.id, (message) => useStore.setState({ syncError: message }));
       store.begin("cloud", repo);
       let data: NocturneData | null = await repo.load();
       if (!data) {
-        const name = (user.user_metadata?.name as string | undefined) ?? user.email?.split("@")[0] ?? "Traveller";
-        data = createEmptyData({
+        // First sign-in: bring along what this browser already holds, or start fresh.
+        data = await localDataFor(user.id, user.name);
+        data ??= createEmptyData({
           id: user.id,
-          name,
+          name: user.name ?? user.email?.split("@")[0] ?? "",
           timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
           createdAt: new Date().toISOString(),
           preferredCarriage: "rain",
@@ -67,7 +69,7 @@ async function doBootstrap(): Promise<BootResult> {
         });
         await repo.replaceAll(data);
       } else if (data.windows.length === 0 && data.tasks.length === 0 && data.journeys.length === 0) {
-        // First sign-in: start with sensible Service Time.
+        // Start with sensible Service Time.
         const windows = defaultWindows(user.id);
         data = { ...data, windows };
         await repo.save(data, { profile: null, upserts: { windows }, deletes: {} });
@@ -106,24 +108,32 @@ export function enterDemo() {
   useStore.getState().reset();
 }
 
+/** The browser's own data, re-keyed to a cloud account — only if it holds anything. */
+async function localDataFor(userId: string, name: string | null): Promise<NocturneData | null> {
+  const local = await new LocalRepository("demo").load();
+  if (!local || (local.tasks.length === 0 && local.journeys.length === 0 && !local.profile.onboardedAt)) return null;
+  const rekey = <T extends { userId: string }>(list: T[]) => list.map((e) => ({ ...e, userId }));
+  const data = { ...local, profile: { ...local.profile, id: userId, name: local.profile.name || name || "" } } as NocturneData;
+  for (const c of COLLECTIONS) (data as unknown as Record<string, unknown>)[c] = rekey(local[c] as { userId: string }[]);
+  return data;
+}
+
 export async function signIn(email: string, password: string) {
-  const { error } = await getSupabase().auth.signInWithPassword({ email, password });
-  if (error) throw error;
+  await (await getCloud()).signIn(email, password);
   writeMode(null);
   useStore.getState().reset();
 }
 
 export async function signUp(name: string, email: string, password: string): Promise<"signed-in" | "confirm-email"> {
-  const { data, error } = await getSupabase().auth.signUp({ email, password, options: { data: { name } } });
-  if (error) throw error;
+  const result = await (await getCloud()).signUp(name, email, password);
   writeMode(null);
   useStore.getState().reset();
-  return data.session ? "signed-in" : "confirm-email";
+  return result;
 }
 
 export async function signOut() {
   const { mode } = useStore.getState();
-  if (mode === "cloud") await getSupabase().auth.signOut();
+  if (mode === "cloud") await (await getCloud()).signOut();
   writeMode(null);
   useStore.getState().reset();
 }
@@ -136,4 +146,4 @@ export async function resetDemo() {
   await bootstrap();
 }
 
-export { isSupabaseConfigured };
+export { isCloudConfigured };

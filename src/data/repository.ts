@@ -11,7 +11,7 @@ export interface ChangeSet {
 }
 
 export interface Repository {
-  readonly kind: "local" | "supabase";
+  readonly kind: "local" | "supabase" | "firebase";
   load(): Promise<NocturneData | null>;
   /** Persist a change. Local storage writes the whole snapshot; Supabase applies the diff. */
   save(next: NocturneData, changes: ChangeSet): Promise<void>;
