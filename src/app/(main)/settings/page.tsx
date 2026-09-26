@@ -12,7 +12,7 @@ import { useGlossary } from "@/components/help/Glossary";
 import { LOCALES, rememberLocale, useI18n, type MessageKey } from "@/i18n";
 import { notificationsEnabled, notificationsSupported, requestNotifications } from "@/lib/notify";
 import { loadSampleData, updateProfile } from "@/state/actions";
-import { isCloudConfigured, resetDemo, signOut } from "@/state/session";
+import { MCP_URL, isCloudConfigured, resetDemo, signOut } from "@/state/session";
 import { useData, useStore } from "@/state/store";
 
 const CARRIAGES: CarriageId[] = ["quiet", "rain", "tunnel", "moon"];
@@ -176,6 +176,7 @@ export default function SettingsPage() {
             </>
           )}
         </div>
+        {mode === "cloud" && MCP_URL && <ClaudeConnector />}
         <button
           type="button"
           onClick={() => {
@@ -220,6 +221,34 @@ export default function SettingsPage() {
           </Button>
         </div>
       </Sheet>
+    </div>
+  );
+}
+
+/** The address to paste into Claude's custom connector. */
+function ClaudeConnector() {
+  const { t } = useI18n();
+  const [copied, setCopied] = useState(false);
+  const url = `${MCP_URL}/mcp`;
+  return (
+    <div className="mt-8 rounded-2xl border border-rule-soft p-4">
+      <p className="eyebrow">{t("settings.claude")}</p>
+      <p className="mt-2 text-sm leading-relaxed text-mist">{t("settings.claudeBody")}</p>
+      <div className="mt-3 flex items-center gap-2">
+        <code className="min-w-0 flex-1 truncate rounded-lg bg-night-850 px-3 py-2 font-mono text-xs text-paper-dim">{url}</code>
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={() => {
+            void navigator.clipboard?.writeText(url).then(() => {
+              setCopied(true);
+              setTimeout(() => setCopied(false), 1800);
+            });
+          }}
+        >
+          {copied ? t("settings.copied") : t("settings.copy")}
+        </Button>
+      </div>
     </div>
   );
 }

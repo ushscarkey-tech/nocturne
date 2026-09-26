@@ -37,6 +37,18 @@ const auth: Partial<Record<keyof typeof source, string>> = {
   "auth.errorDomain": "这个地址还不能登录。",
   "auth.errorProviderOff": "这种登录方式还没有启用。",
   "auth.errorOtherMethod": "这个邮箱用其他方式登录过，试试邮箱和密码。",
+  "auth.connectTitle": "连接 Claude",
+  "auth.connectBody": "{client}({host}) 想要使用你的 Nocturne。连接后它可以:",
+  "auth.connectCan1": "查看今晚的路线、你的任务和最近的夜晚",
+  "auth.connectCan2": "添加、修改和完成任务(就像在应用里一样路线会重新规划)",
+  "auth.connectCan3": "告诉你所有任务是否能按时完成",
+  "auth.connectNote": "它代表你行动，只看到你的数据。你可以随时在 Claude 的连接器设置里断开连接。",
+  "auth.connectAllow": "连接",
+  "auth.connectDeny": "取消",
+  "auth.connectSignIn": "先登录 Nocturne。登录后会回到这个页面完成连接。",
+  "auth.connectExpired": "这个连接请求已过期。从 Claude 重新开始。",
+  "auth.connectOff": "这个 Nocturne 还没有设置 Claude 连接。",
+  "auth.connectFailed": "连接失败。检查你的网络连接，然后从 Claude 重试。",
 };
 
 export default auth;

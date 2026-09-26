@@ -37,6 +37,18 @@ const auth: Partial<Record<keyof typeof source, string>> = {
   "auth.errorDomain": "이 주소에서는 아직 로그인할 수 없어요.",
   "auth.errorProviderOff": "이 로그인 방식이 아직 켜져 있지 않아요.",
   "auth.errorOtherMethod": "이 이메일은 다른 방식으로 가입돼 있어요. 이메일과 비밀번호로 시도해 주세요.",
+  "auth.connectTitle": "Claude 연결",
+  "auth.connectBody": "{client}({host})가 Nocturne을 쓰려고 해요. 연결하면 이런 걸 할 수 있어요:",
+  "auth.connectCan1": "오늘 밤 노선, 할 일, 최근 밤 기록 보기",
+  "auth.connectCan2": "할 일 추가·수정·완료 (앱에서처럼 노선이 다시 짜여요)",
+  "auth.connectCan3": "모든 할 일이 마감 전에 끝나는지 알려 주기",
+  "auth.connectNote": "내 계정으로, 내 데이터만 봐요. Claude 커넥터 설정에서 언제든 연결을 끊을 수 있어요.",
+  "auth.connectAllow": "연결하기",
+  "auth.connectDeny": "취소",
+  "auth.connectSignIn": "먼저 Nocturne에 로그인해 주세요. 로그인하면 이 화면으로 돌아와 연결을 마쳐요.",
+  "auth.connectExpired": "연결 요청이 만료됐어요. Claude에서 다시 시작해 주세요.",
+  "auth.connectOff": "이 Nocturne에는 아직 Claude 연결이 설정되지 않았어요.",
+  "auth.connectFailed": "연결하지 못했어요. 인터넷 연결을 확인하고 Claude에서 다시 시도해 주세요.",
 };
 
 export default auth;

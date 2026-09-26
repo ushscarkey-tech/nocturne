@@ -39,6 +39,10 @@ const settings: Partial<Record<keyof typeof source, string>> = {
   "settings.soundEffectsHint": "售票机、车门、提示音",
   "settings.syncPitch": "登录后，你的晚班记录会同步到所有设备。现在的数据会移到账户里。",
   "settings.signInCta": "登录或新建账户",
+  "settings.claude": "Claude",
+  "settings.claudeBody": "让 Claude 读取今晚的路线，为你添加或修改任务。在 Claude 中：设置 → 连接器 → 添加自定义连接器，然后粘贴这个地址。",
+  "settings.copy": "复制",
+  "settings.copied": "已复制",
 };
 
 export default settings;

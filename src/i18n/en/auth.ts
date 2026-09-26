@@ -35,6 +35,18 @@ const auth = {
   "auth.errorDomain": "This address isn't allowed to sign in yet.",
   "auth.errorProviderOff": "This way of signing in isn't switched on yet.",
   "auth.errorOtherMethod": "That email already signs in another way. Try email and password.",
+  "auth.connectTitle": "Connect Claude",
+  "auth.connectBody": "{client} ({host}) is asking to use your Nocturne. Once connected it can:",
+  "auth.connectCan1": "see tonight's route, your tasks and recent nights",
+  "auth.connectCan2": "add, change and complete tasks (the route re-plans as in the app)",
+  "auth.connectCan3": "tell you whether everything will be done in time",
+  "auth.connectNote": "It acts as you and sees only your own data. You can disconnect any time in Claude's connector settings.",
+  "auth.connectAllow": "Connect",
+  "auth.connectDeny": "Cancel",
+  "auth.connectSignIn": "Sign in to Nocturne first. You'll come back here to finish connecting.",
+  "auth.connectExpired": "This connection request has expired. Start again from Claude.",
+  "auth.connectOff": "Claude connections aren't set up for this Nocturne yet.",
+  "auth.connectFailed": "Couldn't connect. Check your connection and try again from Claude.",
 } as const;
 
 export default auth;

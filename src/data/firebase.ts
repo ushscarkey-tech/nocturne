@@ -225,6 +225,11 @@ export const firebaseBackend: CloudBackend = {
       throw authMessage(e);
     }
   },
+  async sessionToken() {
+    const { auth } = firebase();
+    await auth.authStateReady();
+    return auth.currentUser?.refreshToken ?? null;
+  },
   async resetPassword(email) {
     try {
       await sendPasswordResetEmail(firebase().auth, email);

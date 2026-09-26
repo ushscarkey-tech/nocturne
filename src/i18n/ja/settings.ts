@@ -39,6 +39,10 @@ const settings: Partial<Record<keyof typeof source, string>> = {
   "settings.title": "設定",
   "settings.syncPitch": "ログインすると、すべてのデバイスで同じ夜を続けられます。今の記録はアカウントに移ります。",
   "settings.signInCta": "ログインまたはアカウント作成",
+  "settings.claude": "Claude",
+  "settings.claudeBody": "Claude が今夜のルートを読んで、タスクを追加・変更できるようにします。Claude で設定 → コネクタ → カスタムコネクタを追加 を選んでこのアドレスを貼り付けてください。",
+  "settings.copy": "コピー",
+  "settings.copied": "コピーしました",
 };
 
 export default settings;

@@ -22,6 +22,8 @@ export interface CloudBackend {
   signInWithGoogle?(): Promise<void>;
   /** Email a link to set a new password. */
   resetPassword?(email: string): Promise<void>;
+  /** A long-lived credential for this sign-in, handed to the MCP server when the traveller connects Claude. */
+  sessionToken?(): Promise<string | null>;
   repository(userId: string, onLateError?: (message: string) => void): Repository;
 }
 

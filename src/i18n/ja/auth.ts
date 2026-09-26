@@ -37,6 +37,18 @@ const auth: Partial<Record<keyof typeof source, string>> = {
   "auth.errorDomain": "このアドレスからはまだログインできません。",
   "auth.errorProviderOff": "このログイン方法はまだ有効になっていません。",
   "auth.errorOtherMethod": "このメールアドレスは別の方法で登録されています。メールアドレスとパスワードで試してください。",
+  "auth.connectTitle": "Claude を接続",
+  "auth.connectBody": "{client}({host})が Nocturne を使いたいのです。接続すると以下のことができます:",
+  "auth.connectCan1": "今夜のルート、タスク、最近の夜を見る",
+  "auth.connectCan2": "タスクを追加・変更・完了する(アプリと同じようにルートが再計算されます)",
+  "auth.connectCan3": "すべてのタスクが期限までに完了するかどうかを教える",
+  "auth.connectNote": "あなたのアカウントとして機能し、あなたのデータのみを見ます。Claude のコネクタ設定からいつでも接続を切断できます。",
+  "auth.connectAllow": "接続する",
+  "auth.connectDeny": "キャンセル",
+  "auth.connectSignIn": "最初に Nocturne にログインしてください。ログインするとこの画面に戻り、接続を完了します。",
+  "auth.connectExpired": "この接続リクエストは期限切れです。Claude からもう一度開始してください。",
+  "auth.connectOff": "この Nocturne にはまだ Claude 接続が設定されていません。",
+  "auth.connectFailed": "接続できませんでした。接続を確認して Claude からもう一度試してください。",
 };
 
 export default auth;

@@ -12,6 +12,16 @@ import { useI18n, type MessageKey } from "@/i18n";
  * signed-in session has lapsed). Signing in brings this browser's nights
  * along into the account.
  */
+/** Where to go after signing in: a path inside the app (e.g. back to /connect), never elsewhere. */
+function nextPath(): string {
+  try {
+    const next = new URLSearchParams(window.location.search).get("next") ?? "";
+    return next.startsWith("/") && !next.startsWith("//") ? next : "/";
+  } catch {
+    return "/";
+  }
+}
+
 export default function LoginPage() {
   const router = useRouter();
   const { t } = useI18n();
@@ -47,10 +57,10 @@ export default function LoginPage() {
     void run(async () => {
       if (mode === "signin") {
         await signIn(email, password);
-        router.replace("/");
+        router.replace(nextPath());
       } else {
         const result = await signUp(name || "Traveller", email, password);
-        if (result === "signed-in") router.replace("/");
+        if (result === "signed-in") router.replace(nextPath());
         else setMessage(t("auth.checkInbox"));
       }
     });
@@ -59,7 +69,7 @@ export default function LoginPage() {
   function google() {
     void run(async () => {
       await signInWithGoogle();
-      router.replace("/");
+      router.replace(nextPath());
     });
   }
 

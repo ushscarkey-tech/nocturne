@@ -151,6 +151,17 @@ export async function resetPassword(email: string) {
   await cloud.resetPassword(email.trim());
 }
 
+/** The signed-in traveller's session credential, for connecting Claude; null when not signed in. */
+export async function connectToken(): Promise<string | null> {
+  if (!isCloudConfigured || readMode() !== "cloud") return null;
+  const cloud = await getCloud();
+  if (!(await cloud.currentUser())) return null;
+  return (await cloud.sessionToken?.()) ?? null;
+}
+
+/** Where Claude's connector lives (the MCP server), if one is set up. */
+export const MCP_URL = (process.env.NEXT_PUBLIC_MCP_URL ?? "").replace(/\/$/, "");
+
 /** Whether this backend offers Google sign-in (known without loading it). */
 export const hasGoogleSignIn = cloudKind === "firebase";
 

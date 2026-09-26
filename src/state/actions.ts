@@ -6,10 +6,10 @@
  */
 import * as engine from "@/core/journey";
 import { newId } from "@/core/ids";
-import { planToday, renumberDay } from "@/core/planner";
+import * as ops from "@/core/ops";
+import { renumberDay } from "@/core/planner";
 import { createSeedData } from "@/core/seed";
-import { schedulingProfile } from "@/core/learning";
-import { activeSession, sessionsOn } from "@/core/sessions";
+import { sessionsOn } from "@/core/sessions";
 import { atMinutes, DAY_START_MINUTES, parseHM, serviceDate } from "@/core/time";
 import type {
   CarriageId,
@@ -37,37 +37,13 @@ function commit(next: NocturneData, change?: RouteChange | null) {
   useStore.getState().commit(next, change);
 }
 
-function recordChange(data: NocturneData, change: RouteChange | null): NocturneData {
-  if (!change) return data;
-  const journey = engine.journeyFor(data, serviceDate(new Date(change.at)));
-  if (!journey || !journey.startedAt) return data;
-  const updated = { ...journey, routeChanges: journey.routeChanges + 1, changeLog: [...journey.changeLog, change] };
-  return { ...data, journeys: data.journeys.map((j) => (j.id === journey.id ? updated : j)) };
-}
-
 /** Rebuild or retime tonight's future stations. Skipped once the night has ended. */
 function replan(
   data: NocturneData,
   reason: ReplanReason,
   opts: { mode?: "reoptimize" | "retime"; order?: string[]; focus?: FocusLevel } = {},
 ): { data: NocturneData; change: RouteChange | null } {
-  const now = new Date();
-  const journey = engine.journeyFor(data, serviceDate(now));
-  if (journey?.phase === "final") return { data, change: null };
-  const startFrom = journey?.phase === "stop" && journey.stopEndsAt ? new Date(journey.stopEndsAt) : undefined;
-  const result = planToday(
-    { tasks: data.tasks, windows: data.windows, sessions: data.sessions, userId: data.profile.id, focusProfile: schedulingProfile(data, now) },
-    {
-      now,
-      focus: opts.focus ?? journey?.focus ?? "steady",
-      mode: opts.mode ?? "reoptimize",
-      reason,
-      order: opts.order,
-      startFrom,
-    },
-  );
-  const next = recordChange({ ...data, sessions: result.sessions }, result.change);
-  return { data: next, change: result.change };
+  return ops.replan(data, reason, new Date(), opts);
 }
 
 // ---------------------------------------------------------------------------
@@ -76,121 +52,29 @@ function replan(
 
 /** Settle stale journeys and make sure tonight has a route. */
 export function ensureToday() {
-  const now = new Date();
-  const today = serviceDate(now);
-  let data = engine.settleStale(current(), now);
-  const hasToday = data.sessions.some((s) => s.date === today) || engine.journeyFor(data, today);
-  if (!hasToday) {
-    const planned = planToday(
-      { tasks: data.tasks, windows: data.windows, sessions: data.sessions, userId: data.profile.id },
-      { now, focus: "steady", mode: "reoptimize", reason: "initial" },
-    );
-    data = { ...data, sessions: planned.sessions };
-  }
-  commit(data);
+  commit(ops.ensureDay(current(), new Date()));
 }
 
 // ---------------------------------------------------------------------------
 // Tasks
 // ---------------------------------------------------------------------------
 
-export interface TaskDraft {
-  title: string;
-  description: string;
-  deadline: string | null;
-  estimatedMinutes: number;
-  interest: Task["interest"];
-  difficulty: Task["difficulty"];
-  importance: Task["importance"];
-  splittable: boolean;
-  minSessionMinutes: number;
-  maxSessionMinutes: number;
-  recurrence: Task["recurrence"];
-  lineId: string | null;
-  /** Set when the traveller chose a calibrated estimate over their own. */
-  userEstimatedMinutes?: number | null;
-}
-
-const PLANNING_FIELDS: (keyof Task)[] = [
-  "deadline",
-  "estimatedMinutes",
-  "remainingMinutes",
-  "interest",
-  "difficulty",
-  "importance",
-  "splittable",
-  "minSessionMinutes",
-  "maxSessionMinutes",
-  "recurrence",
-  "status",
-];
-
-function affectsPlan(a: Task | undefined, b: Task | undefined): boolean {
-  if (!a || !b) return true;
-  return PLANNING_FIELDS.some((f) => JSON.stringify(a[f]) !== JSON.stringify(b[f]));
-}
-
-function statusFor(d: Pick<TaskDraft, "estimatedMinutes" | "deadline" | "recurrence">): Task["status"] {
-  return d.estimatedMinutes > 0 ? "active" : "inbox";
-}
+export type TaskDraft = ops.TaskDraft;
 
 export function createTask(draft: TaskDraft): Task {
-  const data = current();
-  const now = iso(new Date());
-  const task: Task = {
-    id: newId(),
-    userId: data.profile.id,
-    userEstimatedMinutes: null,
-    ...draft,
-    title: draft.title.trim(),
-    remainingMinutes: draft.estimatedMinutes,
-    status: statusFor(draft),
-    createdAt: now,
-    updatedAt: now,
-    completedAt: null,
-  };
-  let next: NocturneData = { ...data, tasks: [...data.tasks, task] };
-  let change: RouteChange | null = null;
-  if (task.status === "active") ({ data: next, change } = replan(next, "task-change"));
-  commit(next, change);
+  const { data, change, task } = ops.addTask(current(), draft, new Date());
+  commit(data, change);
   return task;
 }
 
-export function updateTask(id: string, patch: Partial<TaskDraft> & { remainingMinutes?: number }) {
-  const data = current();
-  const before = data.tasks.find((t) => t.id === id);
-  if (!before) return;
-  const merged = { ...before, ...patch };
-  // Keep completed work when the estimate changes.
-  if (patch.estimatedMinutes !== undefined && patch.remainingMinutes === undefined && !before.recurrence) {
-    const done = before.estimatedMinutes - before.remainingMinutes;
-    merged.remainingMinutes = Math.max(0, patch.estimatedMinutes - done);
-  }
-  if (merged.status !== "done") merged.status = statusFor(merged);
-  if (merged.status === "active" && merged.remainingMinutes <= 0 && !merged.recurrence) {
-    merged.status = "done";
-    merged.completedAt = iso(new Date());
-  }
-  const after: Task = { ...merged, title: merged.title.trim(), updatedAt: iso(new Date()) };
-  let next: NocturneData = { ...data, tasks: data.tasks.map((t) => (t.id === id ? after : t)) };
-  let change: RouteChange | null = null;
-  if (affectsPlan(before, after)) ({ data: next, change } = replan(next, "task-change"));
-  commit(next, change);
+export function updateTask(id: string, patch: ops.TaskPatch) {
+  const { data, change } = ops.editTask(current(), id, patch, new Date());
+  commit(data, change);
 }
 
 export function completeTask(id: string) {
-  const data = current();
-  // Completing the task that's running closes its station as well.
-  if (activeSession(data.sessions)?.taskId === id) {
-    run((d, now) => engine.finishEarly(d, now, true));
-    return;
-  }
-  const now = iso(new Date());
-  const tasks = data.tasks.map((t) =>
-    t.id === id ? { ...t, status: "done" as const, remainingMinutes: 0, completedAt: now, updatedAt: now } : t,
-  );
-  const { data: next, change } = replan({ ...data, tasks }, "task-change");
-  commit(next, change);
+  const { data, change } = ops.finishTask(current(), id, new Date());
+  commit(data, change);
 }
 
 /**
