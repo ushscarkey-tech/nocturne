@@ -12,7 +12,7 @@ describe("station names", () => {
   });
 
   it("keeps the first and last stops fixed", () => {
-    expect(stationLabel(stationName("2026-09-26", 0, 4), "ko")).toBe("땅거미");
+    expect(stationLabel(stationName("2026-09-26", 0, 4), "ko")).toBe("어스름");
     expect(stationLabel(stationName("2026-09-26", 3, 4), "ko")).toBe("한밤");
   });
 
