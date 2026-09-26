@@ -11,6 +11,7 @@ import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
 import { ShaderPass } from "three/examples/jsm/postprocessing/ShaderPass.js";
 import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
 import { complete, describe, floatSupport, isApple, pickTarget, sceneLog } from "./gl";
+import { surfaceKit, withCavity } from "./surfaces";
 import { GradeShader, MAX_LIGHTS, bokehMaterial, hazeMaterial, rainMaterial, skyMaterial, wetFloor } from "./platform/shaders";
 import * as tx from "./platform/textures";
 
@@ -146,20 +147,36 @@ export default function PlatformScene3D({ mood = "waiting", rain = true, station
       }
 
       // ----------------------------------------------------------------- materials
+      const floorLen = Z_NEAR - Z_FAR;
+      const kit = surfaceKit(track);
+      const std = (p: THREE.MeshStandardMaterialParameters, cavity = 0) => {
+        const m = track(new THREE.MeshStandardMaterial(p));
+        return cavity ? withCavity(m, cavity) : m;
+      };
+      const n = (x: number, y = x) => new THREE.Vector2(x, y);
       const mat = {
-        coping: lambert({ color: 0x8c8a82 }),
-        face: lambert({ color: 0x2c2b28 }),
-        gravel: lambert({ map: tex(tx.gravel(), [3, 44]) }),
-        sleeper: lambert({ color: 0x55534d }),
-        rail: track(new THREE.MeshStandardMaterial({ color: 0x9a9d9b, metalness: envMap ? 1 : 0.6, roughness: 0.3, envMap })),
-        metal: track(new THREE.MeshStandardMaterial({ color: 0x3a403d, metalness: 0.7, roughness: 0.45, envMap, envMapIntensity: 0.6 })),
-        paint: lambert({ color: 0xb4ae9c }),
-        beam: lambert({ color: 0x565a54 }),
-        roof: lambert({ map: tex(tx.roofSheet(), [1, (ROOF_FROM - ROOF_TO) / 0.24]) }),
-        housing: lambert({ color: 0xc9c8c0 }),
-        wall: lambert({ map: tex(tx.woodWall(), [30 / 3, 1]) }),
-        frame: lambert({ color: 0x2b2a26 }),
-        seat: lambert({ color: 0x3f6a70 }),
+        coping: std({ color: 0x8c8a82, roughness: 0.85, normalMap: kit.relief("concrete", [0.4, floorLen / 2]), normalScale: n(0.7) }, 0.5),
+        face: std({ color: 0x2c2b28, roughness: 0.95, normalMap: kit.relief("rough", [1, floorLen / 2]), normalScale: n(0.8) }, 0.4),
+        gravel: std({ map: tex(tx.gravel(), [3, 44]), roughness: 0.92, normalMap: kit.relief("gravel", [4, 60]), normalScale: n(1.4) }, 0.7),
+        sleeper: std({ color: 0x55534d, roughness: 0.9, normalMap: kit.relief("rough", [1, 1]), normalScale: n(0.8) }, 0.4),
+        rail: track(new THREE.MeshStandardMaterial({ color: 0x9a9d9b, metalness: envMap ? 1 : 0.6, roughness: 0.3, envMap, normalMap: kit.relief("brushed", [1, 200]), normalScale: n(0.3) })),
+        metal: track(new THREE.MeshStandardMaterial({ color: 0x3a403d, metalness: 0.7, roughness: 0.45, envMap, envMapIntensity: 0.6, normalMap: kit.relief("brushed", [1, 1]), normalScale: n(0.4) })),
+        paint: std({ color: 0xb4ae9c, roughness: 0.6, normalMap: kit.relief("plaster", [1, 2]), normalScale: n(0.4) }, 0.35),
+        beam: std({ color: 0x565a54, roughness: 0.55, metalness: 0.3, normalMap: kit.relief("brushed", [2, 2]), normalScale: n(0.4) }),
+        roof: std(
+          {
+            map: tex(tx.roofSheet(), [1, (ROOF_FROM - ROOF_TO) / 0.24]),
+            roughness: 0.55,
+            metalness: 0.25,
+            normalMap: kit.relief("ribs", [1, (ROOF_FROM - ROOF_TO) / 0.96], Math.PI / 2),
+            normalScale: n(0.6),
+          },
+          0.3,
+        ),
+        housing: std({ color: 0xc9c8c0, roughness: 0.5 }),
+        wall: std({ map: tex(tx.woodWall(), [30 / 3, 1]), roughness: 0.8, normalMap: kit.relief("boards", [(30 / 3) * 1.8, 1]), normalScale: n(0.9) }, 0.5),
+        frame: std({ color: 0x2b2a26, roughness: 0.6 }),
+        seat: std({ color: 0x3f6a70, roughness: 0.42 }),
         grass: lambert({ map: tex(tx.grass(), [40, 60]) }),
         dark: lambert({ color: 0x121513 }),
         shadow: basic({ map: tex(tx.softDot()), color: 0x000000, transparent: true, opacity: 0.6, depthWrite: false }),
@@ -223,7 +240,6 @@ export default function PlatformScene3D({ mood = "waiting", rain = true, station
 
       // --------------------------------------------------------------- the floor
       // Wet concrete with a real (blurred) reflection of everything above it.
-      const floorLen = Z_NEAR - Z_FAR;
       const floor = new Reflector(track(new THREE.PlaneGeometry(PL_W, floorLen)), { textureWidth: 256, textureHeight: 256, multisample: 0 });
       const reflectTarget = floor.getRenderTarget();
       // Mipmapped half-float needs a colour-buffer extension; bytes otherwise.
@@ -245,7 +261,15 @@ export default function PlatformScene3D({ mood = "waiting", rain = true, station
         uRoof: { value: new THREE.Vector3(ROOF_EDGE, ROOF_FROM, ROOF_TO) },
       };
       reflectorMaterial.dispose();
-      const floorMat = lambert({ map: tex(tx.concrete(), [2, floorLen / 2.6]) });
+      const floorMat = track(
+        new THREE.MeshStandardMaterial({
+          map: tex(tx.concrete(), [2, floorLen / 2.6]),
+          roughness: 1,
+          roughnessMap: kit.roughness(0.82, 0.14, 91, [3, floorLen / 3]),
+          normalMap: kit.relief("concrete", [2.6, floorLen / 2]),
+          normalScale: new THREE.Vector2(0.55, 0.55),
+        }),
+      );
       wetFloor(floorMat, floorUniforms);
       fallbacks.set(floorMat, () => {
         floorMat.onBeforeCompile = () => {};
@@ -370,7 +394,7 @@ export default function PlatformScene3D({ mood = "waiting", rain = true, station
         [-4.6, "#dfe2de", 61],
         [-5.65, "#a0322c", 62],
       ] as const).forEach(([z, body, seed]) => {
-        const bodyMat = lambert({ color: new THREE.Color(body) });
+        const bodyMat = std({ color: new THREE.Color(body), roughness: 0.35, metalness: 0.15 });
         box(0.72, 1.84, 1.0, bodyMat, PL_W - 0.38, 0.92, z);
         const face = mesh(new THREE.PlaneGeometry(0.96, 1.8), basic({ map: tex(tx.vendingFace(body, seed)), color: lin(1.2, 1.25, 1.3) }), PL_W - 0.745, 0.92, z);
         face.rotation.y = -Math.PI / 2;

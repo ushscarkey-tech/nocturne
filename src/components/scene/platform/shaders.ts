@@ -27,13 +27,14 @@ export interface FloorUniforms {
 }
 
 /**
- * Turns a Lambert material into wet concrete: darker where wet, painted
- * edge line and tactile strip, and a blurred planar reflection that gets
- * sharper in puddles and at grazing angles, rippling while it rains.
+ * Turns a standard material into wet concrete: darker and glossier where
+ * damp, puddles flat and mirror-smooth, grime in the concrete's pits, the
+ * painted edge line and tactile strip, and a blurred planar reflection
+ * that sharpens in puddles and at grazing angles, rippling in the rain.
  */
-export function wetFloor(material: THREE.MeshLambertMaterial, uniforms: FloorUniforms) {
+export function wetFloor(material: THREE.MeshStandardMaterial, uniforms: FloorUniforms) {
   material.onBeforeCompile = (shader) => {
-    Object.assign(shader.uniforms, uniforms);
+    Object.assign(shader.uniforms, uniforms, { uCavity: { value: 0.55 } });
     shader.vertexShader = shader.vertexShader
       .replace(
         "#include <common>",
@@ -55,16 +56,18 @@ vWorldP = (modelMatrix * vec4(transformed, 1.0)).xyz;`,
 uniform sampler2D tReflect;
 uniform float uTime;
 uniform float uRain;
+uniform float uCavity;
 uniform vec3 uRoof;
 varying vec4 vReflUv;
 varying vec3 vWorldP;
 ${NOISE}
-float wetness(vec3 p) {
+// x: how wet (damp under the canopy, soaked in the open), y: standing water.
+vec2 wetness(vec3 p) {
   float n = n_fbm(p.xz * vec2(0.8, 0.3));
   float puddle = smoothstep(0.5, 0.64, n);
   float covered = smoothstep(uRoof.x - 0.05, uRoof.x + 0.9, p.x) * smoothstep(uRoof.z - 2.5, uRoof.z + 1.5, p.z) * (1.0 - smoothstep(uRoof.y - 1.5, uRoof.y + 2.5, p.z));
   float damp = mix(0.9, 0.28, covered);
-  return clamp(max(damp, puddle), 0.0, 1.0);
+  return vec2(clamp(max(damp, puddle), 0.0, 1.0), puddle);
 }
 vec2 ripples(vec2 p, float t) {
   vec2 acc = vec2(0.0);
@@ -87,7 +90,9 @@ vec2 ripples(vec2 p, float t) {
       .replace(
         "#include <map_fragment>",
         `#include <map_fragment>
-float wet = wetness(vWorldP);
+vec2 wp = wetness(vWorldP);
+float wet = wp.x;
+float puddle = wp.y;
 float px = vWorldP.x;
 // The painted edge line and the tactile strip.
 diffuseColor.rgb = mix(vec3(0.5, 0.49, 0.45), diffuseColor.rgb, smoothstep(0.1, 0.115, px));
@@ -95,14 +100,32 @@ vec2 dcell = fract(vec2(px, vWorldP.z) / 0.075) - 0.5;
 float bump = 1.0 - smoothstep(0.2, 0.3, length(dcell));
 float tactile = smoothstep(0.58, 0.59, px) * (1.0 - smoothstep(0.88, 0.89, px));
 diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.34, 0.22, 0.03) * (0.82 + 0.3 * bump), tactile);
-diffuseColor.rgb *= mix(1.0, 0.46, wet);`,
+diffuseColor.rgb *= mix(1.0, 0.5, wet);`,
       )
       .replace(
-        "#include <envmap_fragment>",
-        `#include <envmap_fragment>
-{
+        "#include <roughnessmap_fragment>",
+        `#include <roughnessmap_fragment>
+roughnessFactor = mix(roughnessFactor, roughnessFactor * 0.68, wet);
+roughnessFactor = mix(roughnessFactor, 0.05, puddle);`,
+      )
+      .replace(
+        "#include <normal_fragment_maps>",
+        `#include <normal_fragment_maps>
+vec2 relief = vec2(0.0);
+#ifdef USE_NORMALMAP_TANGENTSPACE
+  relief = mapN.xy;
+  // Grime in the pits, washed out where water stands.
+  diffuseColor.rgb *= mix(1.0, smoothstep(0.35, 0.97, mapN.z / max(length(mapN), 1e-3)), uCavity * (1.0 - puddle));
+#endif
+// Standing water is flat.
+normal = normalize(mix(normal, nonPerturbedNormal, puddle * 0.92));`,
+      )
+      .replace(
+        "#include <opaque_fragment>",
+        `{
   vec2 ruv = vReflUv.xy / vReflUv.w;
   ruv += ripples(vWorldP.xz, uTime) * 0.014 * uRain * wet;
+  ruv += relief * 0.012 * (1.0 - puddle);
   float rough = 1.0 - wet;
   float spread = 0.003 + rough * 0.028;
   float bias = 0.5 + rough * 4.0;
@@ -114,8 +137,9 @@ diffuseColor.rgb *= mix(1.0, 0.46, wet);`,
   refl += texture2D(tReflect, ruv + vec2(0.0, 2.0 * spread), bias).rgb * 0.12;
   vec3 V = normalize(cameraPosition - vWorldP);
   float fres = 0.05 + 0.95 * pow(1.0 - max(V.y, 0.0), 5.0);
-  outgoingLight += refl * mix(0.1, 0.95, wet) * mix(0.2, 1.0, fres);
-}`,
+  outgoingLight += refl * mix(0.08, 0.95, wet) * mix(0.2, 1.0, fres);
+}
+#include <opaque_fragment>`,
       );
   };
   material.customProgramCacheKey = () => "nocturne-wet-floor";

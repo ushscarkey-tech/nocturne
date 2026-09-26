@@ -12,6 +12,7 @@ import type { CarriageId } from "@/core/types";
 import { farLightsMaterial, fieldMaterial, glassMaterial, trackGroundMaterial, tunnelWallMaterial } from "./cabin/shaders";
 import * as ct from "./cabin/textures";
 import { describe, floatSupport, pickTarget, sceneLog } from "./gl";
+import { surfaceKit, withCavity } from "./surfaces";
 import { GradeShader, MAX_LIGHTS, hazeMaterial, rainMaterial, skyMaterial } from "./platform/shaders";
 import * as tx from "./platform/textures";
 
@@ -135,6 +136,12 @@ export default function CabinScene3D({ mode, carriage, stationName = "", termina
       const basic = (p: THREE.MeshBasicMaterialParameters) => track(new THREE.MeshBasicMaterial(p));
       const tex = (c: HTMLCanvasElement, repeat?: [number, number]) => track(tx.texture(c, { repeat }));
       const fonts = tx.pageFonts();
+      const kit = surfaceKit(track);
+      const std = (p: THREE.MeshStandardMaterialParameters, cavity = 0) => {
+        const m = track(new THREE.MeshStandardMaterial(p));
+        return cavity ? withCavity(m, cavity) : m;
+      };
+      const nv = (x: number, y = x) => new THREE.Vector2(x, y);
 
       // Two scenes: the world outside, rendered to a texture the glass looks
       // through, and the carriage around you.
@@ -290,7 +297,7 @@ export default function CabinScene3D({ mode, carriage, stationName = "", termina
       });
 
       // A road beside the line, lamps along it, now and then a car.
-      const road = mesh(land, new THREE.PlaneGeometry(1400, 5), lambert({ color: 0x15171a }), 0, GROUND - 0.02, -24);
+      const road = mesh(land, new THREE.PlaneGeometry(1400, 5), std({ color: 0x17191c, roughness: 0.75, normalMap: kit.relief("asphalt", [280, 1]), normalScale: nv(0.8) }, 0.5), 0, GROUND - 0.02, -24);
       road.rotation.x = -Math.PI / 2;
       const glowTex = tex(tx.softDot());
       const poolMat = basic({ map: glowTex, color: lin(0.5, 0.33, 0.16), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false });
@@ -402,20 +409,20 @@ export default function CabinScene3D({ mode, carriage, stationName = "", termina
       plat.visible = false;
       outside.add(plat);
       const half = PLAT_LEN / 2;
-      mesh(plat, new THREE.BoxGeometry(PLAT_LEN, 0.3, 5), lambert({ map: tex(tx.concrete(), [PLAT_LEN / 2.6, 2]) }), 0, PT - 0.15, -3.7);
-      box(plat, PLAT_LEN, 0.12, 0.4, lambert({ color: 0x8c8a82 }), 0, PT - 0.05, -1.4);
-      box(plat, PLAT_LEN, 1.2, 0.2, lambert({ color: 0x1e1d1b }), 0, PT - 0.75, -1.45);
+      mesh(plat, new THREE.BoxGeometry(PLAT_LEN, 0.3, 5), std({ map: tex(tx.concrete(), [PLAT_LEN / 2.6, 2]), roughness: 0.6, roughnessMap: kit.roughness(0.8, 0.15, 17, [PLAT_LEN / 3, 2]), normalMap: kit.relief("concrete", [PLAT_LEN / 2, 2.5]), normalScale: nv(0.6) }, 0.5), 0, PT - 0.15, -3.7);
+      box(plat, PLAT_LEN, 0.12, 0.4, std({ color: 0x8c8a82, roughness: 0.8, normalMap: kit.relief("concrete", [PLAT_LEN / 2, 0.3]), normalScale: nv(0.6) }, 0.5), 0, PT - 0.05, -1.4);
+      box(plat, PLAT_LEN, 1.2, 0.2, std({ color: 0x1e1d1b, roughness: 0.95, normalMap: kit.relief("rough", [PLAT_LEN / 2, 1]) }, 0.4), 0, PT - 0.75, -1.45);
       const line = mesh(plat, new THREE.PlaneGeometry(PLAT_LEN, 0.08), lambert({ color: 0xc9c3b2 }), 0, PT + 0.012, -1.3);
       line.rotation.x = -Math.PI / 2;
       const tactile = mesh(plat, new THREE.PlaneGeometry(PLAT_LEN, 0.3), lambert({ color: 0x8a6d1c }), 0, PT + 0.012, -1.85);
       tactile.rotation.x = -Math.PI / 2;
-      const roof = mesh(plat, new THREE.PlaneGeometry(PLAT_LEN, 4.6), lambert({ map: tex(tx.roofSheet(), [PLAT_LEN / 0.24, 1]) }), 0, PT + 3.2, -3.95);
+      const roof = mesh(plat, new THREE.PlaneGeometry(PLAT_LEN, 4.6), std({ map: tex(tx.roofSheet(), [PLAT_LEN / 0.24, 1]), roughness: 0.55, metalness: 0.25, normalMap: kit.relief("ribs", [PLAT_LEN / 0.96, 1]), normalScale: nv(0.6) }, 0.3), 0, PT + 3.2, -3.95);
       roof.rotation.x = Math.PI / 2;
       // The roof sheet's ribs should run across the platform here.
       ((roof.material as THREE.MeshLambertMaterial).map as THREE.Texture).rotation = Math.PI / 2;
       box(plat, PLAT_LEN, 0.4, 0.07, lambert({ color: 0xb4ae9c }), 0, PT + 3.1, -1.66);
-      const paint = lambert({ color: 0xb4ae9c });
-      const beam = lambert({ color: 0x4d514b });
+      const paint = std({ color: 0xb4ae9c, roughness: 0.6, normalMap: kit.relief("plaster", [1, 2]), normalScale: nv(0.4) }, 0.35);
+      const beam = std({ color: 0x4d514b, roughness: 0.55, metalness: 0.3, normalMap: kit.relief("brushed", [2, 2]), normalScale: nv(0.4) });
       for (let x = -half + 4.5; x < half; x += 9) {
         mesh(plat, new THREE.CylinderGeometry(0.085, 0.095, 3.2, 12), paint, x, PT + 1.6, -4.8);
         box(plat, 0.12, 0.2, 4.6, beam, x, PT + 3.08, -3.95);
@@ -430,7 +437,7 @@ export default function CabinScene3D({ mode, carriage, stationName = "", termina
       }
       const platLights = [-6.75, -2.25, 2.25, 6.75].map((x) => put(plat, new THREE.PointLight(lin(1, 0.88, 0.72), 9, 11, 2), x, PT + 2.8, -3.0));
       // The building behind: painted boards, two lit windows, a door.
-      const wall = mesh(plat, new THREE.PlaneGeometry(PLAT_LEN, 3.4), lambert({ map: tex(tx.woodWall(), [PLAT_LEN / 3, 1]) }), 0, PT + 1.7, -6.2);
+      const wall = mesh(plat, new THREE.PlaneGeometry(PLAT_LEN, 3.4), std({ map: tex(tx.woodWall(), [PLAT_LEN / 3, 1]), roughness: 0.8, normalMap: kit.relief("boards", [(PLAT_LEN / 3) * 1.8, 1]), normalScale: nv(0.9) }, 0.5), 0, PT + 1.7, -6.2);
       wall.name = "wall";
       const winTex = tex(tx.windowGlow());
       for (const x of [-9, -5, 11, 15]) mesh(plat, new THREE.PlaneGeometry(1.5, 1.1), basic({ map: winTex, color: lin(1.4, 1.3, 1.2) }), x, PT + 1.55, -6.18);
@@ -441,7 +448,7 @@ export default function CabinScene3D({ mode, carriage, stationName = "", termina
         box(bench, 1.4, 0.05, 0.05, beam, 0, PT + 0.2, 0);
         put(plat, bench, x, 0, -5.7);
       }
-      const vending = mesh(plat, new THREE.BoxGeometry(1, 1.84, 0.72), lambert({ color: 0xdfe2de }), 3.4, PT + 0.92, -5.8);
+      const vending = mesh(plat, new THREE.BoxGeometry(1, 1.84, 0.72), std({ color: 0xdfe2de, roughness: 0.35, metalness: 0.15 }), 3.4, PT + 0.92, -5.8);
       mesh(plat, new THREE.PlaneGeometry(0.96, 1.8), basic({ map: tex(tx.vendingFace("#dfe2de", 61)), color: lin(1.2, 1.25, 1.3) }), 3.4, PT + 0.92, -5.43);
       vending.name = "vending";
       // The station name board, facing the train.
@@ -492,9 +499,10 @@ export default function CabinScene3D({ mode, carriage, stationName = "", termina
       const cabinLight = put(cabin, new THREE.PointLight(tint, 3.2, 5, 2), 0.3, 1.45, 0.25);
       const sweep = put(cabin, new THREE.PointLight(lin(1, 0.7, 0.4), 0, 5, 2), 0, 0.4, -1.6);
       cabin.add(new THREE.HemisphereLight(lin(0.05, 0.05, 0.05), lin(0.01, 0.01, 0.01), 1));
-      const wallMat = lambert({ map: tex(ct.wallPanel(), [1, 1]) });
-      const frameMat = lambert({ color: 0x9aa0a0 });
-      const curtainMat = lambert({ color: CURTAIN[target.current.carriage], side: THREE.DoubleSide });
+      // The carriage: moulded panel, brushed aluminium, a woven curtain.
+      const wallMat = std({ map: tex(ct.wallPanel(), [1, 1]), roughness: 0.85, normalMap: kit.relief("fabric", [9, 9]), normalScale: nv(0.12) });
+      const frameMat = std({ color: 0xa4a9a8, roughness: 0.38, metalness: 0.5 });
+      const curtainMat = std({ color: CURTAIN[target.current.carriage], side: THREE.DoubleSide, roughness: 0.95, normalMap: kit.relief("fabric", [3, 6]), normalScale: nv(1.2) }, 0.5);
       const glassMat = track(glassMaterial());
       glassMat.uniforms.tReflect.value = tex(ct.cabinReflection());
       const interior = new THREE.Group();
@@ -531,7 +539,7 @@ export default function CabinScene3D({ mode, carriage, stationName = "", termina
         const sill = new THREE.Mesh(new THREE.BoxGeometry(w + 0.24, 0.025, 0.14), frameMat);
         sill.position.set(0, bottom - 0.06, -D + 0.06);
         interior.add(sill);
-        const table = new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.022, 0.26), lambert({ color: 0x2a2f31 }));
+        const table = new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.022, 0.26), std({ color: 0x2a2f31, roughness: 0.4 }));
         table.position.set(0, bottom - 0.16, -D + 0.14);
         interior.add(table);
         // The curtain, tied back at the left edge of what you can see.
@@ -687,6 +695,9 @@ export default function CabinScene3D({ mode, carriage, stationName = "", termina
         farMat.uniforms.uTravel.value = st.travel;
         farMat.uniforms.uTime.value = st.time;
         fieldMat.uniforms.uTravel.value = st.travel;
+        // The road is one long plane; its surface slides with the distance travelled (5 m per tile).
+        const roadRelief = (road.material as THREE.MeshStandardMaterial).normalMap;
+        if (roadRelief) roadRelief.offset.x = (st.travel / 5) % 1;
         groundMat.uniforms.uTravel.value = st.travel;
         groundMat.uniforms.uBlur.value = st.v / 30;
         groundMat.uniforms.uSpill.value.copy(TINT[c]).multiplyScalar(0.45);
