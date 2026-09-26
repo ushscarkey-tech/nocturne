@@ -1,0 +1,79 @@
+name: Nocturne
+options:
+  bundleIdPrefix: io.github.ushscarkey
+  deploymentTarget:
+    macOS: "14.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    MARKETING_VERSION: "1.0.0"
+    CURRENT_PROJECT_VERSION: "1"
+    SWIFT_VERSION: "5.0"
+    MACOSX_DEPLOYMENT_TARGET: "14.0"
+    # Signed to run locally (no Apple Developer account); see mac/README.md.
+    CODE_SIGN_IDENTITY: "-"
+    CODE_SIGN_STYLE: Manual
+    DEVELOPMENT_TEAM: ""
+    ENABLE_HARDENED_RUNTIME: NO
+    DEAD_CODE_STRIPPING: YES
+targets:
+  Nocturne:
+    type: application
+    platform: macOS
+    sources:
+      - path: Nocturne
+      - path: Shared
+    info:
+      path: Nocturne/Info.plist
+      properties:
+        CFBundleDisplayName: Nocturne
+        CFBundleName: Nocturne
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        LSApplicationCategoryType: public.app-category.productivity
+        LSMinimumSystemVersion: $(MACOSX_DEPLOYMENT_TARGET)
+        NSHumanReadableCopyright: Nocturne
+        CFBundleURLTypes:
+          - CFBundleURLName: io.github.ushscarkey.nocturne
+            CFBundleURLSchemes: [nocturne]
+    entitlements:
+      path: Nocturne/Nocturne.entitlements
+      properties: {}
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: io.github.ushscarkey.nocturne
+        PRODUCT_NAME: Nocturne
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+    dependencies:
+      - target: NocturneWidget
+        embed: true
+  NocturneWidget:
+    type: app-extension
+    platform: macOS
+    sources:
+      - path: NocturneWidget
+      - path: Shared
+    info:
+      path: NocturneWidget/Info.plist
+      properties:
+        CFBundleDisplayName: Nocturne
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+        # The widget reads tonight from the app over the loopback address.
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
+    entitlements:
+      path: NocturneWidget/NocturneWidget.entitlements
+      properties:
+        com.apple.security.app-sandbox: true
+        com.apple.security.network.client: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: io.github.ushscarkey.nocturne.widget
+        PRODUCT_NAME: NocturneWidget
+        SKIP_INSTALL: YES
+    dependencies:
+      - sdk: WidgetKit.framework
+      - sdk: SwiftUI.framework

@@ -1,0 +1,65 @@
+name: Mac app
+
+on:
+  push:
+    branches: [claude/festive-curie-nqi8tu]
+    paths: ["mac/**", ".github/workflows/mac.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: mac-app
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: macos-15
+    defaults:
+      run:
+        working-directory: mac
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generate the Xcode project
+        run: |
+          brew install xcodegen
+          xcodegen generate
+
+      - name: Build (Apple silicon + Intel)
+        run: |
+          xcodebuild -version
+          xcodebuild -project Nocturne.xcodeproj -target Nocturne -configuration Release \
+            SYMROOT="$PWD/build" ARCHS="arm64 x86_64" ONLY_ACTIVE_ARCH=NO build 2>&1 \
+            | grep -E "error:|warning: .*(Swift|swift)|\*\* BUILD" || true
+          test -d build/Release/Nocturne.app
+
+      - name: Check the bundle
+        run: |
+          APP=build/Release/Nocturne.app
+          ls "$APP/Contents/PlugIns"
+          lipo -archs "$APP/Contents/MacOS/Nocturne"
+          codesign --verify --deep --strict --verbose=2 "$APP"
+          codesign -d --entitlements - "$APP/Contents/PlugIns/NocturneWidget.appex"
+          plutil -p "$APP/Contents/PlugIns/NocturneWidget.appex/Contents/Info.plist" | grep -A2 NSExtension
+
+      - name: Make the disk image
+        run: |
+          mkdir -p dmg
+          cp -R build/Release/Nocturne.app dmg/
+          ln -s /Applications dmg/Applications
+          hdiutil create -volname Nocturne -srcfolder dmg -ov -format UDZO Nocturne.dmg
+          ls -lh Nocturne.dmg
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Nocturne-mac
+          path: mac/Nocturne.dmg
+
+      - name: Publish as the latest Mac release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete mac-latest --yes --cleanup-tag || true
+          gh release create mac-latest Nocturne.dmg --title "Nocturne for Mac" --notes-file RELEASE.md --target "$GITHUB_SHA"

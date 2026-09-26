@@ -1,6 +1,7 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
+import { nativeBridge } from "./native";
 
 /** Chrome and Edge's install prompt, held until the traveller asks for it. */
 interface InstallPromptEvent extends Event {
@@ -33,6 +34,7 @@ export function watchInstall() {
 }
 
 function state(): InstallState {
+  if (nativeBridge()) return "installed"; // already the Mac app
   const standalone =
     window.matchMedia?.("(display-mode: standalone)").matches || (navigator as Navigator & { standalone?: boolean }).standalone === true;
   if (standalone || installedNow) return "installed";
