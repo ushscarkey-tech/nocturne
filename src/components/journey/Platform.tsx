@@ -69,22 +69,22 @@ export function StationSign({
   next?: string;
   color: string;
 }) {
-  const { t } = useI18n();
+  const { t, fmt } = useI18n();
   return (
     <div
       className="relative overflow-hidden rounded-[0.4rem] bg-[linear-gradient(180deg,#f0e9d8,#ddd3bd)] px-5 pb-3 pt-3.5 text-[#1b2024] shadow-[0_0_40px_-6px_rgba(240,228,200,0.35),0_18px_40px_-18px_rgba(0,0,0,0.9)]"
-      aria-label={`${t("scene.stationSign")} ${code} ${name}`}
+      aria-label={`${t("scene.stationSign")} ${code} ${fmt.station(name)}`}
     >
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(80%_120%_at_50%_0%,rgba(255,255,255,0.35),transparent_60%)]" aria-hidden />
       <div className="relative flex items-center justify-between">
         <span className="rounded-[3px] border border-[#1b2024]/70 px-1.5 py-px font-mono text-[0.6875rem] font-medium tracking-[0.08em]">{code}</span>
         <span className="font-mono text-[0.625rem] tracking-[0.28em] text-[#1b2024]/60">{note}</span>
       </div>
-      <p className="relative mt-2 text-[clamp(1.6rem,8vw,2.1rem)] font-semibold leading-none tracking-[0.07em]">{name}</p>
+      <p className="relative mt-2 text-[clamp(1.6rem,8vw,2.1rem)] font-semibold leading-none tracking-[0.07em]">{fmt.station(name)}</p>
       <div className="relative mt-3 h-[3px] rounded-full" style={{ background: color }} />
       <div className="relative mt-1.5 flex justify-between font-mono text-[0.5625rem] tracking-[0.2em] text-[#1b2024]/55">
-        <span>{prev ? `← ${prev}` : ""}</span>
-        <span>{next ? `${next} →` : ""}</span>
+        <span>{prev ? `← ${fmt.station(prev)}` : ""}</span>
+        <span>{next ? `${fmt.station(next)} →` : ""}</span>
       </div>
     </div>
   );
@@ -190,7 +190,7 @@ export function StationStop({ data, journey, now, arriving = false }: { data: No
               </div>
               {next && nextTask && (
                 <p className="min-w-0 text-right text-xs leading-relaxed text-mist">
-                  <span className="block font-mono text-[0.625rem] tracking-[0.18em] text-paper-dim/70">{next.stationName}</span>
+                  <span className="station-label block font-mono text-[0.625rem] tracking-[0.18em] text-paper-dim/70">{fmt.station(next.stationName)}</span>
                   <span className="block truncate text-paper-dim">{nextTask.title}</span>
                   <span className="font-mono tabular">{fmt.duration(next.plannedMinutes)}</span>
                 </p>
@@ -254,7 +254,7 @@ export function ServicePaused({ data, journey, now }: { data: NocturneData; jour
               </div>
               {next && nextTask && (
                 <p className="min-w-0 text-right text-xs leading-relaxed text-mist">
-                  <span className="block font-mono text-[0.625rem] tracking-[0.18em] text-paper-dim/70">{next.stationName}</span>
+                  <span className="station-label block font-mono text-[0.625rem] tracking-[0.18em] text-paper-dim/70">{fmt.station(next.stationName)}</span>
                   <span className="block truncate text-paper-dim">{nextTask.title}</span>
                   <span className="font-mono tabular">{fmt.duration(next.plannedMinutes)}</span>
                 </p>

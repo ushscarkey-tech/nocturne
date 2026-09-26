@@ -2,7 +2,7 @@
 
 import { useId, useMemo, type CSSProperties, type ReactNode } from "react";
 import { ticketRowCount, ticketRows, type TicketFace, type TicketRowId } from "@/core/stats";
-import { seeded } from "@/core/stations";
+import { seeded, stationLabel } from "@/core/stations";
 import { formatDuration } from "@/core/time";
 import type { CarriageId, Locale } from "@/core/types";
 import { useI18n } from "@/i18n";
@@ -278,12 +278,12 @@ export function Ticket({
     ),
     route: (
       <div className="flex items-center gap-[0.6em] text-[0.5625em] leading-none tracking-[0.16em]" style={{ opacity: variation.ink[4] }}>
-        <span className="min-w-0 truncate">{face.from}</span>
+        <span className="min-w-0 truncate">{stationLabel(face.from, locale)}</span>
         <span className="relative h-[0.08em] min-w-[1.5em] flex-1 bg-[color:var(--tk-ink)] opacity-40" aria-hidden>
           <span className="absolute -top-[0.22em] left-0 h-[0.52em] w-[0.52em] rounded-full bg-[color:var(--tk-ink)]" />
           <span className="absolute -top-[0.22em] right-0 h-[0.52em] w-[0.52em] rounded-full border-[0.1em] border-[color:var(--tk-ink)] bg-transparent" />
         </span>
-        <span className="min-w-0 truncate text-right">{face.to}</span>
+        <span className="min-w-0 truncate text-right">{stationLabel(face.to, locale)}</span>
       </div>
     ),
     grid1: (

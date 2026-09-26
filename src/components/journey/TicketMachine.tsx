@@ -225,7 +225,7 @@ export function TicketMachine({
             </p>
             <dl className="mt-3.5 animate-enter space-y-1.5 border-t border-white/[0.07] pt-3 font-mono text-xs tracking-[0.12em]" style={{ animationDelay: "850ms" }}>
               <Row label={t("scene.stepRoute")} active={step === "route"} onClick={() => !printing && setStep("route")}>
-                <span className="truncate">{from} → {to}</span>
+                <span className="truncate">{fmt.station(from)} → {fmt.station(to)}</span>
                 {routeOk && <span className="text-lamp/80">✓</span>}
               </Row>
               <Row label={t("scene.stepFocus")} active={step === "focus"} onClick={() => !printing && routeOk && setStep("focus")}>

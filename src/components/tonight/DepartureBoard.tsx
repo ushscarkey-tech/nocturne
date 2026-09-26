@@ -112,7 +112,7 @@ function Row({ s, title, mark, hideOnShort }: { s: StudySession; title: string; 
       <span className="font-mono text-[0.8125rem] tabular text-[#e8c88f]">
         <FlipText text={clock(s.plannedStart)} stagger={25} />
       </span>
-      <span className="truncate font-mono text-[0.5625rem] tracking-[0.14em] text-paper/50">{s.stationName}</span>
+      <span className="station-label truncate font-mono text-[0.5625rem] tracking-[0.14em] text-paper/50">{fmt.station(s.stationName)}</span>
       <span className="truncate text-[0.8125rem] text-paper-dim">{title}</span>
       <span key={mark?.kind ?? (running ? "run" : "same")} className="animate-enter whitespace-nowrap text-right font-mono text-[0.625rem] tracking-[0.06em]">
         {running ? (
@@ -186,7 +186,7 @@ export function RecentChangeDetail({ data, now, forecast }: { data: NocturneData
                   ? t("scene.changeLater", { at, min: fmt.duration(m.min) })
                   : m.kind === "new"
                     ? t("scene.changeNew", { at })
-                    : t("scene.changeTransfer", { station: s.stationName, at });
+                    : t("scene.changeTransfer", { station: fmt.station(s.stationName), at });
             return (
               <li key={s.id} className="flex gap-2">
                 <span className={`mt-[0.45rem] h-1.5 w-1.5 shrink-0 rounded-full ${m.kind === "later" ? "bg-signal" : "bg-lamp"}`} aria-hidden />

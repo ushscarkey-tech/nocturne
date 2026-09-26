@@ -129,7 +129,7 @@ function TicketDetail() {
                 <span className="min-w-0">
                   <span className="block truncate text-paper-dim">{titleOf(st.taskId)}</span>
                   <span className="eyebrow text-[0.6rem] text-haze">
-                    {st.stationName} · {clock(st.actualStart ?? st.plannedStart)}
+                    {fmt.station(st.stationName)} · {clock(st.actualStart ?? st.plannedStart)}
                   </span>
                 </span>
                 <span className="shrink-0 text-right font-mono text-xs tabular text-mist">

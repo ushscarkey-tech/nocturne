@@ -71,7 +71,7 @@ export default function TonightPage() {
   return (
     <div className="relative isolate flex h-full flex-col">
       {/* An empty platform at night. */}
-      <PlatformScene className="absolute inset-0 -z-10" fade={false} stationName={next?.stationName ?? "NOCTURNE"} />
+      <PlatformScene className="absolute inset-0 -z-10" fade={false} stationName={fmt.station(next?.stationName ?? "NOCTURNE")} />
       <div className="pointer-events-none absolute inset-0 -z-10 bg-[linear-gradient(180deg,rgba(4,6,10,0.72)_0%,rgba(4,6,10,0.05)_22%,rgba(4,6,10,0)_40%,rgba(4,6,10,0.78)_70%,rgba(4,6,10,0.96)_100%)]" />
 
       <header className="flex animate-enter items-center justify-between px-6 pt-[max(1.25rem,env(safe-area-inset-top))] md:px-10 md:pt-8" style={{ animationDelay: "150ms" }}>
@@ -116,7 +116,7 @@ export default function TonightPage() {
         {riding && active && nextTask ? (
           <div className="animate-enter" style={{ animationDelay: "700ms" }}>
             <p className="eyebrow text-lamp/90">
-              {t("scene.onBoardNow")} · {active.stationName}
+              {t("scene.onBoardNow")} · {fmt.station(active.stationName)}
             </p>
             <p className="mt-3 line-clamp-2 break-words font-display text-[2.1rem] leading-tight">{nextTask.title}</p>
             <p className="mt-2 font-mono text-sm tabular text-mist">

@@ -118,7 +118,8 @@ export default function JourneyPage() {
   const lastStation = sessionsOn(data.sessions, today)
     .filter((s) => s.status === "done" || s.status === "partial")
     .pop()?.stationName;
-  const boardName = lastStation ?? (journey ? `PLATFORM ${journey.platform}` : "NOCTURNE");
+  const { fmt } = useI18n();
+  const boardName = lastStation ? fmt.station(lastStation) : journey ? `PLATFORM ${journey.platform}` : "NOCTURNE";
 
   // Browsers need a gesture to resume audio after a reload: the first tap does it.
   function resumeSound() {
@@ -200,7 +201,7 @@ export default function JourneyPage() {
           face={boardingTicketFace(data, today, choice.carriage)}
           carriage={choice.carriage}
           departure={first ? clock(first.plannedStart) : "--:--"}
-          destination={route[route.length - 1]?.stationName ?? "NOCTURNE"}
+          destination={fmt.station(route[route.length - 1]?.stationName ?? "NOCTURNE")}
           onOpen={() => {
             setCarriage(choice.carriage);
             setDeparting(true);

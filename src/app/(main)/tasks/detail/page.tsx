@@ -170,7 +170,7 @@ function TaskDetail() {
             {history.slice(0, 8).map((s) => (
               <li key={s.id} className="flex items-center justify-between py-3 text-sm">
                 <span className="text-paper-dim">
-                  {fmt.shortDate(s.date)} <span className="ml-2 text-xs text-haze">{s.stationName}</span>
+                  {fmt.shortDate(s.date)} <span className="ml-2 text-xs text-haze">{fmt.station(s.stationName)}</span>
                 </span>
                 <span className="font-mono text-xs text-mist tabular">
                   {fmt.duration(s.completedMinutes)}

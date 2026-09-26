@@ -123,7 +123,7 @@ export function RouteRow({
       <div className={`flex min-w-0 items-start justify-between gap-3 ${compact ? "py-2.5" : "py-3.5"}`}>
         <div className="min-w-0">
           <p className={`eyebrow ${active ? "text-lamp/90" : ""}`}>
-            {s.stationName}
+            {fmt.station(s.stationName)}
             {s.locked && (
               <span className="ml-2 inline-flex translate-y-[1px] text-mist" title={t("route.locked")}>
                 <Icon name="lock" size={11} aria-label={t("route.locked")} />

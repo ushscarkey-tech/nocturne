@@ -24,6 +24,37 @@ const NAMES = [
   "MIDNIGHT",
 ];
 
+/**
+ * In Korean the stations are pure Korean words (순우리말) that keep each
+ * name's sense. The stored name stays the English one; only display maps.
+ * 이내 (the exact word for the blue hour) is avoided: next to a time on the
+ * board it reads as 以內, "within".
+ */
+const KO: Record<string, string> = {
+  "BLUE HOUR": "땅거미", // the dusk that deepens after sunset
+  STILLWATER: "물안개", // mist rising off still water
+  LANTERN: "반딧불", // a small light in the dark
+  FERNHILL: "산마루", // the ridge of a hill
+  "SILVER BAY": "물굽이", // where water bends
+  NORTHLIGHT: "길잡이별", // the star that shows the way at night
+  "CEDAR CROSS": "솔바람", // wind through the pines
+  HALCYON: "고요", // stillness
+  MOONWELL: "달무리", // the ring of light around the moon
+  ASHGROVE: "숲정이", // the grove kept by a village
+  "QUIET HARBOR": "나루", // a ferry landing
+  EMBER: "잉걸불", // embers glowing red
+  WILLOW: "실버들", // thread-thin willow
+  "GLASS LAKE": "윤슬", // moonlight glinting on ripples
+  "LAST LIGHT": "잔별", // small stars
+  MIDNIGHT: "한밤", // deep night
+};
+
+/** How a station's name reads in a language. */
+export function stationLabel(name: string, locale: string): string {
+  if (locale === "ko") return KO[name] ?? name;
+  return name;
+}
+
 function hash(s: string): number {
   let h = 2166136261;
   for (let i = 0; i < s.length; i++) {

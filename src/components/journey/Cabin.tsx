@@ -122,7 +122,7 @@ export function Cabin({
 
         <main className="flex flex-1 flex-col items-center justify-center text-center">
           <div className={`transition-opacity duration-[2500ms] ${departing ? "opacity-0" : tunnel ? "opacity-75 delay-[1200ms]" : "opacity-100"}`}>
-            <p className={`eyebrow text-paper-dim/50 transition-opacity duration-[2000ms] ${chrome}`}>→ {active.stationName}</p>
+            <p className={`eyebrow text-paper-dim/50 transition-opacity duration-[2000ms] ${chrome}`}>→ {fmt.station(active.stationName)}</p>
             <h1 className="mt-3 line-clamp-3 max-w-lg break-words font-display text-[1.9rem] leading-tight [text-shadow:0_2px_24px_rgba(0,0,0,0.7)] sm:text-4xl">
               {task?.title ?? "—"}
             </h1>
@@ -158,7 +158,7 @@ export function Cabin({
             </p>
             <RouteStrip route={route} activeId={active.id} fraction={fraction} changing={changing} label={t("journey.routeProgress")} className="mt-4" />
             <p className="mt-2 flex justify-between font-mono text-[0.625rem] tracking-[0.14em] text-haze">
-              <span>{clock(active.plannedEnd)} {active.stationName}</span>
+              <span>{clock(active.plannedEnd)} {fmt.station(active.stationName)}</span>
               <span>{arrival ? clock(arrival) : ""}</span>
             </p>
           </div>

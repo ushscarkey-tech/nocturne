@@ -167,6 +167,12 @@
   letter-spacing: 0.08em;
 }
 
+/* Station names are words in Korean, not tracked capitals: give them size. */
+:root:lang(ko) .station-label {
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+}
+
 html {
   background: var(--color-night-900);
   -webkit-tap-highlight-color: transparent;

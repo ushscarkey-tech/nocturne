@@ -7,6 +7,7 @@
  *   const { t, fmt, locale } = useI18n();
  *   t("tasks.remaining", { min: 90 })   // `min` params render as durations
  */
+import { stationLabel } from "@/core/stations";
 import { useCallback, useMemo, useSyncExternalStore } from "react";
 import { fill } from "@/core/messages";
 import { addDays, diffDays, parseDateKey } from "@/core/time";
@@ -62,6 +63,8 @@ export function makeFormatters(locale: Locale) {
     new Intl.DateTimeFormat(intl, options).format(parseDateKey(key));
   return {
     duration: (minutes: number) => formatMinutes(locale, minutes),
+    /** A station's name as it reads in this language (순우리말 in Korean). */
+    station: (name: string) => stationLabel(name, locale),
     /** "Friday, Sep 25" / "9월 25일 금요일" */
     longDate: (key: DateKey) => date(key, { weekday: "long", month: "short", day: "numeric" }),
     /** "Sep 25" / "9월 25일" */

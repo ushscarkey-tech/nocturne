@@ -117,7 +117,7 @@ function StationSheet({ item, onClose }: { item: StationItem; onClose: () => voi
   };
 
   return (
-    <Sheet open onClose={onClose} title={item.task?.title ?? "Station"} eyebrow={`${s.stationName} · ${clock(s.plannedStart)} · ${fmt.duration(s.plannedMinutes)}`}>
+    <Sheet open onClose={onClose} title={item.task?.title ?? "Station"} eyebrow={`${fmt.station(s.stationName)} · ${clock(s.plannedStart)} · ${fmt.duration(s.plannedMinutes)}`}>
       {editable ? (
         <div className="space-y-8">
           <div className="grid grid-cols-2 gap-3">
