@@ -50,6 +50,7 @@ export function BoardingDoors({
   onOpen,
   onInside,
   onHoldScene,
+  onCovered,
 }: {
   face: TicketFace;
   carriage: CarriageId;
@@ -66,6 +67,8 @@ export function BoardingDoors({
    * and the ride's is built only once you're sitting still in your seat.
    */
   onHoldScene?: (hold: boolean) => void;
+  /** The doors now fill the screen: whatever was showing behind can stop. */
+  onCovered?: () => void;
 }) {
   const { t } = useI18n();
   const reduced = usePrefersReducedMotion();
@@ -77,6 +80,24 @@ export function BoardingDoors({
   const [failed3D, setFailed3D] = useState(false);
   const walk = canDraw3D && !failed3D && !reduced;
   const [seated, setSeated] = useState(false);
+  // The 3D scene takes a moment to prepare; until it has drawn, the platform
+  // behind stays in view (no black screen), and then the scene fades in.
+  const [ready3D, setReady3D] = useState(false);
+  const covered = !walk || ready3D;
+  useEffect(() => {
+    if (covered) onCovered?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [covered]);
+  useEffect(() => {
+    if (covered) return;
+    // Far too long: the drawn doors instead.
+    const t = setTimeout(() => setFailed3D(true), 15000);
+    return () => clearTimeout(t);
+  }, [covered]);
+  const ticketRef = useRef<HTMLButtonElement>(null);
+  const readerRef = useRef<HTMLDivElement>(null);
+  const readerAt = useRef<{ x: number; y: number } | null>(null);
+  const [tapping, setTapping] = useState(false);
   const insideCalled = useRef(false);
   const goInside = () => {
     if (insideCalled.current) return;
@@ -115,35 +136,76 @@ export function BoardingDoors({
     onOpen();
   };
 
+  /** Where to hold the ticket: the 3D reader as the scene reports it, or the drawn one. */
+  const reader = () => {
+    if (walk && readerAt.current) return readerAt.current;
+    const r = readerRef.current?.getBoundingClientRect();
+    return r && r.width ? { x: r.left + r.width / 2, y: r.top + r.height * 0.4 } : { x: window.innerWidth * 0.62, y: window.innerHeight * 0.46 };
+  };
+
+  /**
+   * The hand brings the ticket up to the reader, flat against it, presses,
+   * holds for the beep, and lowers it away out of view.
+   */
+  const presentTicket = (contactMs: number) => {
+    const el = ticketRef.current;
+    if (!el?.animate) return;
+    const { x, y } = reader();
+    const w = el.offsetWidth;
+    const h = el.offsetHeight;
+    // The ticket turns about its bottom centre, which sits at (offsetLeft, offsetTop + h).
+    const s = Math.min(0.34, Math.max(0.2, 150 / Math.max(1, w)));
+    const dx = x - el.offsetLeft;
+    const dy = y + (h * s) / 2 - (el.offsetTop + h);
+    const pose = (tx: number, ty: number, rot: number, sc: number) => `translateX(-50%) translate(${tx}px, ${ty}px) rotate(${rot}deg) scale(${sc})`;
+    const total = contactMs / 0.42;
+    el.animate(
+      [
+        { transform: pose(0, 0, -4, 0.52), opacity: 1, offset: 0, easing: "cubic-bezier(0.35, 0, 0.25, 1)" },
+        { transform: pose(dx * 0.92, dy * 0.9 - 6, -1, s * 1.06), opacity: 1, offset: 0.32, easing: "cubic-bezier(0.2, 0, 0.3, 1)" },
+        { transform: pose(dx, dy, 0, s), opacity: 1, offset: 0.42, easing: "ease-in-out" },
+        { transform: pose(dx, dy + 2, 0, s * 0.97), opacity: 1, offset: 0.5, easing: "linear" },
+        { transform: pose(dx, dy + 2, 0, s * 0.97), opacity: 1, offset: 0.64, easing: "cubic-bezier(0.55, 0, 0.9, 0.5)" },
+        { transform: pose(dx * 0.75, dy * 0.3 + window.innerHeight * 0.55, -6, s * 1.35), opacity: 0, offset: 1 },
+      ],
+      { duration: total, fill: "forwards" },
+    );
+  };
+
   function touch() {
-    if (stage !== "waiting") return;
+    if (stage !== "waiting" || !covered || tapping) return;
+    setTapping(true);
     haptic("press");
     void sfx.unlock();
-    setStage("reading");
     if (reduced) {
+      setStage("reading");
       sfx.play("chime", { volume: 0.8 });
       at(300, open);
       at(700, onInside);
       return;
     }
-    at(480, () => {
+    // Contact: the reader answers — the ring and the lamp light, a beep.
+    const CONTACT = 560;
+    presentTicket(CONTACT);
+    at(CONTACT, () => {
+      setStage("reading");
       sfx.play("stamp");
       haptic("tick");
     });
-    at(820, () => sfx.play("chime", { volume: 0.8 }));
-    at(1350, () => {
+    at(CONTACT + 330, () => sfx.play("chime", { volume: 0.8 }));
+    at(CONTACT + 900, () => {
       setStage("opening");
       sfx.play("doors");
       haptic("door");
     });
-    at(2450, () => {
+    at(CONTACT + 2000, () => {
       setStage("entering");
       open();
     });
     // Fetch the ride's scene while you walk, so it's ready when you sit.
     if (walk) void import("@/components/scene/CabinScene3D");
-    if (walk) at(2450 + WALK_LIMIT * 1000, goInside);
-    else at(3750, goInside);
+    if (walk) at(CONTACT + 2000 + WALK_LIMIT * 1000, goInside);
+    else at(CONTACT + 3300, goInside);
   }
 
   function skip() {
@@ -158,20 +220,24 @@ export function BoardingDoors({
 
   return (
     <div
-      className={`fixed inset-0 z-30 overflow-hidden bg-night-950 transition-opacity duration-700 ${
+      className={`fixed inset-0 z-30 overflow-hidden transition-opacity duration-700 ${covered ? "bg-night-950" : "bg-transparent"} ${
         walk ? (seated ? "opacity-0" : "") : stage === "entering" ? "opacity-0 delay-[900ms]" : ""
       }`}
     >
       {walk && (
-        <BoardingScene3D
-          className="absolute inset-0"
-          stage={stage}
-          carriage={carriage}
-          car={face.car}
-          stationName={stationName}
-          onFail={() => setFailed3D(true)}
-          onInside={sitDown}
-        />
+        <div className={`absolute inset-0 transition-opacity duration-500 ${ready3D ? "opacity-100" : "opacity-0"}`}>
+          <BoardingScene3D
+            className="absolute inset-0"
+            stage={stage}
+            carriage={carriage}
+            car={face.car}
+            stationName={stationName}
+            onFail={() => setFailed3D(true)}
+            onInside={sitDown}
+            onReady={() => setReady3D(true)}
+            onReader={(x, y) => (readerAt.current = { x, y })}
+          />
+        </div>
       )}
       {/* Platform ceiling: two long tubes. */}
       <div className={`absolute inset-x-0 top-0 h-[24%] bg-[linear-gradient(180deg,#07090c,#0d1115)] ${walk ? "hidden" : ""}`} aria-hidden>
@@ -259,7 +325,7 @@ export function BoardingDoors({
         </div>
 
         {/* Ticket reader beside the door. */}
-        <div className="absolute left-[calc(50%+min(19vw,6.25rem)+0.6rem)] top-[46%] flex h-12 w-9 flex-col items-center justify-center gap-1.5 rounded-md border border-black/60 bg-[#0e1216] shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
+        <div ref={readerRef} className="absolute left-[calc(50%+min(19vw,6.25rem)+0.6rem)] top-[46%] flex h-12 w-9 flex-col items-center justify-center gap-1.5 rounded-md border border-black/60 bg-[#0e1216] shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
           <span className={`h-4 w-4 rounded-full border ${lit ? "border-[#8fd0a8]/70 shadow-[0_0_10px_rgba(143,208,168,0.5)]" : "border-paper/20"}`} />
           <span className={`h-1 w-1 rounded-full ${stage === "waiting" ? "bg-paper/25" : "bg-[#8fd0a8]"}`} />
         </div>
@@ -281,15 +347,17 @@ export function BoardingDoors({
 
       {/* The ticket, held out. */}
       <button
+        ref={ticketRef}
         type="button"
         onClick={touch}
-        disabled={stage !== "waiting"}
+        disabled={stage !== "waiting" || !covered || tapping}
         aria-label={t("scene.tapTicket")}
         className="absolute bottom-[max(5.5rem,calc(env(safe-area-inset-bottom)+4.5rem))] left-1/2 z-10 disabled:cursor-default"
         style={{
-          transform: `translateX(-50%) ${lit && !reduced ? "translate(34vw, -30vh) scale(0.18) rotate(8deg)" : "rotate(-4deg) scale(0.52)"}`,
-          opacity: lit ? 0 : 1,
-          transition: "transform 650ms cubic-bezier(0.45, 0, 0.2, 1), opacity 450ms 250ms",
+          transform: "translateX(-50%) rotate(-4deg) scale(0.52)",
+          // Dimmed until the doors are ready for it; with reduced motion it simply fades once read.
+          opacity: reduced && lit ? 0 : covered ? 1 : 0.55,
+          transition: "opacity 450ms",
           transformOrigin: "50% 100%",
         }}
       >

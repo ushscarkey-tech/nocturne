@@ -34,6 +34,10 @@ export interface BoardingSceneProps {
   onFail?: () => void;
   /** The walk is over: you are in your seat. */
   onInside?: () => void;
+  /** The first frame is on screen (shaders compiled, textures up): it can be shown. */
+  onReady?: () => void;
+  /** Where the ticket reader sits on screen (CSS pixels from the scene's top left), to hold the ticket to. */
+  onReader?: (x: number, y: number) => void;
 }
 
 // Metres. The platform runs along x; the train's side is at z = SIDE, the
@@ -75,17 +79,21 @@ const MAIN_ONLY = 1;
  * and what you see then is what the ride begins with: the same platform,
  * window, curtain and light.
  */
-export default function BoardingScene3D({ stage, carriage, car, stationName = "", className = "", onFail, onInside }: BoardingSceneProps) {
+export default function BoardingScene3D({ stage, carriage, car, stationName = "", className = "", onFail, onInside, onReady, onReader }: BoardingSceneProps) {
   const mountRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef({ stage, at: 0 });
   const failRef = useRef(onFail);
   const insideRef = useRef(onInside);
+  const readyRef = useRef(onReady);
+  const readerRef = useRef(onReader);
 
   useEffect(() => {
     if (stageRef.current.stage !== stage) stageRef.current = { stage, at: performance.now() };
     failRef.current = onFail;
     insideRef.current = onInside;
-  }, [stage, onFail, onInside]);
+    readyRef.current = onReady;
+    readerRef.current = onReader;
+  }, [stage, onFail, onInside, onReady, onReader]);
 
   useEffect(() => {
     const mount = mountRef.current;
@@ -148,6 +156,7 @@ export default function BoardingScene3D({ stage, carriage, car, stationName = ""
       platRoot.position.set(SEAT_X, EYE_Y, EYE_Z);
       platRoot.add(platform.group);
       outside.add(platRoot);
+      const platformLamp = platform.lights[0].intensity;
       outside.add(new THREE.HemisphereLight(lin(0.045, 0.06, 0.08), lin(0.008, 0.008, 0.008), 0.8));
 
       // ================================================================= CARRIAGE
@@ -290,7 +299,11 @@ export default function BoardingScene3D({ stage, carriage, car, stationName = ""
       // The door frame.
       for (const x of [-DOOR_W / 2 - 0.02, DOOR_W / 2 + 0.02]) addTo(outside, new THREE.Mesh(box(0.04, DOOR_H + 0.04, 0.1), trim), x, FLOOR + DOOR_H / 2, SIDE - 0.04);
       addTo(outside, new THREE.Mesh(box(DOOR_W + 0.08, 0.04, 0.1), trim), 0, FLOOR + DOOR_H + 0.02, SIDE - 0.04);
-      addTo(outside, new THREE.Mesh(box(DOOR_W, 0.03, 0.22), trim), 0, FLOOR - 0.015, SIDE + 0.02);
+      // The step sits a few millimetres below the carriage floor: level with it,
+      // the two fought over the same pixels and the doorway's foot flickered.
+      const stepMat = mat({ color: 0x80868a, roughness: 0.62, metalness: floatOK ? 0.55 : 0.3 });
+      addTo(outside, new THREE.Mesh(box(DOOR_W, 0.03, 0.22), stepMat), 0, FLOOR - 0.006 - 0.015, SIDE + 0.02);
+      addTo(outside, new THREE.Mesh(box(DOOR_W, 0.012, 0.014), mat({ color: 0x151719, roughness: 0.9 })), 0, FLOOR - 0.012, SIDE + 0.124);
 
       // The car number and the line's name, painted beside the door.
       const label = (text: string, w: number, h: number, font: string, color: string) => {
@@ -386,6 +399,7 @@ export default function BoardingScene3D({ stage, carriage, car, stationName = ""
       const lampMat = glow(0x3a3f44, 1);
       addTo(outside, new THREE.Mesh(track(new THREE.SphereGeometry(0.045, 16, 12)), lampMat), 0, FLOOR + DOOR_H + 0.14, SIDE + 0.03);
       const lampLight = addTo(outside, new THREE.PointLight(lin(1, 0.66, 0.3), 0, 2.2, 2), 0, FLOOR + DOOR_H + 0.1, SIDE + 0.25);
+      const READER = new THREE.Vector3(DOOR_W / 2 + 0.24, 1.28, SIDE + 0.06);
       addTo(outside, new THREE.Mesh(box(0.13, 0.22, 0.05), mat({ color: 0x0e1216, roughness: 0.5, metalness: 0.4 })), DOOR_W / 2 + 0.24, 1.25, SIDE + 0.025);
       const ringMat = glow(0x2a3a33, 1);
       addTo(outside, new THREE.Mesh(track(new THREE.TorusGeometry(0.035, 0.006, 8, 32)), ringMat), DOOR_W / 2 + 0.24, 1.28, SIDE + 0.052);
@@ -515,8 +529,8 @@ export default function BoardingScene3D({ stage, carriage, car, stationName = ""
       // Platform → threshold → vestibule → along the aisle → your seat, and
       // you settle facing the window, looking back out at the platform.
       const path = new THREE.CatmullRomCurve3([
-        new THREE.Vector3(0, 1.62, 2.2),
-        new THREE.Vector3(0, 1.62, 1.2),
+        new THREE.Vector3(0, 1.62, 3.6),
+        new THREE.Vector3(0, 1.62, 1.8),
         new THREE.Vector3(0, 1.64, 0.3),
         new THREE.Vector3(0.05, 1.66, SIDE - 0.9),
         new THREE.Vector3(0.9, 1.62, SIDE - 1.5),
@@ -530,16 +544,21 @@ export default function BoardingScene3D({ stage, carriage, car, stationName = ""
         { t: 0.8, at: new THREE.Vector3(SEAT_X + 0.35, EYE_Y + 0.05, SIDE) },
         { t: 1, at: new THREE.Vector3(SEAT_X, EYE_Y, EYE_Z + 1) },
       ];
-      const lookAt = new THREE.Vector3();
-      const lookAtFor = (u: number) => {
-        for (let i = 1; i < looks.length; i++) {
-          if (u <= looks[i].t) {
-            const a = looks[i - 1];
-            const b = looks[i];
-            return lookAt.lerpVectors(a.at, b.at, ease((u - a.t) / (b.t - a.t)));
-          }
-        }
-        return lookAt.copy(looks[looks.length - 1].at);
+      // The gaze follows its own smooth curve, so the head turns without stopping at each mark.
+      const lookCurve = new THREE.CatmullRomCurve3(looks.map((l) => l.at));
+      const lookAtFor = (k: number) => (k >= 1 ? looks[looks.length - 1].at : lookCurve.getPoint(k));
+      const walkLength = path.getLength();
+      // Speed through the walk: ease up to a steady pace, and ease down into the seat.
+      const ACC = 0.2;
+      const DEC = 0.32;
+      const PACE = 1 / (1 - ACC / 2 - DEC / 2);
+      const progress = (u: number) =>
+        u <= 0 ? 0 : u >= 1 ? 1 : u < ACC ? (PACE * u * u) / (2 * ACC) : u > 1 - DEC ? 1 - (PACE * (1 - u) * (1 - u)) / (2 * DEC) : PACE * (u - ACC / 2);
+      const speedAt = (u: number) => (u < ACC ? u / ACC : u > 1 - DEC ? (1 - u) / DEC : 1);
+      /** Where you stand before boarding (no sway): the reader is found from here. */
+      const standAt = () => {
+        camera.position.set(0, 1.62, path.points[0].z);
+        camera.lookAt(looks[0].at);
       };
 
       const layout = () => {
@@ -564,6 +583,11 @@ export default function BoardingScene3D({ stage, carriage, car, stationName = ""
           builtFor = shape;
           buildShell(windowDims(camera.fov, camera.aspect));
         }
+        // Tell the page where the reader is, so the ticket goes to it.
+        standAt();
+        camera.updateMatrixWorld();
+        const p = READER.clone().project(camera);
+        readerRef.current?.(((p.x + 1) / 2) * w, ((1 - p.y) / 2) * h);
       };
 
       let arrived = false;
@@ -584,11 +608,14 @@ export default function BoardingScene3D({ stage, carriage, car, stationName = ""
         settle = 0;
         if (s === "entering" && !reduce) {
           const u = Math.min(1, since / WALK);
-          // Walk at an even pace, easing only at the start and at the seat.
-          const k = u < 0.12 ? (u * u) / 0.24 : u > 0.85 ? 1 - ((1 - u) * (1 - u)) / 0.3 : u;
-          const p = path.getPointAt(Math.min(1, Math.max(0, k)));
-          const stride = Math.sin(since * 9.5) * 0.007 * (1 - ease((u - 0.6) / 0.25));
-          camera.position.set(p.x, p.y + stride, p.z);
+          const k = progress(u);
+          const p = path.getPointAt(k);
+          // Steps follow the distance walked (about 70 cm a stride), and fade as you slow to sit.
+          const phase = ((k * walkLength) / 0.7) * Math.PI;
+          const stepping = speedAt(u) * (1 - ease((u - 0.55) / 0.3));
+          const bob = Math.abs(Math.sin(phase)) * 0.012 * stepping;
+          const sway = Math.sin(phase / 2) * 0.006 * stepping;
+          camera.position.set(p.x + sway, p.y + bob - 0.006 * stepping, p.z);
           camera.lookAt(lookAtFor(k));
           settle = ease((u - 0.55) / 0.45);
           if (u >= 1 && !arrived) {
@@ -602,6 +629,9 @@ export default function BoardingScene3D({ stage, carriage, car, stationName = ""
           camera.lookAt(looks[0].at);
         }
         lampLight.intensity = lit ? 1.4 * (1 - settle) : 0;
+        // Standing close under them, the station lamps would glare off the
+        // steel; they come up to the ride's strength as you take your seat.
+        for (const l of platform.lights) l.intensity = platformLamp * (0.4 + 0.6 * settle);
         // Settling in, the car's lights give way to the ride's light at your seat.
         for (const l of carLights) l.intensity = 2 * (1 - settle);
         carFill.intensity = 1 - settle;
@@ -678,16 +708,26 @@ export default function BoardingScene3D({ stage, carriage, car, stationName = ""
       layout();
       const ro = new ResizeObserver(layout);
       ro.observe(mount);
-      // Warm up: draw once with your window's glass showing, so its shader
-      // compiles now and not as you sit down. Only the second frame, drawn
-      // in the same task, reaches the screen.
+      // Compile every shader first, off the main thread where the browser can
+      // (your window's glass too, though it shows only as you sit), while the
+      // page behind keeps moving; then draw, and say the scene can be shown.
       if (seatGlass) (seatGlass as THREE.Mesh).visible = true;
-      draw();
-      update(performance.now());
-      draw();
-      raf = requestAnimationFrame(frame);
+      let disposed = false;
+      const begin = () => {
+        if (disposed || broken) return;
+        draw();
+        update(performance.now());
+        draw();
+        last = performance.now();
+        raf = requestAnimationFrame(frame);
+        requestAnimationFrame(() => {
+          if (!disposed && !broken) readyRef.current?.();
+        });
+      };
+      Promise.all([kit.ready(), renderer.compileAsync(cabin, camera), renderer.compileAsync(outside, camera)]).then(begin, begin);
 
       return () => {
+        disposed = true;
         cancelAnimationFrame(raf);
         ro.disconnect();
         built?.dispose();

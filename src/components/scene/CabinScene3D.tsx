@@ -847,7 +847,13 @@ export default function CabinScene3D({ mode, carriage, stationName = "", termina
       hidden.forEach((o) => (o.visible = false));
       update(0.016);
       draw();
-      window.dispatchEvent(new Event(SCENE_READY));
+      // Ready to be seen once the surface maps are in (before, surfaces shade black).
+      let gone = false;
+      void kit.ready().then(() => {
+        if (gone || broken) return;
+        draw();
+        requestAnimationFrame(() => !gone && window.dispatchEvent(new Event(SCENE_READY)));
+      });
       if (!reduce) raf = requestAnimationFrame(frame);
       pokeRef.current = () => {
         if (reduce) {
@@ -928,6 +934,7 @@ export default function CabinScene3D({ mode, carriage, stationName = "", termina
       window.addEventListener("click", onClick, true);
 
       return () => {
+        gone = true;
         pokeRef.current = null;
         cancelAnimationFrame(raf);
         ro.disconnect();

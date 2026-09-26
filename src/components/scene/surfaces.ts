@@ -14,12 +14,16 @@ const BASE = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
 export function surfaceKit(track: <T extends { dispose(): void }>(x: T) => T) {
   const loader = new THREE.TextureLoader();
   const sources = new Map<Relief, THREE.Texture>();
+  const loading: Promise<unknown>[] = [];
 
   /** A tiling normal map; each call gets its own repeat but shares the image. */
   const relief = (name: Relief, repeat: [number, number], rotation = 0) => {
     let src = sources.get(name);
     if (!src) {
-      src = track(loader.load(`${BASE}/textures/normals/${name}.webp`));
+      let done: () => void = () => {};
+      loading.push(new Promise<void>((resolve) => (done = resolve)));
+      // Until it arrives the surface would shade black, so a scene waits for `ready` before it shows.
+      src = track(loader.load(`${BASE}/textures/normals/${name}.webp`, () => done(), undefined, () => done()));
       src.wrapS = src.wrapT = THREE.RepeatWrapping;
       src.colorSpace = THREE.NoColorSpace;
       src.anisotropy = 8;
@@ -69,7 +73,10 @@ export function surfaceKit(track: <T extends { dispose(): void }>(x: T) => T) {
     return t;
   };
 
-  return { relief, roughness };
+  /** Every relief map asked for so far has loaded (or failed). */
+  const ready = () => Promise.all(loading).then(() => undefined);
+
+  return { relief, roughness, ready };
 }
 
 /** GLSL: darken where the normal map tilts away (grooves, gaps, pits). */

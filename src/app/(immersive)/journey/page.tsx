@@ -46,6 +46,8 @@ export default function JourneyPage() {
   const [departing, setDeparting] = useState(false);
   // While walking in, the ride's scene waits (see BoardingDoors).
   const [holdScene, setHoldScene] = useState(false);
+  // At the doors the platform stays in view until the doors' own scene is ready.
+  const [doorsCovered, setDoorsCovered] = useState(false);
   const { enabled: soundOn } = useAmbienceState();
 
   const started = !!journey?.startedAt;
@@ -132,6 +134,10 @@ export default function JourneyPage() {
   // Pulling out: doors lock, a melody, then the platform starts to slide.
   const pulling = useRef<ReturnType<typeof setTimeout>[]>([]);
   useEffect(() => () => pulling.current.forEach(clearTimeout), []);
+  // At the ticket machine, fetch the doors' 3D scene ahead of time.
+  useEffect(() => {
+    if (phase === "boarding") void import("@/components/scene/BoardingScene3D");
+  }, [phase]);
   function pullOut() {
     const d = useStore.getState().data;
     // Boarded before Service Time: the train waits at the platform instead.
@@ -158,6 +164,7 @@ export default function JourneyPage() {
         onCarriage={setMachineCarriage}
         onTaken={(c) => {
           setChoice(c);
+          setDoorsCovered(false);
           setAtDoors(true);
         }}
         onQuickBoard={() => {
@@ -187,8 +194,8 @@ export default function JourneyPage() {
   return (
     <div className="relative isolate h-dvh overflow-hidden" onPointerDown={resumeSound}>
       {phase === "boarding" ? (
-        // At the doors the boarding scene covers everything: draw only that.
-        !atDoors && (
+        // At the doors, once their scene is up, draw only that.
+        !(atDoors && doorsCovered) && (
           <>
             {/* Standing on the platform, at the ticket machine. */}
             <PlatformScene className="fixed inset-0 -z-10" fade={false} mood="waiting" rain={carriage === "rain"} stationName={boardName} />
@@ -209,6 +216,7 @@ export default function JourneyPage() {
           destination={fmt.station(route[route.length - 1]?.stationName ?? "NOCTURNE")}
           stationName={boardName}
           onHoldScene={setHoldScene}
+          onCovered={() => setDoorsCovered(true)}
           onOpen={() => {
             setCarriage(choice.carriage);
             setDeparting(true);
