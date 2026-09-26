@@ -76,23 +76,25 @@ export default function TonightPage() {
     <div className="relative isolate flex h-full flex-col">
       {/* An empty platform at night. */}
       <PlatformScene className="absolute inset-0 -z-10" fade={false} stationName={fmt.station(next?.stationName ?? "NOCTURNE")} />
-      <div className="pointer-events-none absolute inset-0 -z-10 bg-[linear-gradient(180deg,rgba(4,6,10,0.72)_0%,rgba(4,6,10,0.05)_22%,rgba(4,6,10,0)_40%,rgba(4,6,10,0.78)_70%,rgba(4,6,10,0.96)_100%)]" />
+      <div className="pointer-events-none absolute inset-0 -z-10 bg-[linear-gradient(180deg,rgba(4,6,10,0.72)_0%,rgba(4,6,10,0.05)_22%,rgba(4,6,10,0)_40%,rgba(4,6,10,0.78)_70%,rgba(4,6,10,0.96)_100%)] lg:bg-[linear-gradient(180deg,rgba(4,6,10,0.6)_0%,rgba(4,6,10,0)_24%,rgba(4,6,10,0)_52%,rgba(4,6,10,0.85)_100%)]" />
+      {/* Wide screens: the rail and the departure side read against a soft darkness from the left. */}
+      <div className="pointer-events-none absolute inset-0 -z-10 hidden bg-[linear-gradient(90deg,rgba(4,6,10,0.8)_0%,rgba(4,6,10,0.35)_38%,rgba(4,6,10,0)_62%)] lg:block" />
 
-      <header className="flex animate-enter items-center justify-between px-6 pt-[max(1.25rem,env(safe-area-inset-top))] md:px-10 md:pt-8" style={{ animationDelay: "150ms" }}>
-        <p className="font-mono text-[0.6875rem] tracking-[0.4em] text-paper-dim">NOCTURNE</p>
+      <header className="flex animate-enter items-center justify-between px-6 pt-[max(1.25rem,env(safe-area-inset-top))] md:px-10 md:pt-8 lg:pl-[17rem] lg:pr-12 lg:pt-10 xl:pr-16" style={{ animationDelay: "150ms" }}>
+        <p className="font-mono text-[0.6875rem] tracking-[0.4em] text-paper-dim lg:invisible">NOCTURNE</p>
         <div className="-mr-2 flex items-center gap-1">
           <PlatformClock now={now} size={26} className="mr-2 opacity-80" />
           <button
             type="button"
             onClick={() => useQuickAdd.getState().show()}
             aria-label={t("quickadd.open")}
-            className="flex h-11 w-11 items-center justify-center rounded-full text-mist transition-colors hover:text-paper"
+            className="flex h-11 w-11 items-center justify-center rounded-full text-mist transition-colors hover:text-paper lg:hidden"
           >
             <Icon name="plus" size={19} />
           </button>
         </div>
       </header>
-      <div className="mt-3 flex animate-enter items-baseline justify-between gap-4 px-6 md:px-10" style={{ animationDelay: "350ms" }}>
+      <div className="mt-3 flex animate-enter items-baseline justify-between gap-4 px-6 md:px-10 lg:mt-0 lg:max-w-[45rem] lg:justify-start lg:gap-6 lg:pl-[17rem] lg:pr-0" style={{ animationDelay: "350ms" }}>
         <p className="eyebrow text-paper-dim/80">{fmt.longDate(today)}</p>
         {windows.length > 0 && (
           <p className="truncate font-mono text-[0.6875rem] tabular text-mist" aria-label={t("tonight.serviceLabel")}>
@@ -108,7 +110,7 @@ export default function TonightPage() {
 
       {/* The departure board hanging over the platform. */}
       {route.length > 0 && (
-        <div ref={boardRef} className="mt-7 w-full px-6 md:max-w-2xl md:px-10">
+        <div ref={boardRef} className="mt-7 w-full px-6 md:max-w-2xl md:px-10 lg:absolute lg:right-12 lg:top-32 lg:mt-0 lg:w-[31rem] lg:max-w-none lg:px-0 xl:right-16 xl:w-[36rem]">
           <DepartureBoard data={data} now={now} forecast={forecast} onOpen={() => setPanel("route")} className="animate-enter" style={{ animationDelay: "550ms" }} />
         </div>
       )}
@@ -116,7 +118,7 @@ export default function TonightPage() {
       {/* The platform breathes here. */}
       <div className="min-h-0 flex-1" />
 
-      <section aria-label={t("tonight.next")} className="w-full px-6 pb-[calc(5.75rem+env(safe-area-inset-bottom))] md:max-w-2xl md:px-10">
+      <section aria-label={t("tonight.next")} className="w-full px-6 pb-[calc(5.75rem+env(safe-area-inset-bottom))] md:max-w-2xl md:px-10 lg:max-w-[52rem] lg:pb-16 lg:pl-[17rem] lg:pr-0">
         {riding && active && nextTask ? (
           <div className="animate-enter" style={{ animationDelay: "700ms" }}>
             <p className="eyebrow text-lamp/90">
@@ -153,7 +155,7 @@ export default function TonightPage() {
         ) : summary.next && nextTask ? (
           <div ref={departRef}>
             <p className="eyebrow animate-enter" style={{ animationDelay: "700ms" }}>{t("scene.departure")}</p>
-            <p className="mt-1 animate-enter font-mono text-[clamp(4.25rem,21vw,6.5rem)] font-extralight leading-none tracking-tight text-lamp tabular" style={{ animationDelay: "900ms" }}>
+            <p className="mt-1 animate-enter font-mono text-[clamp(4.25rem,21vw,6.5rem)] font-extralight leading-none tracking-tight text-lamp tabular lg:text-[8.5rem]" style={{ animationDelay: "900ms" }}>
               <FlipText text={departsNow ? t("tonight.now") : clock(departsAt!)} />
             </p>
             <p className="mt-4 animate-enter font-mono text-sm tabular text-paper-dim" style={{ animationDelay: "1150ms" }}>

@@ -28,7 +28,7 @@ final class WebController: NSObject, WKNavigationDelegate, WKUIDelegate {
         webView.underPageBackgroundColor = NSColor(red: 7 / 255, green: 10 / 255, blue: 16 / 255, alpha: 1)
 
         window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 480, height: 880),
+            contentRect: NSRect(x: 0, y: 0, width: 1280, height: 820),
             styleMask: [.titled, .closable, .miniaturizable, .resizable],
             backing: .buffered,
             defer: false
@@ -42,7 +42,7 @@ final class WebController: NSObject, WKNavigationDelegate, WKUIDelegate {
         window.isReleasedWhenClosed = false
         window.contentView = webView
         window.center()
-        window.setFrameAutosaveName("NocturneMain")
+        window.setFrameAutosaveName("NocturneMainWindow")
         super.init()
 
         handler.onMessage = { [weak self] body in self?.receive(body) }

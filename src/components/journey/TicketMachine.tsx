@@ -187,7 +187,7 @@ export function TicketMachine({
 
       {/* The machine. It softens into the background once the ticket is out. */}
       <div
-        className={`mx-auto mt-4 w-full max-w-[27rem] animate-enter transition-[opacity,transform] duration-700 ease-[var(--ease-glide)] ${
+        className={`mx-auto mt-4 w-full max-w-[27rem] animate-enter transition-[opacity,transform] duration-700 ease-[var(--ease-glide)] lg:mt-[5vh] lg:[zoom:1.15] [@media(min-width:64rem)_and_(min-height:900px)]:[zoom:1.3] ${
           stage === "taken" ? "scale-[0.97] opacity-20" : emerged ? "opacity-60" : ""
         }`}
         style={{ animationDelay: "200ms" }}

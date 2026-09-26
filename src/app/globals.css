@@ -172,6 +172,11 @@
   font-size: 0.75rem;
   letter-spacing: 0.04em;
 }
+@media (min-width: 64rem) {
+  :root:lang(ko) .station-label {
+    font-size: 0.8125rem;
+  }
+}
 
 html {
   background: var(--color-night-900);

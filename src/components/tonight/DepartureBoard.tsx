@@ -52,7 +52,9 @@ export function DepartureBoard({
   const recent = useRecentChange(data, now);
   if (rows.length === 0) return null;
   const title = (id: string) => data.tasks.find((x) => x.id === id)?.title ?? "—";
-  const shown = rows.slice(0, 4);
+  // Four lines on a phone; the tall board on a wide screen shows up to eight.
+  const shown = rows.slice(0, 8);
+  const more = (n: number) => rows.length - Math.min(rows.length, n);
   const transfers = recent?.diff.transfers.slice(0, 2) ?? [];
 
   return (
@@ -60,13 +62,13 @@ export function DepartureBoard({
       type="button"
       onClick={onOpen}
       aria-label={t("scene.openRoute")}
-      className={`relative block w-full rounded-md border border-black/70 bg-[#090d11]/88 px-3.5 pb-2.5 pt-2 text-left shadow-[0_18px_40px_-20px_rgba(0,0,0,0.9),inset_0_1px_0_rgba(255,255,255,0.04)] transition-colors hover:border-white/10 ${className}`}
+      className={`relative block w-full rounded-md border border-black/70 bg-[#090d11]/88 px-3.5 pb-2.5 pt-2 text-left lg:px-5 lg:pb-4 lg:pt-3.5 shadow-[0_18px_40px_-20px_rgba(0,0,0,0.9),inset_0_1px_0_rgba(255,255,255,0.04)] transition-colors hover:border-white/10 ${className}`}
       style={style}
     >
       {/* Hangers: the board hangs from the canopy. */}
       <span className="absolute -top-3 left-[18%] h-3 w-px bg-white/10" aria-hidden />
       <span className="absolute -top-3 right-[18%] h-3 w-px bg-white/10" aria-hidden />
-      <div className="flex items-center justify-between font-mono text-[0.5625rem] tracking-[0.28em] text-paper/45">
+      <div className="flex items-center justify-between font-mono text-[0.5625rem] tracking-[0.28em] text-paper/45 lg:text-[0.625rem]">
         <span>{t("scene.departures").toUpperCase()}</span>
         {recent ? (
           <span className="flex items-center gap-1.5 text-lamp/90">
@@ -77,13 +79,16 @@ export function DepartureBoard({
           <span className="tabular">{clock(now)}</span>
         )}
       </div>
-      <ol className="mt-1.5">
+      <ol className="mt-1.5 lg:mt-3">
         {shown.map((s, i) => (
-          <Row key={s.id} s={s} title={title(s.taskId)} mark={recent?.diff.marks[s.id]} hideOnShort={i >= 2} />
+          <Row key={s.id} s={s} title={title(s.taskId)} mark={recent?.diff.marks[s.id]} hideOnShort={i >= 2} wideOnly={i >= 4} />
         ))}
       </ol>
-      {rows.length > shown.length && (
-        <p className="mt-1 text-right font-mono text-[0.5625rem] tracking-[0.2em] text-haze">{t("scene.moreStations", { n: rows.length - shown.length })}</p>
+      {more(4) > 0 && (
+        <p className="mt-1 text-right font-mono text-[0.5625rem] tracking-[0.2em] text-haze lg:hidden">{t("scene.moreStations", { n: more(4) })}</p>
+      )}
+      {more(8) > 0 && (
+        <p className="mt-2 hidden text-right font-mono text-[0.625rem] tracking-[0.2em] text-haze lg:block">{t("scene.moreStations", { n: more(8) })}</p>
       )}
       {transfers.map((x) => {
         const day = transferDay(forecast, x.taskId, today);
@@ -100,21 +105,21 @@ export function DepartureBoard({
   );
 }
 
-function Row({ s, title, mark, hideOnShort }: { s: StudySession; title: string; mark?: StationMark; hideOnShort: boolean }) {
+function Row({ s, title, mark, hideOnShort, wideOnly }: { s: StudySession; title: string; mark?: StationMark; hideOnShort: boolean; wideOnly: boolean }) {
   const { t, fmt } = useI18n();
   const running = s.status === "active";
   return (
     <li
-      className={`grid grid-cols-[2.9rem_minmax(0,4.6rem)_minmax(0,1fr)_auto] items-baseline gap-2 border-t border-white/[0.045] py-[0.3rem] first:border-t-0 ${
-        hideOnShort ? "[@media(max-height:740px)]:hidden" : ""
-      }`}
+      className={`grid-cols-[2.9rem_minmax(0,4.6rem)_minmax(0,1fr)_auto] items-baseline gap-2 border-t border-white/[0.045] py-[0.3rem] first:border-t-0 lg:grid-cols-[3.6rem_minmax(0,5.5rem)_minmax(0,1fr)_auto] lg:gap-3 lg:py-2.5 ${
+        wideOnly ? "hidden lg:grid" : "grid"
+      } ${hideOnShort ? "[@media(max-height:740px)]:max-lg:hidden" : ""}`}
     >
-      <span className="font-mono text-[0.8125rem] tabular text-[#e8c88f]">
+      <span className="font-mono text-[0.8125rem] tabular text-[#e8c88f] lg:text-[1.0625rem]">
         <FlipText text={clock(s.plannedStart)} stagger={25} />
       </span>
-      <span className="station-label truncate font-mono text-[0.5625rem] tracking-[0.14em] text-paper/50">{fmt.station(s.stationName)}</span>
-      <span className="truncate text-[0.8125rem] text-paper-dim">{title}</span>
-      <span key={mark?.kind ?? (running ? "run" : "same")} className="animate-enter whitespace-nowrap text-right font-mono text-[0.625rem] tracking-[0.06em]">
+      <span className="station-label truncate font-mono text-[0.5625rem] tracking-[0.14em] text-paper/50 lg:text-[0.6875rem]">{fmt.station(s.stationName)}</span>
+      <span className="truncate text-[0.8125rem] text-paper-dim lg:text-[0.9375rem]">{title}</span>
+      <span key={mark?.kind ?? (running ? "run" : "same")} className="animate-enter whitespace-nowrap text-right font-mono text-[0.625rem] tracking-[0.06em] lg:text-[0.75rem]">
         {running ? (
           <span className="inline-flex items-center gap-1 text-[#9fd4b4]">
             <span className="h-1 w-1 rounded-full bg-[#9fd4b4] motion-safe-only animate-breathe" aria-hidden />
