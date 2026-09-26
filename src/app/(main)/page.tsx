@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useRef, useState, type ReactNode } from "react";
 import { availabilityForDate } from "@/core/availability";
-import { awaitingConfirmation, journeyFor } from "@/core/journey";
+import { awaitingConfirmation, journeyFor, serviceLeft as serviceMinutesLeft } from "@/core/journey";
 import { remainingSeconds, routeOf } from "@/core/sessions";
 import { clock, formatHM, serviceDate, serviceMinutes } from "@/core/time";
 import { Button, ButtonLink, buttonClass } from "@/components/ui/Button";
@@ -24,7 +25,7 @@ import { useNow } from "@/lib/hooks";
 import { taskHref, ticketHref } from "@/lib/paths";
 import { routeItems, routeSummary } from "@/lib/route-view";
 import { useConflict } from "@/lib/use-planner";
-import { loadSampleData } from "@/state/actions";
+import { continueService, loadSampleData } from "@/state/actions";
 import { useI18n } from "@/i18n";
 import { useData } from "@/state/store";
 
@@ -46,6 +47,8 @@ export default function TonightPage() {
   const { conflict, forecast } = useConflict(data, now);
   const arrivals = useArrivals(data, forecast, today);
   const [panel, setPanel] = useState<Panel>(null);
+  const [nothingDue, setNothingDue] = useState(false);
+  const router = useRouter();
   const boardRef = useRef<HTMLDivElement>(null);
   const departRef = useRef<HTMLDivElement>(null);
   const boardButtonRef = useRef<HTMLDivElement>(null);
@@ -56,6 +59,7 @@ export default function TonightPage() {
   const ended = journey?.phase === "final" && !!journey.startedAt;
   const nowMin = serviceMinutes(now, today);
   const serviceLeft = windows.some((w) => w.end > nowMin);
+  const minutesLeft = ended ? serviceMinutesLeft(data, now) : 0;
   const active = summary.active;
   const next = active ?? summary.next;
   const nextTask = next ? tasksById.get(next.taskId) : undefined;
@@ -133,6 +137,18 @@ export default function TonightPage() {
           <>
             <p className="eyebrow text-lamp/90">{t("scene.finalStation")}</p>
             <p className="mt-3 font-display text-[2.1rem] leading-tight">{t("tonight.complete")}</p>
+            {!ticket && minutesLeft >= 20 &&
+              (nothingDue ? (
+                <p className="mt-3 text-sm text-haze">{t("journey.nothingDueNow")}</p>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => (continueService() ? router.push("/journey") : setNothingDue(true))}
+                  className="mt-3 min-h-9 text-left text-sm text-mist underline decoration-rule underline-offset-4 hover:text-paper"
+                >
+                  {t("journey.serviceTimeLeft", { duration: fmt.duration(minutesLeft) })}
+                </button>
+              ))}
           </>
         ) : summary.next && nextTask ? (
           <div ref={departRef}>

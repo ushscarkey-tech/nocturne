@@ -7,7 +7,8 @@ import * as engine from "./journey";
 import { newId } from "./ids";
 import { schedulingProfile } from "./learning";
 import { planToday } from "./planner";
-import { activeSession } from "./sessions";
+import { MIN_USEFUL_MINUTES } from "./availability";
+import { activeSession, upcomingOn } from "./sessions";
 import { serviceDate } from "./time";
 import type { FocusLevel, NocturneData, ReplanReason, RouteChange, Task } from "./types";
 
@@ -45,15 +46,16 @@ export function recordChange(data: NocturneData, change: RouteChange | null): No
   return { ...data, journeys: data.journeys.map((j) => (j.id === journey.id ? updated : j)) };
 }
 
-/** Rebuild or retime tonight's future stations. Skipped once the night has ended. */
-export function replan(
-  data: NocturneData,
-  reason: ReplanReason,
-  now: Date,
-  opts: { mode?: "reoptimize" | "retime"; order?: string[]; focus?: FocusLevel } = {},
-): OpResult {
+type ReplanOptions = { mode?: "reoptimize" | "retime"; order?: string[]; focus?: FocusLevel };
+
+/**
+ * Rebuild or retime tonight's future stations. Once the night has ended the
+ * route stays as it was, unless the traveller changes their tasks or
+ * Service Time while there is time left: then the line reopens if work fits.
+ */
+export function replan(data: NocturneData, reason: ReplanReason, now: Date, opts: ReplanOptions = {}): OpResult {
   const journey = engine.journeyFor(data, serviceDate(now));
-  if (journey?.phase === "final") return { data, change: null };
+  if (journey?.phase === "final") return (reason === "task-change" && reopen(data, now, opts)) || { data, change: null };
   const startFrom = journey?.phase === "stop" && journey.stopEndsAt ? new Date(journey.stopEndsAt) : undefined;
   const result = planToday(
     { tasks: data.tasks, windows: data.windows, sessions: data.sessions, userId: data.profile.id, focusProfile: schedulingProfile(data, now) },
@@ -68,6 +70,17 @@ export function replan(
   );
   const next = recordChange({ ...data, sessions: result.sessions }, result.change);
   return { data: next, change: result.change };
+}
+
+/** The ended night with its line open again for boarding, or null when nothing fits in the time left. */
+function reopen(data: NocturneData, now: Date, opts: ReplanOptions): OpResult | null {
+  const date = serviceDate(now);
+  if (engine.serviceLeft(data, now) < MIN_USEFUL_MINUTES) return null;
+  // Stations left behind when the night ended hand their work back.
+  const sessions = data.sessions.filter((s) => !(s.date === date && s.endedBy === "unreached"));
+  const journeys = data.journeys.map((j) => (j.date === date ? { ...j, phase: "boarding" as const, completedAt: null, stopEndsAt: null } : j));
+  const result = replan({ ...data, sessions, journeys }, "task-change", now, opts);
+  return upcomingOn(result.data.sessions, date).length > 0 ? result : null;
 }
 
 /** Settle stale journeys and make sure tonight has a route. */
