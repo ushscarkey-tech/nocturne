@@ -20,6 +20,23 @@ const conflict: Partial<Record<keyof typeof source, string>> = {
   "conflict.done": "完成",
   "conflict.everythingFits": "一切在截止前都能安排。",
   "conflict.resolutionNote": "优先级低的任务会先列出。给它更多时间、减少工作量或延期到另一天。",
+  "conflict.rescueLead": "到{date}还差{min}。这样做就能全部完成。",
+  "conflict.rescueLeadPartial": "到{date}还差{min}。已经尽量补上了。",
+  "conflict.rescueReplan": "重新安排今晚的路线，就都放得下。",
+  "conflict.rescueStill": "这样还差{min}。请在下面自行调整。",
+  "conflict.rescueShortStops": "稍微缩短休息",
+  "conflict.rescueShortStopsDetail": "长站后的停靠从 10 分钟变为 5 分钟。",
+  "conflict.rescueExtraTime": "多一点学习时间",
+  "conflict.rescueTrim": "试着用更短的时间完成",
+  "conflict.rescuePostpone": "不急的事推迟截止日期",
+  "conflict.rescueGain": "+{min}",
+  "conflict.rescueApply": "应用",
+  "conflict.rescueApplyAll": "就这样做",
+  "conflict.rescueReplanButton": "重新规划路线",
+  "conflict.rescueChip": "补上不够的时间",
+  "conflict.orYourself": "自己调整",
+  "conflict.rescueMore": "另外{n}项",
+  "conflict.rescueStudy": "自习",
 };
 
 export default conflict;

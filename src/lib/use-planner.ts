@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import { worstConflict, type Forecast } from "@/core/allocate";
+import { stopsOf } from "@/core/availability";
 import { forecast } from "@/core/planner";
 import { serviceDate } from "@/core/time";
 import type { NocturneData } from "@/core/types";
@@ -13,8 +14,12 @@ import type { NocturneData } from "@/core/types";
 export function useForecast(data: NocturneData, now: Date): Forecast {
   const minute = Math.floor(now.getTime() / 60_000);
   return useMemo(
-    () => forecast({ tasks: data.tasks, windows: data.windows, sessions: data.sessions, userId: data.profile.id }, new Date(minute * 60_000)),
-    [data.tasks, data.windows, data.sessions, data.profile.id, minute],
+    () =>
+      forecast(
+        { tasks: data.tasks, windows: data.windows, sessions: data.sessions, userId: data.profile.id, stops: stopsOf(data.profile) },
+        new Date(minute * 60_000),
+      ),
+    [data.tasks, data.windows, data.sessions, data.profile, minute],
   );
 }
 

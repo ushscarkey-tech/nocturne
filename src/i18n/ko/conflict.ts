@@ -20,6 +20,23 @@ const conflict: Partial<Record<keyof typeof source, string>> = {
   "conflict.done": "완료",
   "conflict.everythingFits": "이제 모든 게 마감 전에 들어가요.",
   "conflict.resolutionNote": "우선순위가 낮은 할 일부터 나열됩니다. 시간을 더 주거나, 일의 양을 줄이거나, 다른 날로 미루세요.",
+  "conflict.rescueLead": "{date}까지 {min}이 모자라요. 이렇게 하면 다 끝낼 수 있어요.",
+  "conflict.rescueLeadPartial": "{date}까지 {min}이 모자라요. 할 수 있는 만큼 메워 봤어요.",
+  "conflict.rescueReplan": "오늘 노선을 다시 짜면 다 들어가요.",
+  "conflict.rescueStill": "이렇게 해도 {min}이 모자라요. 아래에서 직접 조정해 주세요.",
+  "conflict.rescueShortStops": "쉬는 시간 조금 줄이기",
+  "conflict.rescueShortStopsDetail": "긴 정거장 뒤 정차 시간을 10분에서 5분으로 줄여요.",
+  "conflict.rescueExtraTime": "자습 시간 조금 늘리기",
+  "conflict.rescueTrim": "이 일들은 조금 더 빨리 끝내 보기",
+  "conflict.rescuePostpone": "덜 급한 일은 마감 미루기",
+  "conflict.rescueGain": "+{min}",
+  "conflict.rescueApply": "적용",
+  "conflict.rescueApplyAll": "이대로 하기",
+  "conflict.rescueReplanButton": "노선 다시 짜기",
+  "conflict.rescueChip": "모자란 시간 메우기",
+  "conflict.orYourself": "직접 조정하기",
+  "conflict.rescueMore": "외 {n}개",
+  "conflict.rescueStudy": "자습",
 };
 
 export default conflict;

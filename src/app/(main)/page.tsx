@@ -186,7 +186,7 @@ export default function TonightPage() {
           <div className="mt-5 flex animate-enter flex-wrap gap-2" style={{ animationDelay: "1450ms" }}>
             {conflict && (
               <Chip tone="signal" onClick={() => setPanel("conflict")}>
-                {t("scene.conflict")}
+                {t("conflict.rescueChip")}
               </Chip>
             )}
             {overdue.length > 0 && <Chip onClick={() => setPanel("overdue")}>{t("scene.pastDeadline", { n: overdue.length })}</Chip>}
@@ -239,8 +239,8 @@ export default function TonightPage() {
         </div>
       </Sheet>
       <ArrivalSheet open={panel === "arrival"} onClose={() => setPanel(null)} summary={arrivals} today={today} onResolve={() => setPanel("conflict")} />
-      <Sheet open={panel === "conflict"} onClose={() => setPanel(null)} title={t("scene.conflict")}>
-        {conflict && <ConflictNotice conflict={conflict} tasks={data.tasks} />}
+      <Sheet open={panel === "conflict"} onClose={() => setPanel(null)} title={t("conflict.rescueChip")}>
+        {conflict ? <ConflictNotice conflict={conflict} tasks={data.tasks} /> : <p className="text-sm leading-relaxed text-mist">{t("conflict.everythingFits")}</p>}
       </Sheet>
       <Sheet open={panel === "overdue"} onClose={() => setPanel(null)} title={t("tonight.pastDeadline")}>
         <ul className="space-y-3 text-sm">

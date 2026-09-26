@@ -15,6 +15,8 @@ const INSTRUCTIONS = `Nocturne is the traveller's evening study planner, told as
 Tonight's study plan is a route of stations; each station is one block of one task. Service Time is when they can study.
 Use get_tonight for tonight's plan, list_tasks for tasks, quick_add or add_task to add work (a deadline and an estimate let it be planned),
 update_task / complete_task / log_progress to change things, and arrival_forecast to answer "will I finish everything in time?".
+If something won't fit, never stop at "it can't be done": arrival_forecast includes a rescue_plan (shorter Station Stops, extra study time on specific days and hours,
+trimming less important tasks, moving the least urgent deadlines back). Explain it concretely and offer to apply it with apply_rescue_plan.
 Changes re-plan the route immediately, exactly as in the app. Answer in the traveller's language.`;
 
 type RpcId = string | number | null;

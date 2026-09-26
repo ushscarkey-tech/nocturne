@@ -71,6 +71,7 @@ function profileFromRow(row: Record<string, unknown>): Profile {
     learnFromSessions: (row.learn_from_sessions as boolean) ?? true,
     autoAdjustEstimates: (row.auto_adjust_estimates as boolean) ?? true,
     useFocusHistory: (row.use_focus_history as boolean) ?? true,
+    shortStops: (row.short_stops as boolean) ?? false,
   };
 }
 

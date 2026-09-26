@@ -10,6 +10,17 @@ export interface Interval {
 /** Break inserted between stations, and the rough cadence used for capacity. */
 export const BREAK_SHORT = 5;
 export const BREAK_LONG = 10;
+
+/** Station Stop length: the usual, or short when the traveller needs the time. */
+export type Stops = "normal" | "short";
+const STOP_MINUTES: Record<Stops, { short: number; long: number }> = {
+  normal: { short: BREAK_SHORT, long: BREAK_LONG },
+  short: { short: 3, long: 5 },
+};
+
+export function stopsOf(profile: { shortStops?: boolean }): Stops {
+  return profile.shortStops ? "short" : "normal";
+}
 /** Fragments shorter than this are not worth a station. */
 export const MIN_USEFUL_MINUTES = 15;
 
@@ -96,16 +107,16 @@ export function totalMinutes(list: Interval[]): number {
  * Focus minutes that realistically fit a stretch of time once Station Stops
  * are accounted for (roughly one 10-minute stop per hour).
  */
-export function focusCapacity(length: number): number {
+export function focusCapacity(length: number, stops: Stops = "normal"): number {
   if (length < MIN_USEFUL_MINUTES) return 0;
-  const stops = Math.max(0, Math.ceil(length / 60) - 1);
-  return Math.max(0, length - stops * BREAK_LONG);
+  const count = Math.max(0, Math.ceil(length / 60) - 1);
+  return Math.max(0, length - count * STOP_MINUTES[stops].long);
 }
 
-export function capacityOf(list: Interval[]): number {
-  return list.reduce((sum, i) => sum + focusCapacity(i.end - i.start), 0);
+export function capacityOf(list: Interval[], stops: Stops = "normal"): number {
+  return list.reduce((sum, i) => sum + focusCapacity(i.end - i.start, stops), 0);
 }
 
-export function breakAfter(minutes: number): number {
-  return minutes >= 45 ? BREAK_LONG : BREAK_SHORT;
+export function breakAfter(minutes: number, stops: Stops = "normal"): number {
+  return minutes >= 45 ? STOP_MINUTES[stops].long : STOP_MINUTES[stops].short;
 }

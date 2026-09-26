@@ -4,10 +4,11 @@
  * would in-app) and writes back only what changed.
  */
 import { arrivalForecast } from "../src/core/arrival";
-import { availabilityForDate } from "../src/core/availability";
+import { availabilityForDate, stopsOf } from "../src/core/availability";
 import * as ops from "../src/core/ops";
 import { forecast } from "../src/core/planner";
 import { parseQuickAdd } from "../src/core/quickadd";
+import { applyRescue, rescuePlan, type RescuePlan } from "../src/core/rescue";
 import { routeOf } from "../src/core/sessions";
 import { stationLabel } from "../src/core/stations";
 import { addDays, clock, formatHM, serviceDate } from "../src/core/time";
@@ -65,6 +66,31 @@ export class Ctx {
 }
 
 // ----------------------------------------------------------------- shaping
+
+function rescueView(plan: RescuePlanOrNull, d: NocturneData) {
+  if (!plan) return null;
+  const title = (id: string) => d.tasks.find((t) => t.id === id)?.title ?? id;
+  return {
+    deadline: plan.deadline,
+    short_minutes: plan.shortfall,
+    still_short_after_minutes: plan.left,
+    steps: plan.steps.map((st) =>
+      st.kind === "shortStops"
+        ? { step: "short_stops", gain_minutes: st.gain, what: "Station Stops after long stations go from 10 to 5 minutes" }
+        : st.kind === "extraTime"
+          ? { step: "extra_time", gain_minutes: st.gain, study: st.windows.map((w) => ({ date: w.date, from: w.start, to: w.end })) }
+          : st.kind === "trim"
+            ? { step: "trim", gain_minutes: st.gain, tasks: st.cuts.map((c) => ({ title: title(c.taskId), from_minutes: c.from, to_minutes: c.to })) }
+            : {
+                step: "postpone",
+                gain_minutes: st.gain,
+                tasks: st.moves.map((m) => ({ title: title(m.taskId), from: m.from, to: m.to })),
+                study: st.windows.map((w) => ({ date: w.date, from: w.start, to: w.end })),
+              },
+    ),
+  };
+}
+type RescuePlanOrNull = RescuePlan | null;
 
 function taskView(t: Task, d: NocturneData) {
   return {
@@ -336,7 +362,7 @@ export const TOOLS: ToolDef[] = [
     async run(ctx) {
       const d = await ctx.get();
       const today = serviceDate(ctx.now);
-      const f = forecast({ tasks: d.tasks, windows: d.windows, sessions: d.sessions, userId: d.profile.id }, ctx.now);
+      const f = forecast({ tasks: d.tasks, windows: d.windows, sessions: d.sessions, userId: d.profile.id, stops: stopsOf(d.profile) }, ctx.now);
       const s = arrivalForecast(f, d.tasks, today);
       return {
         today,
@@ -352,7 +378,38 @@ export const TOOLS: ToolDef[] = [
           days_to_spare: a.slackDays,
           plan: a.plan.slice(0, 10),
         })),
+        // When something won't make it: how it can, not just that it can't.
+        rescue_plan: rescueView(rescuePlan(d, ctx.now), d),
       };
+    },
+  },
+  {
+    name: "apply_rescue_plan",
+    title: "Make it all fit",
+    description:
+      "When work won't fit before a deadline, apply the plan arrival_forecast suggests (shorter Station Stops, extra study time on specific days, trimming the less important tasks, moving the least urgent deadlines back). Show the traveller the plan and ask before applying. Pass which steps to apply, or omit to apply all.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        steps: {
+          type: "array",
+          items: { type: "string", enum: ["short_stops", "extra_time", "trim", "postpone"] },
+          description: "Which steps to apply. Omit for all.",
+        },
+      },
+    },
+    async run(ctx, args) {
+      const d = await ctx.get();
+      const plan = rescuePlan(d, ctx.now);
+      if (!plan) return { applied: [], message: "Everything already fits before its deadline." };
+      const KIND = { short_stops: "shortStops", extra_time: "extraTime", trim: "trim", postpone: "postpone" } as const;
+      const wanted = Array.isArray(args.steps) ? new Set((args.steps as string[]).map((k) => KIND[k as keyof typeof KIND]).filter(Boolean)) : null;
+      const steps = plan.steps.filter((st) => !wanted || wanted.has(st.kind));
+      const r = applyRescue(d, steps, ctx.now);
+      ctx.set(r.data);
+      await ctx.save();
+      const after = rescuePlan(r.data, ctx.now);
+      return { applied: steps.map((st) => st.kind), still_short_minutes: after ? after.shortfall : 0, route_change: changeView(r.change), tonight: tonight(ctx, r.data) };
     },
   },
   {

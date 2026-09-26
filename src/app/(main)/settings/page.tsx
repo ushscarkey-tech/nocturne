@@ -129,6 +129,12 @@ export default function SettingsPage() {
 
           <div className="divide-y divide-rule-soft border-y border-rule-soft">
             <Toggle
+              checked={p.shortStops}
+              onChange={(v) => updateProfile({ shortStops: v })}
+              label={t("settings.shortStops")}
+              description={t("settings.shortStopsHint")}
+            />
+            <Toggle
               checked={p.autoTunnel}
               onChange={(v) => updateProfile({ autoTunnel: v })}
               label={t("settings.autoTunnel")}

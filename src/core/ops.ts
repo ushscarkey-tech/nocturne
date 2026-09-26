@@ -7,7 +7,7 @@ import * as engine from "./journey";
 import { newId } from "./ids";
 import { schedulingProfile } from "./learning";
 import { planToday } from "./planner";
-import { MIN_USEFUL_MINUTES } from "./availability";
+import { MIN_USEFUL_MINUTES, stopsOf } from "./availability";
 import { activeSession, upcomingOn } from "./sessions";
 import { serviceDate } from "./time";
 import type { FocusLevel, NocturneData, ReplanReason, RouteChange, Task } from "./types";
@@ -58,7 +58,14 @@ export function replan(data: NocturneData, reason: ReplanReason, now: Date, opts
   if (journey?.phase === "final") return (reason === "task-change" && reopen(data, now, opts)) || { data, change: null };
   const startFrom = journey?.phase === "stop" && journey.stopEndsAt ? new Date(journey.stopEndsAt) : undefined;
   const result = planToday(
-    { tasks: data.tasks, windows: data.windows, sessions: data.sessions, userId: data.profile.id, focusProfile: schedulingProfile(data, now) },
+    {
+      tasks: data.tasks,
+      windows: data.windows,
+      sessions: data.sessions,
+      userId: data.profile.id,
+      focusProfile: schedulingProfile(data, now),
+      stops: stopsOf(data.profile),
+    },
     {
       now,
       focus: opts.focus ?? journey?.focus ?? "steady",
@@ -90,7 +97,7 @@ export function ensureDay(data: NocturneData, now: Date): NocturneData {
   const hasToday = next.sessions.some((s) => s.date === today) || engine.journeyFor(next, today);
   if (!hasToday) {
     const planned = planToday(
-      { tasks: next.tasks, windows: next.windows, sessions: next.sessions, userId: next.profile.id },
+      { tasks: next.tasks, windows: next.windows, sessions: next.sessions, userId: next.profile.id, stops: stopsOf(next.profile) },
       { now, focus: "steady", mode: "reoptimize", reason: "initial" },
     );
     next = { ...next, sessions: planned.sessions };

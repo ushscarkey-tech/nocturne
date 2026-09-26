@@ -50,6 +50,8 @@ const settings: Partial<Record<keyof typeof source, string>> = {
   "settings.installIos": "Safari에서 공유 버튼(아이폰은 아래, 아이패드는 오른쪽 위)을 누르고 '홈 화면에 추가'를 고르세요.",
   "settings.installMacSafari": "Safari 메뉴 막대에서 파일 → 'Dock에 추가'를 고르세요.",
   "settings.installOther": "브라우저 메뉴에서 '앱 설치'나 '홈 화면에 추가'를 찾아 누르세요.",
+  "settings.shortStops": "짧은 정차",
+  "settings.shortStopsHint": "긴 정거장 뒤 쉬는 시간을 10분 대신 5분으로. 더 많이 담을 수 있어요.",
 };
 
 export default settings;

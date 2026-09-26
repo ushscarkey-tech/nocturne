@@ -7,6 +7,7 @@
 import * as engine from "@/core/journey";
 import { newId } from "@/core/ids";
 import * as ops from "@/core/ops";
+import { applyRescue, type RescueStep } from "@/core/rescue";
 import { renumberDay } from "@/core/planner";
 import { createSeedData } from "@/core/seed";
 import { sessionsOn } from "@/core/sessions";
@@ -341,7 +342,19 @@ function updateProfileData(data: NocturneData, patch: Partial<Profile>): Nocturn
 }
 
 export function updateProfile(patch: Partial<Profile>) {
+  // Stop length changes how much fits, so the route follows at once.
+  if (patch.shortStops !== undefined && patch.shortStops !== current().profile.shortStops) {
+    const { data, change } = ops.replan(updateProfileData(current(), patch), "task-change", new Date());
+    commit(data, change);
+    return;
+  }
   commit(updateProfileData(current(), patch));
+}
+
+/** Carry out a rescue plan (or some of its steps). */
+export function applyRescuePlan(steps: RescueStep[]) {
+  const { data, change } = applyRescue(current(), steps, new Date());
+  commit(data, change);
 }
 
 export async function loadSampleData() {

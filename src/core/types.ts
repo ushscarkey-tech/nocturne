@@ -35,6 +35,8 @@ export interface Profile {
   learnFromSessions: boolean;
   autoAdjustEstimates: boolean;
   useFocusHistory: boolean;
+  /** Shorter Station Stops (5 min after a long station instead of 10), to fit more in. */
+  shortStops: boolean;
 }
 
 export interface Task {
@@ -51,6 +53,8 @@ export interface Task {
    * (`estimatedMinutes` then holds the adjusted value). Null = unadjusted.
    */
   userEstimatedMinutes: number | null;
+  /** Minutes a rescue plan has already trimmed off, so it never trims a task twice over. */
+  trimmedMinutes?: number;
   remainingMinutes: number;
   interest: Level;
   difficulty: Level;
@@ -223,6 +227,7 @@ export const PROFILE_DEFAULTS = {
   learnFromSessions: true,
   autoAdjustEstimates: true,
   useFocusHistory: true,
+  shortStops: false,
 };
 
 /** Fill fields added after a record was saved, so old data keeps working. */

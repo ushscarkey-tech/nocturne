@@ -9,7 +9,7 @@
 import { newId } from "./ids";
 import { schedulingProfile } from "./learning";
 import { planToday, type PlanTodayOptions } from "./planner";
-import { availabilityForDate, breakAfter } from "./availability";
+import { availabilityForDate, breakAfter, stopsOf } from "./availability";
 import { activeSession, elapsedSeconds, routeOf, sessionsOn, upcomingOn } from "./sessions";
 import { boardingDetails } from "./stations";
 import { serviceDate, serviceMinutes } from "./time";
@@ -79,6 +79,7 @@ function replan(
       sessions: data.sessions,
       userId: data.profile.id,
       focusProfile: schedulingProfile(data, opts.now),
+      stops: stopsOf(data.profile),
     },
     { ...opts, focus: opts.focus ?? focusFallback },
   );
@@ -370,7 +371,7 @@ export function finishEarly(data: NocturneData, now: Date, wholeTask: boolean): 
   const { data: closedData, closed } = closeActive(data, now, wholeTask ? "early-all" : "early");
   if (!closed) return { data, change: null };
   const journey = journeyFor(closedData, closed.date)!;
-  const startFrom = new Date(now.getTime() + breakAfter(closed.completedMinutes) * 60_000);
+  const startFrom = new Date(now.getTime() + breakAfter(closed.completedMinutes, stopsOf(closedData.profile)) * 60_000);
   const planned = replan(closedData, { now, mode: "retime", reason: "finish-early", startFrom }, journey.focus);
   const j = afterStation(planned.data, withChange(journey, planned.change), now);
   return { data: replaceJourney(planned.data, j), change: planned.change };

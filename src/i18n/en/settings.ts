@@ -48,6 +48,8 @@ const settings = {
   "settings.installIos": "In Safari, tap Share (at the bottom on iPhone, top right on iPad), then Add to Home Screen.",
   "settings.installMacSafari": "In Safari's menu bar, choose File → Add to Dock.",
   "settings.installOther": "Look for Install app or Add to Home Screen in your browser's menu.",
+  "settings.shortStops": "Short Station Stops",
+  "settings.shortStopsHint": "5 minutes after a long station instead of 10, to fit more in.",
 } as const;
 
 export default settings;

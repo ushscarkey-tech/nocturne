@@ -12,7 +12,7 @@
  * - Feasibility is checked independently with the EDF cumulative test so a
  *   shortfall is reported instead of silently producing an impossible plan.
  */
-import { availabilityForDate, breakAfter, capacityOf, clipIntervals, subtractIntervals, type Interval } from "./availability";
+import { availabilityForDate, breakAfter, capacityOf, clipIntervals, subtractIntervals, type Interval, type Stops } from "./availability";
 import { creditedOn, remainingSeconds, remainingWork, spanOf } from "./sessions";
 import { addDays, dayOfWeek, diffDays, roundTo, roundUp, serviceDate, serviceMinutes } from "./time";
 import type { DateKey, StudySession, StudyWindow, Task } from "./types";
@@ -32,6 +32,8 @@ export interface AllocatorInput {
   excludeToday?: ReadonlySet<string>;
   /** Minutes past midnight from which today's capacity counts (defaults to now). */
   todayFrom?: number;
+  /** Station Stop length (the traveller's setting). */
+  stops?: Stops;
 }
 
 export interface DayPlan {
@@ -84,6 +86,7 @@ function fixedOn(
   today: DateKey,
   now: Date,
   keepTodayPlan: boolean,
+  stops: Stops = "normal",
 ): { blocks: Interval[]; committed: Record<string, number> } {
   const blocks: Interval[] = [];
   const committed: Record<string, number> = {};
@@ -92,11 +95,11 @@ function fixedOn(
     if (s.date !== date) continue;
     let work = 0;
     if (s.status === "active") {
-      blocks.push({ start: nowMin, end: nowMin + remainingSeconds(s, now) / 60 + breakAfter(s.plannedMinutes) });
+      blocks.push({ start: nowMin, end: nowMin + remainingSeconds(s, now) / 60 + breakAfter(s.plannedMinutes, stops) });
       work = remainingWork(s, now);
     } else if (s.status === "planned" && (s.locked || (keepTodayPlan && date === today))) {
       const span = spanOf(s);
-      blocks.push({ start: span.start, end: span.end + breakAfter(s.plannedMinutes) });
+      blocks.push({ start: span.start, end: span.end + breakAfter(s.plannedMinutes, stops) });
       work = s.workMinutes;
     }
     if (work > 0) committed[s.taskId] = (committed[s.taskId] ?? 0) + work;
@@ -122,10 +125,10 @@ export function allocate(input: AllocatorInput): Forecast {
   for (let i = 0; i < horizon; i++) {
     const date = addDays(today, i);
     let intervals = availabilityForDate(windows, date);
-    const { blocks, committed } = fixedOn(sessions, date, today, now, keepTodayPlan);
+    const { blocks, committed } = fixedOn(sessions, date, today, now, keepTodayPlan, input.stops);
     if (i === 0) intervals = clipIntervals(intervals, roundUp(input.todayFrom ?? serviceMinutes(now, today), 5));
     intervals = subtractIntervals(intervals, blocks);
-    days.push({ date, index: i, intervals, capacity: capacityOf(intervals), load: 0, allocations: {}, committed });
+    days.push({ date, index: i, intervals, capacity: capacityOf(intervals, input.stops), load: 0, allocations: {}, committed });
   }
 
   const committedTotal = (taskId: string) => days.reduce((sum, d) => sum + (d.committed[taskId] ?? 0), 0);

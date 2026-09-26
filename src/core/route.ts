@@ -2,7 +2,7 @@
  * Day routing: turn a day's allocation into an ordered sequence of stations
  * that fit inside Service Time, with Station Stops between them.
  */
-import { breakAfter, type Interval } from "./availability";
+import { breakAfter, type Interval, type Stops } from "./availability";
 import { diffDays, roundTo } from "./time";
 import type { DateKey, FocusLevel, Task } from "./types";
 
@@ -121,6 +121,7 @@ export function packOptimized(
   intervals: Interval[],
   ctx: OrderContext,
   minSessionFor: (taskId: string) => number,
+  stops: Stops = "normal",
 ): PackResult {
   const pool = chunks.map((c) => ({ ...c }));
   const slots: Slot[] = [];
@@ -166,7 +167,7 @@ export function packOptimized(
       }
       slots.push({ ...placed, start: cursor, end: cursor + placed.minutes });
       prev = placed;
-      cursor += placed.minutes + breakAfter(placed.minutes);
+      cursor += placed.minutes + breakAfter(placed.minutes, stops);
     }
   }
   return { slots, overflow: pool };
@@ -181,6 +182,7 @@ export function packInOrder(
   intervals: Interval[],
   splittable: (taskId: string) => boolean,
   minSessionFor: (taskId: string) => number,
+  stops: Stops = "normal",
 ): PackResult {
   const queue = chunks.map((c) => ({ ...c }));
   const slots: Slot[] = [];
@@ -196,7 +198,7 @@ export function packInOrder(
     const c = queue[0];
     if (c.minutes <= space) {
       slots.push({ ...c, start: cursor, end: cursor + c.minutes });
-      cursor += c.minutes + breakAfter(c.minutes);
+      cursor += c.minutes + breakAfter(c.minutes, stops);
       queue.shift();
       continue;
     }

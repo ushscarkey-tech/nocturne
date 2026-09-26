@@ -8,7 +8,7 @@
  * - only future, unlocked stations are rebuilt or retimed.
  */
 import { allocate, isRecurring, type Forecast } from "./allocate";
-import { availabilityForDate, breakAfter, clipIntervals, subtractIntervals, type Interval } from "./availability";
+import { availabilityForDate, breakAfter, clipIntervals, subtractIntervals, type Interval, type Stops } from "./availability";
 import { newId } from "./ids";
 import { chunksFor, packInOrder, packOptimized, type Chunk, type Slot } from "./route";
 import { isClosed, remainingSeconds, remainingWork, sessionsOn, spanOf } from "./sessions";
@@ -27,6 +27,8 @@ export interface PlanTodayInput {
   userId: string;
   /** Learned focus pattern; null/undefined = general rules only. */
   focusProfile?: FocusProfile | null;
+  /** Station Stop length (the traveller's setting). */
+  stops?: Stops;
 }
 
 export interface PlanTodayOptions {
@@ -65,6 +67,7 @@ export function freeTimeToday(
   sessions: StudySession[],
   now: Date,
   from: number,
+  stops: Stops = "normal",
 ): Interval[] {
   const today = serviceDate(now);
   const nowMin = serviceMinutes(now, today);
@@ -73,10 +76,10 @@ export function freeTimeToday(
     if (s.date !== today) continue;
     // Each busy block carries the Station Stop that follows it.
     if (s.status === "active") {
-      blocks.push({ start: nowMin, end: nowMin + remainingSeconds(s, now) / 60 + breakAfter(s.plannedMinutes) });
+      blocks.push({ start: nowMin, end: nowMin + remainingSeconds(s, now) / 60 + breakAfter(s.plannedMinutes, stops) });
     } else if (s.status === "planned" && s.locked) {
       const span = spanOf(s);
-      blocks.push({ start: span.start, end: span.end + breakAfter(s.plannedMinutes) });
+      blocks.push({ start: span.start, end: span.end + breakAfter(s.plannedMinutes, stops) });
     }
   }
   return subtractIntervals(clipIntervals(availabilityForDate(windows, today), roundUp(from, 5)), blocks);
@@ -135,7 +138,8 @@ export function planToday(input: PlanTodayInput, opts: PlanTodayOptions): PlanTo
   const nowMin = serviceMinutes(now, today);
   const fromMin =
     opts.startFrom && serviceDate(opts.startFrom) === today ? Math.max(nowMin, serviceMinutes(opts.startFrom, today)) : nowMin;
-  const free = freeTimeToday(windows, kept, now, fromMin);
+  const stops = input.stops ?? "normal";
+  const free = freeTimeToday(windows, kept, now, fromMin, stops);
   const minSessionFor = (id: string) => tasksById.get(id)?.minSessionMinutes ?? 25;
 
   const todays = sessionsOn(kept, today);
@@ -154,7 +158,7 @@ export function planToday(input: PlanTodayInput, opts: PlanTodayOptions): PlanTo
       ? [...opts.order.map((id) => byId.get(id)).filter((s): s is StudySession => !!s), ...movable.filter((s) => !opts.order!.includes(s.id))]
       : movable;
     const chunks = ordered.map((s) => ({ key: s.id, taskId: s.taskId, minutes: s.plannedMinutes, work: s.workMinutes }));
-    ({ slots, overflow } = packInOrder(chunks, free, (id) => tasksById.get(id)?.splittable ?? true, minSessionFor));
+    ({ slots, overflow } = packInOrder(chunks, free, (id) => tasksById.get(id)?.splittable ?? true, minSessionFor, stops));
   } else {
     const skippedToday = new Set(
       sessionsOn(sessions, today)
@@ -191,6 +195,7 @@ export function planToday(input: PlanTodayInput, opts: PlanTodayOptions): PlanTo
         keepTodayPlan: false,
         excludeToday: skippedToday,
         todayFrom: fromMin,
+        stops,
       });
       dayWork = forecast.days[0]?.allocations ?? {};
     }
@@ -202,10 +207,10 @@ export function planToday(input: PlanTodayInput, opts: PlanTodayOptions): PlanTo
     const ctx = { date: today, focus, tasks: tasksById, previousTaskId };
     const profile = input.focusProfile ?? null;
     if (profile) {
-      ({ slots, overflow } = packOptimized(chunks, free, { ...ctx, history: (t, m) => historyNudge(profile, t, m) }, minSessionFor));
+      ({ slots, overflow } = packOptimized(chunks, free, { ...ctx, history: (t, m) => historyNudge(profile, t, m) }, minSessionFor, stops));
       // Say so when history, not the general rules, moved demanding work earlier.
       if (profile.bestHardWindow && reason !== "initial") {
-        const plain = packOptimized(chunks, free, ctx, minSessionFor).slots;
+        const plain = packOptimized(chunks, free, ctx, minSessionFor, stops).slots;
         for (const slot of slots) {
           const t = tasksById.get(slot.taskId);
           if (!t || t.difficulty < 4) continue;
@@ -217,7 +222,7 @@ export function planToday(input: PlanTodayInput, opts: PlanTodayOptions): PlanTo
         }
       }
     } else {
-      ({ slots, overflow } = packOptimized(chunks, free, ctx, minSessionFor));
+      ({ slots, overflow } = packOptimized(chunks, free, ctx, minSessionFor, stops));
     }
   }
 
@@ -373,7 +378,7 @@ export function describeChange(
 
 /** Future-days forecast consistent with the persisted route for today. */
 export function forecast(input: PlanTodayInput, now: Date): Forecast {
-  return allocate({ tasks: input.tasks, windows: input.windows, sessions: input.sessions, now, keepTodayPlan: true });
+  return allocate({ tasks: input.tasks, windows: input.windows, sessions: input.sessions, now, keepTodayPlan: true, stops: input.stops });
 }
 
 export { makeSession };

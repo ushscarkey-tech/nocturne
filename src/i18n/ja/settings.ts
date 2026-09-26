@@ -50,6 +50,8 @@ const settings: Partial<Record<keyof typeof source, string>> = {
   "settings.installIos": "Safariで共有をタップし(iPhoneは下部、iPadは右上)、ホーム画面に追加を選びます。",
   "settings.installMacSafari": "Safariのメニューバーから ファイル → Dockに追加 を選びます。",
   "settings.installOther": "ブラウザのメニューからアプリをインストールまたはホーム画面に追加を探します。",
+  "settings.shortStops": "短い停車",
+  "settings.shortStopsHint": "長い駅の後の停車が10分から5分に短くなり、もっと詰められます。",
 };
 
 export default settings;

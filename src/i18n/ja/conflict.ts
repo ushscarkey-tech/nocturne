@@ -20,6 +20,23 @@ const conflict: Partial<Record<keyof typeof source, string>> = {
   "conflict.shortfall": "不足分",
   "conflict.taskPlural": "タスク",
   "conflict.taskSingular": "タスク",
+  "conflict.rescueLead": "{date}まで{min}足りません。こうすれば全部終わらせられます。",
+  "conflict.rescueLeadPartial": "{date}まで{min}足りません。できるだけ埋めてみました。",
+  "conflict.rescueReplan": "今夜のルートを立て直すと、すべて収まります。",
+  "conflict.rescueStill": "これでも{min}足りません。下で直接調整してください。",
+  "conflict.rescueShortStops": "休憩を少し短く",
+  "conflict.rescueShortStopsDetail": "長い駅の後の停車が10分から5分に短くなります。",
+  "conflict.rescueExtraTime": "もう少し学習時間を",
+  "conflict.rescueTrim": "少し短い時間で終わらせてみる",
+  "conflict.rescuePostpone": "急がないものは締切を延ばす",
+  "conflict.rescueGain": "+{min}",
+  "conflict.rescueApply": "適用",
+  "conflict.rescueApplyAll": "この通りにする",
+  "conflict.rescueReplanButton": "ルートを立て直す",
+  "conflict.rescueChip": "足りない時間を埋める",
+  "conflict.orYourself": "自分で調整する",
+  "conflict.rescueMore": "ほか{n}件",
+  "conflict.rescueStudy": "自習",
 };
 
 export default conflict;

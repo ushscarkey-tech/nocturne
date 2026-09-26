@@ -18,6 +18,23 @@ const conflict = {
   "conflict.done": "Done",
   "conflict.everythingFits": "Everything fits before its deadline again.",
   "conflict.resolutionNote": "Lower-priority tasks are listed first. Give one more time, trim the work, or let it wait for another day.",
+  "conflict.rescueLead": "{min} short before {date}. Here's how to finish it all:",
+  "conflict.rescueLeadPartial": "{min} short before {date}. This closes as much as it can:",
+  "conflict.rescueReplan": "Rebuilding tonight's route fits everything in.",
+  "conflict.rescueStill": "Still {min} short after this. Adjust the tasks below.",
+  "conflict.rescueShortStops": "Shorter Station Stops",
+  "conflict.rescueShortStopsDetail": "The stop after a long station goes from 10 to 5 minutes.",
+  "conflict.rescueExtraTime": "A little more study time",
+  "conflict.rescueTrim": "Aim to do these a bit faster",
+  "conflict.rescuePostpone": "Move the less urgent ones back",
+  "conflict.rescueGain": "+{min}",
+  "conflict.rescueApply": "Apply",
+  "conflict.rescueApplyAll": "Do all of this",
+  "conflict.rescueReplanButton": "Rebuild the route",
+  "conflict.rescueChip": "Make it fit",
+  "conflict.orYourself": "Or adjust it yourself",
+  "conflict.rescueMore": "+{n} more",
+  "conflict.rescueStudy": "Study",
 } as const;
 
 export default conflict;
