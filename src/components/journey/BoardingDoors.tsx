@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import dynamic from "next/dynamic";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { sfx } from "@/audio/sfx";
 import type { TicketFace } from "@/core/stats";
 import type { CarriageId } from "@/core/types";
@@ -9,6 +10,24 @@ import { Ticket } from "@/components/ticket/Ticket";
 import { FlipText } from "@/components/scene/FlipText";
 import { haptic } from "@/lib/haptics";
 import { usePrefersReducedMotion } from "@/lib/hooks";
+
+// three.js loads only when someone is at the doors.
+const BoardingScene3D = dynamic(() => import("@/components/scene/BoardingScene3D"), { ssr: false, loading: () => null });
+
+let webgl2: boolean | null = null;
+function hasWebGL2() {
+  if (webgl2 === null) {
+    try {
+      webgl2 = !!document.createElement("canvas").getContext("webgl2");
+    } catch {
+      webgl2 = false;
+    }
+  }
+  return webgl2;
+}
+const noSubscribe = () => () => {};
+/** Fallback if the walk never reports that you've sat down (seconds after the doors open). */
+const WALK_LIMIT = 8;
 
 const STRIPE: Record<CarriageId, string> = { rain: "#4c5f7a", quiet: "#4f6a5c", tunnel: "#8a5a2b", moon: "#b69a62" };
 
@@ -41,6 +60,23 @@ export function BoardingDoors({
   const [stage, setStage] = useState<Stage>("waiting");
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
   const opened = useRef(false);
+  // In 3D the doors open and you walk in to your seat; otherwise the drawn doors.
+  const canDraw3D = useSyncExternalStore(noSubscribe, hasWebGL2, () => false);
+  const [failed3D, setFailed3D] = useState(false);
+  const walk = canDraw3D && !failed3D && !reduced;
+  const [seated, setSeated] = useState(false);
+  const insideCalled = useRef(false);
+  const goInside = () => {
+    if (insideCalled.current) return;
+    insideCalled.current = true;
+    onInside();
+  };
+  // Sat down: the view fades into the carriage.
+  const sitDown = () => {
+    if (seated) return;
+    setSeated(true);
+    at(700, goInside);
+  };
 
   useEffect(() => () => timers.current.forEach(clearTimeout), []);
   const at = (ms: number, fn: () => void) => timers.current.push(setTimeout(fn, ms));
@@ -76,13 +112,14 @@ export function BoardingDoors({
       setStage("entering");
       open();
     });
-    at(3750, onInside);
+    if (walk) at(2450 + WALK_LIMIT * 1000, goInside);
+    else at(3750, goInside);
   }
 
   function skip() {
     timers.current.forEach(clearTimeout);
     open();
-    onInside();
+    goInside();
   }
 
   const lit = stage !== "waiting";
@@ -90,9 +127,23 @@ export function BoardingDoors({
   const stripe = STRIPE[carriage];
 
   return (
-    <div className={`fixed inset-0 z-30 overflow-hidden bg-night-950 transition-opacity duration-700 ${stage === "entering" ? "opacity-0 delay-[900ms]" : ""}`}>
+    <div
+      className={`fixed inset-0 z-30 overflow-hidden bg-night-950 transition-opacity duration-700 ${
+        walk ? (seated ? "opacity-0" : "") : stage === "entering" ? "opacity-0 delay-[900ms]" : ""
+      }`}
+    >
+      {walk && (
+        <BoardingScene3D
+          className="absolute inset-0"
+          stage={stage}
+          carriage={carriage}
+          car={face.car}
+          onFail={() => setFailed3D(true)}
+          onInside={sitDown}
+        />
+      )}
       {/* Platform ceiling: two long tubes. */}
-      <div className="absolute inset-x-0 top-0 h-[24%] bg-[linear-gradient(180deg,#07090c,#0d1115)]" aria-hidden>
+      <div className={`absolute inset-x-0 top-0 h-[24%] bg-[linear-gradient(180deg,#07090c,#0d1115)] ${walk ? "hidden" : ""}`} aria-hidden>
         <div className="absolute inset-x-[22%] top-[22%] h-[3px] rounded-full bg-[#f3e6c8]/80 shadow-[0_0_24px_6px_rgba(240,222,176,0.18)]" />
         <div className="absolute inset-x-[30%] top-[18%] h-24 bg-[radial-gradient(50%_60%_at_50%_0%,rgba(240,222,176,0.1),transparent)]" />
       </div>
@@ -114,7 +165,7 @@ export function BoardingDoors({
 
       {/* The carriage, the door, the platform: the camera pushes in through the door. */}
       <div
-        className="absolute inset-0"
+        className={`absolute inset-0 ${walk ? "hidden" : ""}`}
         style={{
           transformOrigin: "50% 58%",
           transform: stage === "entering" && !reduced ? "scale(3.1)" : "none",
@@ -195,7 +246,7 @@ export function BoardingDoors({
       </div>
 
       {/* Warm light fills the frame as we step in. */}
-      <div className={`pointer-events-none absolute inset-0 bg-[#f1dfb8] transition-opacity duration-[1300ms] ${stage === "entering" && !reduced ? "opacity-25" : "opacity-0"}`} />
+      <div className={`pointer-events-none absolute inset-0 bg-[#f1dfb8] transition-opacity duration-[1300ms] ${stage === "entering" && !reduced && !walk ? "opacity-25" : "opacity-0"}`} />
 
       {/* The ticket, held out. */}
       <button
@@ -220,7 +271,7 @@ export function BoardingDoors({
       </p>
       <p
         aria-live="polite"
-        className={`absolute inset-x-0 bottom-[max(2.5rem,calc(env(safe-area-inset-bottom)+1.75rem))] text-center font-mono text-[0.625rem] tracking-[0.3em] text-lamp/80 transition-opacity duration-500 ${doorsOpen ? "opacity-100" : "opacity-0"}`}
+        className={`absolute inset-x-0 bottom-[max(2.5rem,calc(env(safe-area-inset-bottom)+1.75rem))] text-center font-mono text-[0.625rem] tracking-[0.3em] text-lamp/80 transition-opacity duration-500 ${doorsOpen && !(walk && stage === "entering") ? "opacity-100" : "opacity-0"}`}
       >
         {doorsOpen ? t("scene.doorsOpening").toUpperCase() : ""}
       </p>
