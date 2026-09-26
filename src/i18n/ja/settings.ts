@@ -43,6 +43,13 @@ const settings: Partial<Record<keyof typeof source, string>> = {
   "settings.claudeBody": "Claude が今夜のルートを読んで、タスクを追加・変更できるようにします。Claude で設定 → コネクタ → カスタムコネクタを追加 を選んでこのアドレスを貼り付けてください。",
   "settings.copy": "コピー",
   "settings.copied": "コピーしました",
+  "settings.install": "アプリをインストール",
+  "settings.installBody": "ホーム画面またはDockからNocturneを開くと、ブラウザなしにフルスクリーン表示できます。",
+  "settings.installButton": "インストール",
+  "settings.installed": "このデバイスにインストール済み。",
+  "settings.installIos": "Safariで共有をタップし(iPhoneは下部、iPadは右上)、ホーム画面に追加を選びます。",
+  "settings.installMacSafari": "Safariのメニューバーから ファイル → Dockに追加 を選びます。",
+  "settings.installOther": "ブラウザのメニューからアプリをインストールまたはホーム画面に追加を探します。",
 };
 
 export default settings;

@@ -10,6 +10,7 @@ import { Icon } from "@/components/ui/Icon";
 import { Sheet } from "@/components/ui/Sheet";
 import { useGlossary } from "@/components/help/Glossary";
 import { LOCALES, rememberLocale, useI18n, type MessageKey } from "@/i18n";
+import { install, useInstallState } from "@/lib/install";
 import { notificationsEnabled, notificationsSupported, requestNotifications } from "@/lib/notify";
 import { loadSampleData, updateProfile } from "@/state/actions";
 import { MCP_URL, isCloudConfigured, resetDemo, signOut } from "@/state/session";
@@ -176,6 +177,7 @@ export default function SettingsPage() {
             </>
           )}
         </div>
+        <InstallApp />
         {mode === "cloud" && MCP_URL && <ClaudeConnector />}
         <button
           type="button"
@@ -221,6 +223,32 @@ export default function SettingsPage() {
           </Button>
         </div>
       </Sheet>
+    </div>
+  );
+}
+
+/** Put Nocturne on the home screen or Dock: the browser's own prompt where there is one, the steps where there isn't. */
+function InstallApp() {
+  const { t } = useI18n();
+  const state = useInstallState();
+  if (!state) return null;
+  const how: Record<Exclude<typeof state, "prompt">, MessageKey> = {
+    installed: "settings.installed",
+    ios: "settings.installIos",
+    "mac-safari": "settings.installMacSafari",
+    manual: "settings.installOther",
+  };
+  return (
+    <div className="mt-8 rounded-2xl border border-rule-soft p-4">
+      <p className="eyebrow">{t("settings.install")}</p>
+      <p className="mt-2 text-sm leading-relaxed text-mist">{t("settings.installBody")}</p>
+      {state === "prompt" ? (
+        <Button variant="secondary" size="sm" className="mt-3" onClick={() => void install()}>
+          {t("settings.installButton")}
+        </Button>
+      ) : (
+        <p className={`mt-3 text-sm leading-relaxed ${state === "installed" ? "text-lamp/90" : "text-paper-dim"}`}>{t(how[state])}</p>
+      )}
     </div>
   );
 }

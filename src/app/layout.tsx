@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { IBM_Plex_Mono, Instrument_Serif, Inter } from "next/font/google";
 import { LocaleSync } from "@/components/shell/LocaleSync";
+import { ServiceWorker } from "@/components/shell/ServiceWorker";
 import "./globals.css";
 
 const inter = Inter({ variable: "--font-inter", subsets: ["latin"] });
@@ -20,6 +21,8 @@ export const metadata: Metadata = {
   title: { default: "Nocturne", template: "%s · Nocturne" },
   description: "A planner that doesn't break when your plan does.",
   applicationName: "Nocturne",
+  // On iPhone and iPad, "Add to Home Screen" opens it full screen.
+  appleWebApp: { capable: true, title: "Nocturne", statusBarStyle: "black-translucent" },
 };
 
 export const viewport: Viewport = {
@@ -40,6 +43,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       </head>
       <body>
         <LocaleSync />
+        <ServiceWorker />
         {children}
       </body>
     </html>

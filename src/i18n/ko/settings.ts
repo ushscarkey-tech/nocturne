@@ -43,6 +43,13 @@ const settings: Partial<Record<keyof typeof source, string>> = {
   "settings.replace": "바꾸기",
   "settings.soundEffects": "효과음",
   "settings.soundEffectsHint": "발권기, 문, 안내음",
+  "settings.install": "앱으로 설치",
+  "settings.installBody": "홈 화면이나 Dock에서 바로 열리고, 브라우저 없이 전체 화면으로 떠요.",
+  "settings.installButton": "설치",
+  "settings.installed": "이 기기에 설치되어 있어요.",
+  "settings.installIos": "Safari에서 공유 버튼(아이폰은 아래, 아이패드는 오른쪽 위)을 누르고 '홈 화면에 추가'를 고르세요.",
+  "settings.installMacSafari": "Safari 메뉴 막대에서 파일 → 'Dock에 추가'를 고르세요.",
+  "settings.installOther": "브라우저 메뉴에서 '앱 설치'나 '홈 화면에 추가'를 찾아 누르세요.",
 };
 
 export default settings;

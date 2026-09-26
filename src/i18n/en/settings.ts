@@ -41,6 +41,13 @@ const settings = {
   "settings.replace": "Replace",
   "settings.soundEffects": "Effects",
   "settings.soundEffectsHint": "Ticket machine, doors, chimes",
+  "settings.install": "Install the app",
+  "settings.installBody": "Open Nocturne from your home screen or Dock, full screen, without the browser around it.",
+  "settings.installButton": "Install",
+  "settings.installed": "Installed on this device.",
+  "settings.installIos": "In Safari, tap Share (at the bottom on iPhone, top right on iPad), then Add to Home Screen.",
+  "settings.installMacSafari": "In Safari's menu bar, choose File → Add to Dock.",
+  "settings.installOther": "Look for Install app or Add to Home Screen in your browser's menu.",
 } as const;
 
 export default settings;

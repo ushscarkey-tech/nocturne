@@ -43,6 +43,13 @@ const settings: Partial<Record<keyof typeof source, string>> = {
   "settings.claudeBody": "让 Claude 读取今晚的路线，为你添加或修改任务。在 Claude 中：设置 → 连接器 → 添加自定义连接器，然后粘贴这个地址。",
   "settings.copy": "复制",
   "settings.copied": "已复制",
+  "settings.install": "安装应用",
+  "settings.installBody": "从主屏幕或程序坞打开 Nocturne，全屏显示，不需要浏览器界面。",
+  "settings.installButton": "安装",
+  "settings.installed": "已在此设备上安装。",
+  "settings.installIos": "在Safari中点击分享（iPhone在下方，iPad在右上），然后选择添加到主屏幕。",
+  "settings.installMacSafari": "在Safari菜单栏中选择 文件 → 添加到程序坞。",
+  "settings.installOther": "在浏览器菜单中寻找安装应用或添加到主屏幕的选项。",
 };
 
 export default settings;
