@@ -42,7 +42,7 @@ jobs:
           NEXT_PUBLIC_FIREBASE_PROJECT_ID: ${{ vars.NEXT_PUBLIC_FIREBASE_PROJECT_ID || 'nocturne-7cb72' }}
           NEXT_PUBLIC_FIREBASE_APP_ID: ${{ vars.NEXT_PUBLIC_FIREBASE_APP_ID || '1:509885339815:web:631da59b8e53e1ebeb2382' }}
           # Claude's connector (the MCP server on Vercel); empty hides it.
-          NEXT_PUBLIC_MCP_URL: ${{ vars.NEXT_PUBLIC_MCP_URL || '' }}
+          NEXT_PUBLIC_MCP_URL: ${{ vars.NEXT_PUBLIC_MCP_URL || 'https://nocturne-mcp.vercel.app' }}
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
       - uses: actions/upload-pages-artifact@v3
