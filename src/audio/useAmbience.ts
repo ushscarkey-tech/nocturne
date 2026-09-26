@@ -73,6 +73,10 @@ export const ambience = {
   setPreset(preset: PresetId, fadeSeconds?: number) {
     getAmbience().setPreset(preset, fadeSeconds);
   },
+  /** How far the cabin curtain is drawn (0 open … 1 closed). */
+  setCurtain(amount: number) {
+    getAmbience().setCurtain(amount);
+  },
   /** Lower the ambience to `amount` × its level for `seconds`, then restore it. */
   duck(amount: number, seconds: number) {
     getAmbience().duck(amount, seconds);

@@ -3,6 +3,7 @@
 import dynamic from "next/dynamic";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import type { CarriageId } from "@/core/types";
+import { ambience } from "@/audio/useAmbience";
 import { usePrefersReducedMotion } from "@/lib/hooks";
 
 export type SceneMode = "platform" | "night" | "tunnel" | "still";
@@ -41,7 +42,13 @@ export function NightScene(props: NightSceneProps) {
   if (!canDraw3D || failed) return <NightScene2D {...props} />;
   return (
     <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden bg-night-950" aria-hidden>
-      <CabinScene3D {...props} className="absolute inset-0 animate-[fade_1600ms_ease-out_both]" onFail={() => setFailed(true)} />
+      <CabinScene3D
+        {...props}
+        className="absolute inset-0 animate-[fade_1600ms_ease-out_both]"
+        onFail={() => setFailed(true)}
+        // Drawing the curtain muffles the rain and rails outside.
+        onCurtain={ambience.setCurtain}
+      />
       {/* A soft scrim keeps the centre readable. */}
       <div className="absolute inset-0 bg-[radial-gradient(62%_40%_at_50%_46%,rgba(4,6,10,0.5),transparent_78%)]" />
     </div>

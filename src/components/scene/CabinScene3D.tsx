@@ -11,6 +11,7 @@ import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPa
 import type { CarriageId } from "@/core/types";
 import { farLightsMaterial, fieldMaterial, glassMaterial, trackGroundMaterial, tunnelWallMaterial } from "./cabin/shaders";
 import * as ct from "./cabin/textures";
+import { Curtain } from "./cabin/curtain";
 import { describe, floatSupport, pickTarget, sceneLog } from "./gl";
 import { surfaceKit, withCavity } from "./surfaces";
 import { GradeShader, MAX_LIGHTS, hazeMaterial, rainMaterial, skyMaterial } from "./platform/shaders";
@@ -27,6 +28,8 @@ export interface CabinSceneProps {
   className?: string;
   /** Called if this device can't draw the scene; the caller shows the 2D one. */
   onFail?: () => void;
+  /** How far the curtain is drawn beyond its resting place (0 … 1), as you pull it. */
+  onCurtain?: (amount: number) => void;
 }
 
 // Metres, relative to your eyes. The train runs toward +x, so the world
@@ -40,6 +43,8 @@ const BRAKE = 1.4;
 const ACCEL = 0.7;
 const PLAT_LEN = 150;
 const LAMP_EVERY = 25; // tunnel lamps
+/** Where the curtain rests: drawn a little way over the glass. */
+const CURTAIN_REST = 0.04;
 
 const QUALITY = [
   { dpr: 1.5, bloom: true },
@@ -56,7 +61,7 @@ const TINT: Record<CarriageId, THREE.Color> = {
   tunnel: lin(1, 0.7, 0.42),
   moon: lin(0.86, 0.9, 1),
 };
-const CURTAIN: Record<CarriageId, number> = { quiet: 0x33453a, rain: 0x2b3944, tunnel: 0x4a3526, moon: 0x383d45 };
+const CURTAIN: Record<CarriageId, number> = { quiet: 0x4a6152, rain: 0x3e5261, tunnel: 0x6b4e38, moon: 0x515866 };
 
 /** Wrap x into [-span/2, span/2). */
 const wrap = (x: number, span: number) => ((((x + span / 2) % span) + span) % span) - span / 2;
@@ -83,10 +88,14 @@ function roundedRect(w: number, h: number, r: number, cx = 0, cy = 0) {
  * dark fields, a road with a few lamps, houses, flats and hills, a tunnel
  * now and then, and platforms that slide in and come to rest.
  */
-export default function CabinScene3D({ mode, carriage, stationName = "", terminal = false, className = "", onFail }: CabinSceneProps) {
+export default function CabinScene3D({ mode, carriage, stationName = "", terminal = false, className = "", onFail, onCurtain }: CabinSceneProps) {
   const mountRef = useRef<HTMLDivElement>(null);
   const target = useRef({ mode, carriage, stationName, terminal });
   const failRef = useRef(onFail);
+  const curtainRef = useRef(onCurtain);
+  useEffect(() => {
+    curtainRef.current = onCurtain;
+  }, [onCurtain]);
   const pokeRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
@@ -305,6 +314,7 @@ export default function CabinScene3D({ mode, carriage, stationName = "", termina
       const lampHaze = track(hazeMaterial(lin(1, 0.7, 0.42), 0.09));
       fallbacks.set(lampHaze, hide(lampHaze));
       const poleMat = lambert({ color: 0x1a1d1f });
+      const roadLamps: THREE.Object3D[] = [];
       for (let i = 0; i < 7; i++) {
         const g = new THREE.Group();
         mesh(g, new THREE.CylinderGeometry(0.07, 0.09, 6.5, 8), poleMat, 0, GROUND + 3.25, 0);
@@ -316,12 +326,27 @@ export default function CabinScene3D({ mode, carriage, stationName = "", termina
         const pool = mesh(g, new THREE.PlaneGeometry(9, 9), poolMat, 0, GROUND + 0.02, 1.1);
         pool.rotation.x = -Math.PI / 2;
         put(land, g, 0, 0, -27.5);
+        roadLamps.push(g);
         slot(g, -210 + i * 60, 420, () => {
           g.visible = chance() < 0.8;
         });
       }
-      // The car: two headlights and their pool, crossing the view.
+      // The car: a small hatchback, its headlights and their pool, crossing the view.
       const car = new THREE.Group();
+      // Paint that shows only where light finds it: under the road lamps it comes up.
+      const carPaint = lambert({ color: 0x3a4148, emissive: 0x14181d, emissiveIntensity: 1 });
+      const carGlass = lambert({ color: 0x0b0f14, emissive: 0x06080b });
+      const carTyre = lambert({ color: 0x07080a });
+      box(car, 4.2, 0.62, 1.74, carPaint, 0, GROUND + 0.62, 0);
+      box(car, 2.3, 0.56, 1.56, carPaint, -0.35, GROUND + 1.2, 0);
+      box(car, 2.18, 0.4, 1.6, carGlass, -0.35, GROUND + 1.21, 0);
+      box(car, 0.9, 0.05, 1.5, carPaint, -0.35, GROUND + 1.49, 0);
+      for (const wx of [-1.35, 1.35]) {
+        for (const wz of [-0.8, 0.8]) {
+          const wheel = mesh(car, new THREE.CylinderGeometry(0.32, 0.32, 0.22, 14), carTyre, wx, GROUND + 0.32, wz);
+          wheel.rotation.x = Math.PI / 2;
+        }
+      }
       const carBeam = basic({ map: glowTex, color: lin(2.5, 2.3, 2), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false });
       const tail = basic({ map: glowTex, color: lin(2.5, 0.3, 0.2), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false });
       for (const dz of [-0.7, 0.7]) {
@@ -502,11 +527,17 @@ export default function CabinScene3D({ mode, carriage, stationName = "", termina
       // The carriage: moulded panel, brushed aluminium, a woven curtain.
       const wallMat = std({ map: tex(ct.wallPanel(), [1, 1]), roughness: 0.85, normalMap: kit.relief("fabric", [9, 9]), normalScale: nv(0.12) });
       const frameMat = std({ color: 0xa4a9a8, roughness: 0.38, metalness: 0.5 });
-      const curtainMat = std({ color: CURTAIN[target.current.carriage], side: THREE.DoubleSide, roughness: 0.95, normalMap: kit.relief("fabric", [3, 6]), normalScale: nv(1.2) }, 0.5);
+      const curtainMat = std({ color: CURTAIN[target.current.carriage], side: THREE.DoubleSide, roughness: 0.88, normalMap: kit.relief("fabric", [6, 8]), normalScale: nv(0.8) }, 0.35);
+      // A little reading light over the seat catches the curtain's folds.
+      put(cabin, new THREE.PointLight(lin(1, 0.86, 0.66), 0.9, 1.8, 2), -0.35, 0.55, -0.15);
       const glassMat = track(glassMaterial());
       glassMat.uniforms.tReflect.value = tex(ct.cabinReflection());
       const interior = new THREE.Group();
       cabin.add(interior);
+      // The curtain survives a relayout; it keeps how far it was drawn.
+      let curtain: Curtain | null = null;
+      let curtainCover = CURTAIN_REST;
+      let curtainZ = -D + 0.05;
 
       const buildInterior = (halfW: number, halfH: number) => {
         interior.children.slice().forEach((c) => {
@@ -542,27 +573,31 @@ export default function CabinScene3D({ mode, carriage, stationName = "", termina
         const table = new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.022, 0.26), std({ color: 0x2a2f31, roughness: 0.4 }));
         table.position.set(0, bottom - 0.16, -D + 0.14);
         interior.add(table);
-        // The curtain, tied back at the left edge of what you can see.
+        // The curtain hangs straight from a rail over the window, gathered
+        // at the left; it can be pulled across the glass.
         const tanH = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * camera.aspect;
         const cz = -D + 0.05;
+        curtainZ = cz;
         const edgeL = -(-cz * tanH);
-        const cw = Math.min(0.26, -cz * tanH * 0.7);
-        const ch = h + 0.3;
-        const cgeo = new THREE.PlaneGeometry(cw, ch, 32, 24);
-        const pos = cgeo.attributes.position;
-        for (let i = 0; i < pos.count; i++) {
-          const x = pos.getX(i);
-          const y = pos.getY(i);
-          const u = (x + cw / 2) / cw;
-          const tie = 1 - Math.exp(-Math.pow((y + ch * 0.08) / (ch * 0.22), 2));
-          const pinch = 0.45 + 0.55 * tie;
-          pos.setX(i, -cw / 2 + u * cw * pinch);
-          pos.setZ(i, Math.sin(u * Math.PI * 10) * 0.012 * (0.6 + 0.4 * tie));
-        }
-        cgeo.computeVertexNormals();
-        const curtain = new THREE.Mesh(cgeo, curtainMat);
-        curtain.position.set(Math.max(-w / 2 + 0.02, edgeL + cw * 0.25), cy + 0.08, cz);
-        interior.add(curtain);
+        const railY = cy + h / 2 + 0.11;
+        const left = Math.max(edgeL + 0.015, -w / 2 - 0.1);
+        const rail = new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.006, w / 2 + 0.08 - left, 8), frameMat);
+        rail.rotation.z = Math.PI / 2;
+        rail.position.set((left + w / 2 + 0.08) / 2, railY + 0.012, cz + 0.035);
+        interior.add(rail);
+        if (curtain) curtainCover = curtain.target;
+        curtain = new Curtain(curtainMat, {
+          left,
+          railY,
+          length: railY - (bottom - 0.03),
+          width: w / 2 + 0.04 - left,
+          parked: Math.min(0.1, (w / 2 + 0.04 - left) * 0.12),
+          z: cz,
+          wallGap: 0.045,
+          floorY: bottom - 0.035,
+          cover: curtainCover,
+        });
+        interior.add(curtain.mesh);
       };
 
       // ================================================================= POST
@@ -600,7 +635,10 @@ export default function CabinScene3D({ mode, carriage, stationName = "", termina
         joint: 0,
         reflect: start === "tunnel" ? 0.14 : 0.08,
         rain: 0,
+        lastV: 0,
+        drawn: 0,
       };
+      st.lastV = st.v;
       if (st.plat.on) drawSign(target.current.stationName, st.plat.end);
       let level = 0;
       let halfW = 1;
@@ -673,11 +711,25 @@ export default function CabinScene3D({ mode, carriage, stationName = "", termina
 
         // Rail joints: a small knock every 25 m.
         const joint = Math.floor(st.travel / 25);
+        let knock = 0;
         if (joint !== st.joint) {
           st.joint = joint;
           st.jolt = Math.min(1, st.v / CRUISE);
+          knock = st.jolt;
         }
         st.jolt *= Math.exp(-dt * 9);
+
+        // The curtain feels the train: pulling away, braking, the joints, the roll.
+        const accel = dt > 0 ? (st.v - st.lastV) / dt : 0;
+        st.lastV = st.v;
+        if (curtain) {
+          curtain.update(dt, accel, knock, Math.sin(st.time * 0.9) * (st.v / CRUISE) + Math.sin(st.time * 2.3) * 0.3 * (st.v / CRUISE));
+          const drawn = Math.max(0, (curtain.cover - CURTAIN_REST) / (1 - CURTAIN_REST));
+          if (Math.abs(drawn - st.drawn) > 0.01) {
+            st.drawn = drawn;
+            curtainRef.current?.(drawn);
+          }
+        }
 
         // ---- apply
         const vis = halfW * 3 + 20;
@@ -730,6 +782,16 @@ export default function CabinScene3D({ mode, carriage, stationName = "", termina
         }
         car.visible = carState.on;
         car.position.x = carState.x;
+        if (carState.on) {
+          // Nearest lit road lamp: the body catches its light as it passes beneath.
+          let lit = 0;
+          for (const g of roadLamps) {
+            if (!g.visible) continue;
+            const d = g.position.x - carState.x;
+            lit = Math.max(lit, Math.exp(-(d * d) / 50));
+          }
+          carPaint.emissiveIntensity = 1 + lit * 5;
+        }
 
         // Rain: outside only on the rain carriage; beads on the glass always a few.
         const wet = c === "rain";
@@ -899,11 +961,82 @@ export default function CabinScene3D({ mode, carriage, stationName = "", termina
       };
       document.addEventListener("visibilitychange", onVisibility);
 
+      // ---- Touching the curtain: brush it, or take hold and pull it across.
+      const ray = new THREE.Raycaster();
+      const ndc = new THREE.Vector2();
+      const onPlane = (e: PointerEvent) => {
+        const r = mount.getBoundingClientRect();
+        if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) return null;
+        ndc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+        ray.setFromCamera(ndc, camera);
+        const t = (curtainZ - ray.ray.origin.z) / ray.ray.direction.z;
+        return t > 0 ? ray.ray.at(t, new THREE.Vector3()) : null;
+      };
+      const busy = (t: EventTarget | null) =>
+        !!(t as Element | null)?.closest?.("button, a, input, textarea, select, label, [role=button], [role=slider], [role=dialog], dialog");
+      let lastPoint: THREE.Vector3 | null = null;
+      let tookHold = false;
+      const cursor = (c: string) => {
+        document.documentElement.style.cursor = c;
+      };
+      const settle = () => {
+        if (!reduce || !curtain) return;
+        curtain.update(0.2, 0, 0, 0);
+        draw();
+      };
+      const onMove = (e: PointerEvent) => {
+        if (!curtain) return;
+        const p = onPlane(e);
+        if (curtain.holding) {
+          if (p) curtain.drag(p.x, p.y);
+          settle();
+          return;
+        }
+        const over = !!p && curtain.hit(p.x, p.y) && !busy(e.target);
+        cursor(over ? "grab" : "");
+        if (over && p && lastPoint) curtain.brush(p.x, p.y, p.x - lastPoint.x, p.y - lastPoint.y);
+        lastPoint = over ? p : null;
+      };
+      const onDown = (e: PointerEvent) => {
+        if (!curtain || busy(e.target)) return;
+        const p = onPlane(e);
+        if (!p || !curtain.hit(p.x, p.y)) return;
+        tookHold = true;
+        curtain.grab(p.x, p.y);
+        cursor("grabbing");
+        e.stopPropagation();
+      };
+      const onUp = () => {
+        if (!curtain?.holding) return;
+        curtain.release();
+        cursor("");
+        settle();
+      };
+      // The press that took the curtain shouldn't also tap whatever lies beneath it.
+      const onClick = (e: MouseEvent) => {
+        if (!tookHold) return;
+        tookHold = false;
+        e.stopPropagation();
+        e.preventDefault();
+      };
+      window.addEventListener("pointermove", onMove, { passive: true });
+      window.addEventListener("pointerdown", onDown, true);
+      window.addEventListener("pointerup", onUp);
+      window.addEventListener("pointercancel", onUp);
+      window.addEventListener("click", onClick, true);
+
       return () => {
         pokeRef.current = null;
         cancelAnimationFrame(raf);
         ro.disconnect();
         document.removeEventListener("visibilitychange", onVisibility);
+        window.removeEventListener("pointermove", onMove);
+        window.removeEventListener("pointerdown", onDown, true);
+        window.removeEventListener("pointerup", onUp);
+        window.removeEventListener("pointercancel", onUp);
+        window.removeEventListener("click", onClick, true);
+        cursor("");
+        curtainRef.current?.(0);
         interior.children.forEach((c) => (c as THREE.Mesh).geometry?.dispose());
         disposables.forEach((d) => d.dispose());
         target3.dispose();

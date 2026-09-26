@@ -111,6 +111,9 @@ function hallImpulse(ctx: AudioContext, seconds: number, decay: number): AudioBu
 export class AmbienceEngine {
   private ctx: AudioContext | null = null;
   private master: GainNode | null = null;
+  /** A drawn curtain: it muffles the outside (rain, rails) and lowers it a little. */
+  private curtainFilter: BiquadFilterNode | null = null;
+  private curtainGain: GainNode | null = null;
   private effects: GainNode | null = null;
   private buses = new Map<BusId, GainNode>();
   private layers = new Map<LayerId, Layer>();
@@ -245,6 +248,8 @@ export class AmbienceEngine {
     void this.ctx?.close();
     this.ctx = null;
     this.master = null;
+    this.curtainFilter = null;
+    this.curtainGain = null;
     this.effects = null;
     this.running = false;
   }
@@ -263,7 +268,14 @@ export class AmbienceEngine {
     compressor.connect(ctx.destination);
     this.master = ctx.createGain();
     this.master.gain.value = 0;
-    this.master.connect(compressor);
+    this.curtainFilter = ctx.createBiquadFilter();
+    this.curtainFilter.type = "lowpass";
+    this.curtainFilter.frequency.value = 20000;
+    this.curtainFilter.Q.value = 0.5;
+    this.curtainGain = ctx.createGain();
+    this.master.connect(this.curtainFilter);
+    this.curtainFilter.connect(this.curtainGain);
+    this.curtainGain.connect(compressor);
     for (const bus of ["train", "environment", "focus"] as BusId[]) {
       const g = ctx.createGain();
       g.gain.value = this.mix[bus];
@@ -285,6 +297,18 @@ export class AmbienceEngine {
     this.layers.set("station", this.stationLayer());
     this.layers.set("brown", this.brownLayer());
     this.layers.set("tunnelHum", this.tunnelLayer());
+  }
+
+  /**
+   * How far the window curtain is drawn (0 open … 1 closed): the fabric
+   * takes the hiss off the rain and rails and the whole outside softens.
+   */
+  setCurtain(amount: number) {
+    const ctx = this.ctx;
+    if (!ctx || !this.curtainFilter || !this.curtainGain) return;
+    const a = Math.min(1, Math.max(0, amount));
+    this.curtainFilter.frequency.setTargetAtTime(20000 * Math.pow(1400 / 20000, a), ctx.currentTime, 0.12);
+    this.curtainGain.gain.setTargetAtTime(1 - 0.45 * a, ctx.currentTime, 0.12);
   }
 
   /** Ramp the ambience master to its level, honouring an active duck. */
