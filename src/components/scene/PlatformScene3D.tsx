@@ -47,9 +47,11 @@ const FLICKER = 3;
 
 /** Quality steps, dropped one at a time if the device can't keep up. */
 const QUALITY = [
-  { dpr: 1.5, reflect: 0.5, bloom: true },
-  { dpr: 1, reflect: 0.35, bloom: true },
-  { dpr: 0.75, reflect: 0.3, bloom: false },
+  { dpr: 1.5, reflect: 0.5, bloom: true, fps: 60 },
+  { dpr: 1.2, reflect: 0.4, bloom: true, fps: 60 },
+  { dpr: 1, reflect: 0.35, bloom: true, fps: 60 },
+  { dpr: 1, reflect: 0.35, bloom: false, fps: 30 },
+  { dpr: 0.75, reflect: 0.3, bloom: false, fps: 30 },
 ];
 
 const lin = (r: number, g: number, b: number) => new THREE.Color().setRGB(r, g, b);
@@ -757,7 +759,8 @@ export default function PlatformScene3D({ mood = "waiting", rain = true, station
         last = now;
         if (!visible) return;
         acc += dt;
-        if (acc < 1 / 30 - 0.004) return;
+        const q = QUALITY[level];
+        if (acc < 1 / q.fps - 0.004) return;
         const step = Math.min(acc, 0.1);
         acc = 0;
         time += step;
@@ -768,7 +771,7 @@ export default function PlatformScene3D({ mood = "waiting", rain = true, station
         warm += step;
         interval = interval * 0.94 + dt * 0.06;
         if (warm > 2 && level < QUALITY.length - 1) {
-          slowFor = interval > 1 / 36 ? slowFor + step : 0;
+          slowFor = interval > (q.fps >= 60 ? 1 / 45 : 1 / 26) ? slowFor + step : 0;
           if (slowFor > 2.5) {
             level += 1;
             log.set("quality", `step ${level}`);

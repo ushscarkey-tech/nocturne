@@ -98,3 +98,6 @@ export function describe(renderer: THREE.WebGLRenderer, log: SceneLog) {
   log.set("ua", navigator.userAgent.replace(/^Mozilla\/5.0 /, "").slice(0, 120));
   log.set("webgl2", String(renderer.capabilities.isWebGL2 !== false));
 }
+
+/** Fired on window once a scene has drawn its first real frame (shaders compiled, textures up). */
+export const SCENE_READY = "nocturne:scene-ready";

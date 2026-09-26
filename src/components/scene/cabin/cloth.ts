@@ -1,5 +1,20 @@
 import * as THREE from "three";
+import type { CarriageId } from "@/core/types";
 import { CAVITY } from "../surfaces";
+
+const lin = (r: number, g: number, b: number) => new THREE.Color().setRGB(r, g, b);
+
+/** The carriage light, per carriage (shared by boarding and the ride, so one leads into the other). */
+export const CABIN_TINT: Record<CarriageId, THREE.Color> = {
+  quiet: lin(1, 0.84, 0.62),
+  rain: lin(0.74, 0.84, 0.98),
+  tunnel: lin(1, 0.7, 0.42),
+  moon: lin(0.86, 0.9, 1),
+};
+/** The curtains' cloth, per carriage. */
+export const CURTAIN_COLOR: Record<CarriageId, number> = { quiet: 0x4a6152, rain: 0x3e5261, tunnel: 0x6b4e38, moon: 0x515866 };
+/** How far the curtains are drawn over the glass when nobody has touched them. */
+export const CURTAIN_REST = 0.04;
 
 export interface ClothBacklight {
   /** What lies behind the window, as rendered this frame, and its size in pixels. */

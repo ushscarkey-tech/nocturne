@@ -12,8 +12,8 @@ import type { CarriageId } from "@/core/types";
 import { farLightsMaterial, fieldMaterial, glassMaterial, trackGroundMaterial, tunnelWallMaterial } from "./cabin/shaders";
 import * as ct from "./cabin/textures";
 import { Curtain } from "./cabin/curtain";
-import { clothMaterial, type ClothBacklight } from "./cabin/cloth";
-import { describe, floatSupport, pickTarget, sceneLog } from "./gl";
+import { CABIN_TINT as TINT, CURTAIN_COLOR as CURTAIN, CURTAIN_REST, clothMaterial, type ClothBacklight } from "./cabin/cloth";
+import { SCENE_READY, describe, floatSupport, pickTarget, sceneLog } from "./gl";
 import { surfaceKit, withCavity } from "./surfaces";
 import { GradeShader, MAX_LIGHTS, hazeMaterial, rainMaterial, skyMaterial } from "./platform/shaders";
 import * as tx from "./platform/textures";
@@ -44,26 +44,18 @@ const BRAKE = 1.4;
 const ACCEL = 0.7;
 const PLAT_LEN = 150;
 const LAMP_EVERY = 25; // tunnel lamps
-/** Where the curtain rests: drawn a little way over the glass. */
-const CURTAIN_REST = 0.04;
 
+/** Steps down, one at a time, while frames keep arriving late: sharpness first, then glow, then frame rate. */
 const QUALITY = [
-  { dpr: 1.5, bloom: true },
-  { dpr: 1, bloom: true },
-  { dpr: 0.75, bloom: false },
+  { dpr: 1.5, bloom: true, fps: 60 },
+  { dpr: 1.2, bloom: true, fps: 60 },
+  { dpr: 1, bloom: true, fps: 60 },
+  { dpr: 1, bloom: false, fps: 30 },
+  { dpr: 0.75, bloom: false, fps: 30 },
 ];
 
 const lin = (r: number, g: number, b: number) => new THREE.Color().setRGB(r, g, b);
 const WHITE = new THREE.Color(1, 1, 1);
-
-/** The carriage light, per carriage. */
-const TINT: Record<CarriageId, THREE.Color> = {
-  quiet: lin(1, 0.84, 0.62),
-  rain: lin(0.74, 0.84, 0.98),
-  tunnel: lin(1, 0.7, 0.42),
-  moon: lin(0.86, 0.9, 1),
-};
-const CURTAIN: Record<CarriageId, number> = { quiet: 0x4a6152, rain: 0x3e5261, tunnel: 0x6b4e38, moon: 0x515866 };
 
 /** Wrap x into [-span/2, span/2). */
 const wrap = (x: number, span: number) => ((((x + span / 2) % span) + span) % span) - span / 2;
@@ -935,7 +927,8 @@ export default function CabinScene3D({ mode, carriage, stationName = "", termina
           fpsFrom = now;
         }
         acc += dt;
-        if (acc < 1 / 30 - 0.004) return;
+        const q = QUALITY[level];
+        if (acc < 1 / q.fps - 0.004) return;
         const step = Math.min(acc, 0.1);
         acc = 0;
         update(step);
@@ -943,7 +936,7 @@ export default function CabinScene3D({ mode, carriage, stationName = "", termina
         warm += step;
         interval = interval * 0.94 + dt * 0.06;
         if (warm > 2 && level < QUALITY.length - 1) {
-          slowFor = interval > 1 / 36 ? slowFor + step : 0;
+          slowFor = interval > (q.fps >= 60 ? 1 / 45 : 1 / 26) ? slowFor + step : 0;
           if (slowFor > 2.5) {
             level += 1;
             slowFor = 0;
@@ -957,9 +950,25 @@ export default function CabinScene3D({ mode, carriage, stationName = "", termina
       layout();
       const ro = new ResizeObserver(layout);
       ro.observe(mount);
+      // Warm up: draw once with everything that only shows up later (the
+      // tunnel, a platform, cars, rain) so its shaders compile and textures
+      // upload now, not with a stall halfway through the ride. Only the
+      // second frame, drawn in the same task, ever reaches the screen.
+      const hidden: THREE.Object3D[] = [];
+      for (const s of [outside, cabin]) {
+        s.traverse((o) => {
+          if (!o.visible) {
+            hidden.push(o);
+            o.visible = true;
+          }
+        });
+      }
+      draw();
+      hidden.forEach((o) => (o.visible = false));
       update(0.016);
-      if (reduce) draw();
-      else raf = requestAnimationFrame(frame);
+      draw();
+      window.dispatchEvent(new Event(SCENE_READY));
+      if (!reduce) raf = requestAnimationFrame(frame);
       pokeRef.current = () => {
         if (reduce) {
           update(0.016);

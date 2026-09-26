@@ -10,6 +10,7 @@ import { Ticket } from "@/components/ticket/Ticket";
 import { FlipText } from "@/components/scene/FlipText";
 import { haptic } from "@/lib/haptics";
 import { usePrefersReducedMotion } from "@/lib/hooks";
+import { SCENE_READY } from "@/components/scene/gl";
 
 // three.js loads only when someone is at the doors.
 const BoardingScene3D = dynamic(() => import("@/components/scene/BoardingScene3D"), { ssr: false, loading: () => null });
@@ -27,7 +28,9 @@ function hasWebGL2() {
 }
 const noSubscribe = () => () => {};
 /** Fallback if the walk never reports that you've sat down (seconds after the doors open). */
-const WALK_LIMIT = 8;
+const WALK_LIMIT = 9;
+/** How long, once seated, to wait for the ride's scene to be ready before fading into it anyway. */
+const READY_LIMIT = 2500;
 
 const STRIPE: Record<CarriageId, string> = { rain: "#4c5f7a", quiet: "#4f6a5c", tunnel: "#8a5a2b", moon: "#b69a62" };
 
@@ -43,17 +46,26 @@ export function BoardingDoors({
   carriage,
   departure,
   destination,
+  stationName,
   onOpen,
   onInside,
+  onHoldScene,
 }: {
   face: TicketFace;
   carriage: CarriageId;
   departure: string;
   destination: string;
+  /** Where you board, on the name board across the platform. */
+  stationName?: string;
   /** The doors are open: board now. */
   onOpen: () => void;
   /** The view is inside the carriage. */
   onInside: () => void;
+  /**
+   * While true, keep the ride's scene unmounted: one 3D scene at a time,
+   * and the ride's is built only once you're sitting still in your seat.
+   */
+  onHoldScene?: (hold: boolean) => void;
 }) {
   const { t } = useI18n();
   const reduced = usePrefersReducedMotion();
@@ -71,11 +83,27 @@ export function BoardingDoors({
     insideCalled.current = true;
     onInside();
   };
-  // Sat down: the view fades into the carriage.
+  const [released, setReleased] = useState(false);
+  useEffect(() => {
+    onHoldScene?.(walk && !released);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [walk, released]);
+  // Sat down: the ride's scene is built behind this one (you're still, so
+  // nobody sees the moment it takes); once it has drawn, fade across.
   const sitDown = () => {
-    if (seated) return;
-    setSeated(true);
-    at(700, goInside);
+    if (released) return;
+    setReleased(true);
+    let faded = false;
+    const fade = () => {
+      if (faded) return;
+      faded = true;
+      window.removeEventListener(SCENE_READY, fade);
+      // A frame for the ride to settle, then the crossfade.
+      at(120, () => setSeated(true));
+      at(120 + 700, goInside);
+    };
+    window.addEventListener(SCENE_READY, fade);
+    at(READY_LIMIT, fade);
   };
 
   useEffect(() => () => timers.current.forEach(clearTimeout), []);
@@ -112,6 +140,8 @@ export function BoardingDoors({
       setStage("entering");
       open();
     });
+    // Fetch the ride's scene while you walk, so it's ready when you sit.
+    if (walk) void import("@/components/scene/CabinScene3D");
     if (walk) at(2450 + WALK_LIMIT * 1000, goInside);
     else at(3750, goInside);
   }
@@ -138,6 +168,7 @@ export function BoardingDoors({
           stage={stage}
           carriage={carriage}
           car={face.car}
+          stationName={stationName}
           onFail={() => setFailed3D(true)}
           onInside={sitDown}
         />

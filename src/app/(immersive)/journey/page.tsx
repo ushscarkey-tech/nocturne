@@ -44,6 +44,8 @@ export default function JourneyPage() {
   const [choice, setChoice] = useState<{ focus: FocusLevel; carriage: CarriageId } | null>(null);
   const [atDoors, setAtDoors] = useState(false);
   const [departing, setDeparting] = useState(false);
+  // While walking in, the ride's scene waits (see BoardingDoors).
+  const [holdScene, setHoldScene] = useState(false);
   const { enabled: soundOn } = useAmbienceState();
 
   const started = !!journey?.startedAt;
@@ -185,12 +187,15 @@ export default function JourneyPage() {
   return (
     <div className="relative isolate h-dvh overflow-hidden" onPointerDown={resumeSound}>
       {phase === "boarding" ? (
-        <>
-          {/* Standing on the platform, at the ticket machine. */}
-          <PlatformScene className="fixed inset-0 -z-10" fade={false} mood="waiting" rain={carriage === "rain"} stationName={boardName} />
-          <div className="pointer-events-none fixed inset-0 -z-10 bg-[linear-gradient(180deg,rgba(4,6,10,0.55)_0%,rgba(4,6,10,0.78)_50%,rgba(4,6,10,0.94)_100%)]" />
-        </>
-      ) : (
+        // At the doors the boarding scene covers everything: draw only that.
+        !atDoors && (
+          <>
+            {/* Standing on the platform, at the ticket machine. */}
+            <PlatformScene className="fixed inset-0 -z-10" fade={false} mood="waiting" rain={carriage === "rain"} stationName={boardName} />
+            <div className="pointer-events-none fixed inset-0 -z-10 bg-[linear-gradient(180deg,rgba(4,6,10,0.55)_0%,rgba(4,6,10,0.78)_50%,rgba(4,6,10,0.94)_100%)]" />
+          </>
+        )
+      ) : atDoors && holdScene ? null : (
         <NightScene mode={scene} carriage={carriage} stationName={boardName} terminal={phase === "final"} />
       )}
       <div key={phase} className="h-full animate-fade">
@@ -202,6 +207,8 @@ export default function JourneyPage() {
           carriage={choice.carriage}
           departure={first ? clock(first.plannedStart) : "--:--"}
           destination={fmt.station(route[route.length - 1]?.stationName ?? "NOCTURNE")}
+          stationName={boardName}
+          onHoldScene={setHoldScene}
           onOpen={() => {
             setCarriage(choice.carriage);
             setDeparting(true);
