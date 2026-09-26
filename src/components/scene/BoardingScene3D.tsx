@@ -6,17 +6,19 @@ import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer
 import { FXAAPass } from "three/examples/jsm/postprocessing/FXAAPass.js";
 import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
 import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
+import { ShaderPass } from "three/examples/jsm/postprocessing/ShaderPass.js";
 import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
 import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import type { CarriageId } from "@/core/types";
 import * as bt from "./boarding/textures";
-import { CABIN_TINT, CURTAIN_COLOR, CURTAIN_REST, clothMaterial } from "./cabin/cloth";
+import { CABIN_TINT, CURTAIN_REST, type ClothBacklight } from "./cabin/cloth";
 import { Curtain } from "./cabin/curtain";
-import { curtainFabric } from "./cabin/textures";
+import { lin, sceneKit } from "./cabin/kit";
+import { PT, buildPlatform } from "./cabin/platform";
+import { D, cabinLights, rideFov, roundedRect, windowDims, windowMaterials, windowParts, type WindowDims } from "./cabin/window";
 import { describe, floatSupport, pickTarget, sceneLog } from "./gl";
-import { pageFonts, stationSign, texture, vendingFace, woodWall } from "./platform/textures";
-import { surfaceKit } from "./surfaces";
+import { GradeShader } from "./platform/shaders";
 
 export type BoardingStage = "waiting" | "reading" | "opening" | "entering";
 
@@ -45,29 +47,33 @@ const DOOR_H = 2.02;
 const CEIL = FLOOR + 2.28;
 const DOOR_SLIDE = 1.1;
 const WALK = 5.2;
-/** Window openings in the car's sides: centre height, half width and half height. */
-const WIN_CY = 1.535;
-const WIN_HW = 0.68;
-const WIN_HH = 0.495;
-/** Your seat: the bay by the platform-side window just past the door. */
+const WINDOWS_X = [-6.6, -4.3, -2.0, 2.0, 4.3, 6.6];
+/**
+ * Your seat: the bay by the platform-side window just past the door. You
+ * sit exactly where the ride's camera sits — eyes the ride's height above
+ * the platform, the ride's distance from the glass — so the walk's last
+ * frame is the ride's first.
+ */
 const SEAT_X = 2.0;
-/** The ride's field of view, so the last frame of the walk matches the first of the ride. */
-const rideFov = (aspect: number) => (aspect < 0.8 ? 62 : aspect < 1.2 ? 56 : 48);
-/** Dropped one at a time while frames keep arriving late. */
-const QUALITY = [1.75, 1.35, 1];
+const EYE_Y = -PT;
+const EYE_Z = SIDE - 0.08 - D;
+/** Dropped one at a time while frames keep arriving late (the ride's ladder, so both look alike). */
+const QUALITY = [1.5, 1.2, 1];
 
 const STRIPE: Record<CarriageId, number> = { rain: 0x4c6a8e, quiet: 0x55786a, tunnel: 0x9a6431, moon: 0xb69a62 };
 /** Seat moquette base colour per carriage (sRGB 0–255). */
 const SEAT: Record<CarriageId, [number, number, number]> = { rain: [58, 78, 96], quiet: [68, 92, 76], tunnel: [104, 72, 50], moon: [78, 84, 100] };
 
 const ease = (t: number) => (t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t));
-const lin = (r: number, g: number, b: number) => new THREE.Color().setRGB(r, g, b);
+/** Layer for things the view through your own window must not include. */
+const MAIN_ONLY = 1;
 
 /**
  * Boarding, in 3D: you stand on the platform before tonight's carriage.
  * The ticket touches the reader, the door lamp comes on, the doors slide
- * into the body and you walk in, down the aisle, and sit by the window —
- * where the ride begins.
+ * into the body and you walk in, along the aisle, and sit by the window —
+ * and what you see then is what the ride begins with: the same platform,
+ * window, curtain and light.
  */
 export default function BoardingScene3D({ stage, carriage, car, stationName = "", className = "", onFail, onInside }: BoardingSceneProps) {
   const mountRef = useRef<HTMLDivElement>(null);
@@ -87,7 +93,7 @@ export default function BoardingScene3D({ stage, carriage, car, stationName = ""
     const log = sceneLog("boarding");
     let renderer: THREE.WebGLRenderer;
     try {
-      renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+      renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: "high-performance" });
     } catch (err) {
       log.note(`no WebGL: ${String(err)}`);
       failRef.current?.();
@@ -109,178 +115,180 @@ export default function BoardingScene3D({ stage, carriage, car, stationName = ""
         disposables.push(x);
         return x;
       };
+      const K = sceneKit(track);
+      const { kit, tex } = K;
       const mat = (p: THREE.MeshStandardMaterialParameters) => track(new THREE.MeshStandardMaterial(p));
       const glow = (color: number, intensity: number) => track(new THREE.MeshStandardMaterial({ color: 0x000000, emissive: color, emissiveIntensity: intensity }));
       const box = (w: number, h: number, d: number) => track(new THREE.BoxGeometry(w, h, d));
       const rounded = (w: number, h: number, d: number, r: number) => track(new RoundedBoxGeometry(w, h, d, 3, r));
-      const tex = (c: HTMLCanvasElement, repeat?: [number, number]) => track(texture(c, { repeat }));
-      const kit = surfaceKit(track);
       const floatOK = floatSupport(renderer);
 
-      const scene = new THREE.Scene();
-      scene.fog = new THREE.FogExp2(0x05070b, 0.045);
-      const camera = new THREE.PerspectiveCamera(50, 1, 0.05, 80);
+      // Two scenes, lit apart as they are on the ride: the platform and the
+      // train's outside under the station lamps; the carriage inside under
+      // its own. The carriage is drawn first, the outside over it, sharing
+      // depth, so each hides what it should of the other.
+      const outside = new THREE.Scene();
+      outside.fog = new THREE.FogExp2(lin(0.009, 0.013, 0.017), 0.0065);
+      const cabin = new THREE.Scene();
+      const camera = new THREE.PerspectiveCamera(50, 1, 0.03, 80);
+      camera.layers.enable(MAIN_ONLY);
+      const addTo = <T extends THREE.Object3D>(scene: THREE.Scene, o: T, x = 0, y = 0, z = 0) => {
+        o.position.set(x, y, z);
+        scene.add(o);
+        return o;
+      };
 
       // ================================================================ PLATFORM
-      const concrete = mat({ map: tex(bt.slabs(), [10, 2.25]), normalMap: kit.relief("concrete", [14, 3]), roughness: 0.86 });
-      const platform = new THREE.Mesh(track(new THREE.PlaneGeometry(40, 9)), concrete);
-      platform.rotation.x = -Math.PI / 2;
-      platform.position.set(0, 0, SIDE + 0.12 + 4.5);
-      scene.add(platform);
-      const edge = new THREE.Mesh(track(new THREE.PlaneGeometry(40, 0.08)), mat({ color: 0xd8d2c0, roughness: 0.6 }));
-      edge.rotation.x = -Math.PI / 2;
-      edge.position.set(0, 0.002, SIDE + 0.17);
-      scene.add(edge);
-      const tactileMat = mat({ map: tex(bt.tactile(), [10, 1]), bumpMap: tex(bt.tactile(true), [10, 1]), bumpScale: 2, roughness: 0.7 });
-      tactileMat.bumpMap!.colorSpace = THREE.NoColorSpace;
-      const tactile = new THREE.Mesh(track(new THREE.PlaneGeometry(40, 0.32)), tactileMat);
-      tactile.rotation.x = -Math.PI / 2;
-      tactile.position.set(0, 0.003, SIDE + 0.75);
-      scene.add(tactile);
-      // Below the edge, the dark gap down to the track.
-      const drop = new THREE.Mesh(box(40, 1.2, 0.05), mat({ color: 0x0c0d0f, roughness: 1 }));
-      drop.position.set(0, -0.6, SIDE + 0.12);
-      scene.add(drop);
-      // The canopy and its tubes.
-      const canopy = new THREE.Mesh(track(new THREE.PlaneGeometry(40, 9)), mat({ color: 0x15191d, roughness: 0.9 }));
-      canopy.rotation.x = Math.PI / 2;
-      canopy.position.set(0, 3.7, SIDE + 4.2);
-      scene.add(canopy);
-      const tubeMat = glow(0xfff1d6, 3.2);
-      for (const z of [0.9, 3.6]) {
-        for (let x = -12; x <= 12; x += 4) {
-          const tube = new THREE.Mesh(box(1.6, 0.05, 0.08), tubeMat);
-          tube.position.set(x, 3.62, z);
-          scene.add(tube);
-        }
-      }
-      for (const x of [-4, 0, 4]) {
-        const l = new THREE.PointLight(lin(1, 0.9, 0.74), 3.6, 9, 1.6);
-        l.position.set(x, 3.4, 1.4);
-        scene.add(l);
-      }
-      const column = mat({ color: 0x22272c, roughness: 0.6, metalness: 0.3 });
-      for (const x of [-6.5, 6.5]) {
-        const c = new THREE.Mesh(box(0.28, 3.7, 0.28), column);
-        c.position.set(x, 1.85, SIDE + 3.2);
-        scene.add(c);
-      }
-      scene.add(new THREE.HemisphereLight(lin(0.12, 0.13, 0.16), lin(0.02, 0.02, 0.02), 1));
-      // Behind you, the station building: painted boards, a vending machine
-      // and the name board facing the train. You see it again from your seat.
-      const BACK = SIDE + 6.2;
-      const boards = tex(woodWall(), [40 / 3, 1]);
-      const back = new THREE.Mesh(track(new THREE.PlaneGeometry(40, 3.7)), mat({ map: boards, roughness: 0.8, normalMap: kit.relief("boards", [24, 1]), normalScale: new THREE.Vector2(0.9, 0.9) }));
-      back.rotation.y = Math.PI;
-      back.position.set(0, 1.85, BACK);
-      scene.add(back);
-      const vend = new THREE.Mesh(box(1, 1.84, 0.72), mat({ color: 0xdfe2de, roughness: 0.35, metalness: 0.15 }));
-      vend.position.set(SEAT_X - 1.6, 0.92, BACK - 0.4);
-      scene.add(vend);
-      const vendFace = new THREE.Mesh(track(new THREE.PlaneGeometry(0.96, 1.8)), track(new THREE.MeshBasicMaterial({ map: tex(vendingFace("#dfe2de", 61)), color: lin(1.2, 1.25, 1.3) })));
-      vendFace.rotation.y = Math.PI;
-      vendFace.position.set(SEAT_X - 1.6, 0.92, BACK - 0.77);
-      scene.add(vendFace);
-      const sign = new THREE.Mesh(track(new THREE.PlaneGeometry(2, 0.5)), track(new THREE.MeshBasicMaterial({ map: tex(stationSign(stationName || "NOCTURNE", pageFonts())), color: lin(1, 1, 0.96) })));
-      sign.rotation.y = Math.PI;
-      sign.position.set(SEAT_X + 0.1, 1.62, SIDE + 4.1);
-      scene.add(sign);
-      const signBack = new THREE.Mesh(box(2.08, 0.6, 0.1), mat({ color: 0x2b2a26, roughness: 0.8 }));
-      signBack.position.set(SEAT_X + 0.1, 1.62, SIDE + 4.16);
-      scene.add(signBack);
-      // A roof post just beyond the board, as the ride sees it.
-      const post = new THREE.Mesh(track(new THREE.CylinderGeometry(0.085, 0.095, 3.7, 12)), mat({ color: 0xb4ae9c, roughness: 0.6, normalMap: kit.relief("plaster", [1, 2]), normalScale: new THREE.Vector2(0.4, 0.4) }));
-      post.position.set(SEAT_X - 0.75, 1.85, SIDE + 4.9);
-      scene.add(post);
-      for (const dx of [-0.9, 0.9]) {
-        const leg = new THREE.Mesh(box(0.06, 1.35, 0.06), column);
-        leg.position.set(SEAT_X + 0.1 + dx, 0.67, SIDE + 4.16);
-        scene.add(leg);
-      }
+      // The ride's own platform, set down so your seat is where the ride's eyes are.
+      const platform = buildPlatform(K, stationName);
+      const platRoot = new THREE.Group();
+      platRoot.rotation.y = Math.PI;
+      platRoot.position.set(SEAT_X, EYE_Y, EYE_Z);
+      platRoot.add(platform.group);
+      outside.add(platRoot);
+      outside.add(new THREE.HemisphereLight(lin(0.045, 0.06, 0.08), lin(0.008, 0.008, 0.008), 0.8));
 
       // ================================================================= CARRIAGE
       // ShapeGeometry UVs are metres; the textures are placed in metres too.
-      const WINDOWS_X = [-6.6, -4.3, -2.0, 2.0, 4.3, 6.6];
       const paintMap = tex(bt.bodyPaint(WINDOWS_X, [-12, 12]));
       paintMap.repeat.set(1 / 24, 1 / 4.45);
       paintMap.offset.set(0.5, 1 / 4.45);
       // Stainless steel, satin-brushed along the car, like a Seoul subway car.
       const paint = mat({ map: paintMap, roughness: 0.4, metalness: floatOK ? 0.8 : 0.35 });
-      const liningMap = tex(bt.lining(), [1, 1]);
-      liningMap.repeat.set(1 / 4, 1 / (CEIL - FLOOR));
-      liningMap.offset.set(0, -FLOOR / (CEIL - FLOOR));
-      const inside = mat({ map: liningMap, roughness: 0.7, side: THREE.DoubleSide, normalMap: kit.relief("plaster", [0.5, 0.5]), normalScale: new THREE.Vector2(0.2, 0.2) });
       const plainInside = mat({ color: 0xa99d84, roughness: 0.8 });
       const trim = mat({ color: 0xb9bec0, roughness: 0.3, metalness: floatOK ? 0.85 : 0.35, normalMap: kit.relief("brushed", [2, 2]), normalScale: new THREE.Vector2(0.3, 0.3) });
       const stripeMat = mat({ color: STRIPE[carriage], roughness: 0.5, metalness: 0.2 });
-
-      // A wall along x at z, with the door and windows cut out of it.
-      const WINDOWS = WINDOWS_X;
-      const wall = (z: number, material: THREE.Material, door: boolean) => {
-        const s = new THREE.Shape([new THREE.Vector2(-12, -1), new THREE.Vector2(12, -1), new THREE.Vector2(12, 3.45), new THREE.Vector2(-12, 3.45)]);
-        if (door) s.holes.push(new THREE.Path([new THREE.Vector2(-DOOR_W / 2, FLOOR), new THREE.Vector2(DOOR_W / 2, FLOOR), new THREE.Vector2(DOOR_W / 2, FLOOR + DOOR_H), new THREE.Vector2(-DOOR_W / 2, FLOOR + DOOR_H)]));
-        for (const x of WINDOWS) {
-          s.holes.push(new THREE.Path().absarc(x - 0.6, 1.95, 0.08, Math.PI, Math.PI / 2, true).absarc(x + 0.6, 1.95, 0.08, Math.PI / 2, 0, true).absarc(x + 0.6, 1.12, 0.08, 0, -Math.PI / 2, true).absarc(x - 0.6, 1.12, 0.08, -Math.PI / 2, -Math.PI, true));
-        }
-        const m = new THREE.Mesh(track(new THREE.ShapeGeometry(s, 6)), material);
-        m.position.z = z;
-        scene.add(m);
-      };
-      // Outer skin, the inner lining a hand's width behind it, and the far side.
-      wall(SIDE, paint, true);
-      wall(SIDE - 0.08, inside, true);
-      wall(FAR, inside, false);
-      // Roof edge, lower skirt and the carriage's colour.
-      const skirt = new THREE.Mesh(box(24, 0.5, 0.06), paint);
-      skirt.position.set(0, -0.2, SIDE - 0.02);
-      scene.add(skirt);
-      // The line colour: a band under the windows and a thin one above.
-      for (const [y, h] of [
-        [0.99, 0.1],
-        [2.15, 0.035],
-      ] as const) {
-        for (const [x0, x1] of [
-          [-12, -DOOR_W / 2 - 0.04],
-          [DOOR_W / 2 + 0.04, 12],
-        ]) {
-          const band = new THREE.Mesh(box(x1 - x0, h, 0.012), stripeMat);
-          band.position.set((x0 + x1) / 2, y, SIDE + 0.012);
-          scene.add(band);
-        }
-      }
-      // Pressed beads: raised horizontal ribs in the steel below the windows
-      // and above them, stopping at the door; the window band stays smooth.
+      const paneMat = track(new THREE.MeshStandardMaterial({ color: 0x2a3036, roughness: 0.08, metalness: 0.1, transparent: true, opacity: 0.28, depthWrite: false }));
+      const farPaneMat = track(new THREE.MeshStandardMaterial({ color: 0x0b1117, roughness: 0.3, metalness: 0, transparent: true, opacity: 0.32, depthWrite: false }));
       const beadGeo = track(new THREE.CylinderGeometry(0.011, 0.011, 1, 10, 1, false, 0, Math.PI));
-      const beadRows: [number, number, number][] = [];
-      for (let y = 0.02; y <= 0.9; y += 0.055) beadRows.push([y, -12, 12]);
-      for (let y = 2.26; y <= 3.05; y += 0.055) beadRows.push([y, -12, 12]);
-      const beadSegs: [number, number, number][] = [];
-      for (const [y, x0, x1] of beadRows) {
-        // Below the door head, the doorway interrupts the bead.
-        if (y < FLOOR + DOOR_H + 0.05) {
-          beadSegs.push([y, x0, -DOOR_W / 2 - 0.06], [y, DOOR_W / 2 + 0.06, x1]);
-        } else beadSegs.push([y, x0, x1]);
-      }
-      const beads = new THREE.InstancedMesh(beadGeo, paint, beadSegs.length);
-      const m4 = new THREE.Matrix4();
-      const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.PI / 2, 0, Math.PI / 2));
-      beadSegs.forEach(([y, x0, x1], i) => {
-        m4.compose(new THREE.Vector3((x0 + x1) / 2, y, SIDE), q, new THREE.Vector3(1, x1 - x0, 1));
-        beads.setMatrixAt(i, m4);
-      });
-      scene.add(beads);
+
+      // Your window, as on the ride: its glass shows what's outside (drawn
+      // separately each frame, like the ride does), and its curtain is lit through.
+      const outTarget = pickTarget(renderer, floatOK);
+      const clothBack: ClothBacklight = { outside: outTarget.texture, res: new THREE.Vector2(1, 1), winMin: new THREE.Vector2(), winMax: new THREE.Vector2(), strength: 0.45 };
+      const mats = windowMaterials(K, carriage, clothBack);
+      mats.glass.uniforms.tOutside.value = outTarget.texture;
+      mats.glass.uniforms.uTint.value.copy(CABIN_TINT[carriage]);
+      mats.glass.uniforms.uReflect.value = 0;
+      // The carriage side is cut to the ride's window, so rebuilt if the screen's shape changes.
+      const shell = { outside: new THREE.Group(), cabin: new THREE.Group() };
+      outside.add(shell.outside);
+      cabin.add(shell.cabin);
+      let built: { dispose: () => void } | null = null;
+      let seatGlass: THREE.Mesh | null = null;
+
+      const buildShell = (d: WindowDims) => {
+        built?.dispose();
+        shell.outside.clear();
+        shell.cabin.clear();
+        const geos: THREE.BufferGeometry[] = [];
+        const curtains: Curtain[] = [];
+        const partsList: { dispose: () => void }[] = [];
+        const keep = <G extends THREE.BufferGeometry>(g: G) => {
+          geos.push(g);
+          return g;
+        };
+        const cy = EYE_Y + d.cy;
+        const bottom = cy - d.h / 2;
+        const top = cy + d.h / 2;
+        // Outer skin with the doorway and window openings (a touch larger than the glass).
+        const skin = new THREE.Shape([new THREE.Vector2(-12, -1), new THREE.Vector2(12, -1), new THREE.Vector2(12, 3.45), new THREE.Vector2(-12, 3.45)]);
+        skin.holes.push(new THREE.Path([new THREE.Vector2(-DOOR_W / 2, FLOOR), new THREE.Vector2(DOOR_W / 2, FLOOR), new THREE.Vector2(DOOR_W / 2, FLOOR + DOOR_H), new THREE.Vector2(-DOOR_W / 2, FLOOR + DOOR_H)]));
+        for (const x of WINDOWS_X) skin.holes.push(roundedRect(d.w + 0.06, d.h + 0.06, d.r + 0.03, x, cy));
+        const skinMesh = new THREE.Mesh(keep(new THREE.ShapeGeometry(skin, 8)), paint);
+        skinMesh.position.z = SIDE;
+        shell.outside.add(skinMesh);
+        const skirt = new THREE.Mesh(keep(new THREE.BoxGeometry(24, 0.5, 0.06)), paint);
+        skirt.position.set(0, -0.2, SIDE - 0.02);
+        shell.outside.add(skirt);
+        // The line colour: a band under the windows and a thin one above.
+        for (const [y, h] of [
+          [bottom - 0.1, 0.1],
+          [Math.min(FLOOR + DOOR_H + 0.13, top + 0.16), 0.035],
+        ] as const) {
+          for (const [x0, x1] of [
+            [-12, -DOOR_W / 2 - 0.04],
+            [DOOR_W / 2 + 0.04, 12],
+          ]) {
+            const band = new THREE.Mesh(keep(new THREE.BoxGeometry(x1 - x0, h, 0.012)), stripeMat);
+            band.position.set((x0 + x1) / 2, y, SIDE + 0.012);
+            shell.outside.add(band);
+          }
+        }
+        // Pressed beads: raised horizontal ribs in the steel below the windows
+        // and above them, stopping at the door; the window band stays smooth.
+        const rows: number[] = [];
+        for (let y = 0.02; y <= bottom - 0.2; y += 0.055) rows.push(y);
+        for (let y = Math.max(top + 0.26, FLOOR + DOOR_H + 0.2); y <= 3.05; y += 0.055) rows.push(y);
+        const segs: [number, number, number][] = [];
+        for (const y of rows) {
+          if (y < FLOOR + DOOR_H + 0.05) segs.push([y, -12, -DOOR_W / 2 - 0.06], [y, DOOR_W / 2 + 0.06, 12]);
+          else segs.push([y, -12, 12]);
+        }
+        const beads = new THREE.InstancedMesh(beadGeo, paint, segs.length);
+        const m4 = new THREE.Matrix4();
+        const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.PI / 2, 0, Math.PI / 2));
+        segs.forEach(([y, x0, x1], i) => beads.setMatrixAt(i, m4.compose(new THREE.Vector3((x0 + x1) / 2, y, SIDE), q, new THREE.Vector3(1, x1 - x0, 1))));
+        shell.outside.add(beads);
+        // The inside walls, in the ride's wall panel, with the ride's window openings.
+        const inner = (holesAt: (x: number) => number, door: boolean) => {
+          const s = new THREE.Shape([new THREE.Vector2(-12, FLOOR), new THREE.Vector2(12, FLOOR), new THREE.Vector2(12, CEIL), new THREE.Vector2(-12, CEIL)]);
+          if (door) s.holes.push(new THREE.Path([new THREE.Vector2(-DOOR_W / 2, FLOOR), new THREE.Vector2(DOOR_W / 2, FLOOR), new THREE.Vector2(DOOR_W / 2, FLOOR + DOOR_H), new THREE.Vector2(-DOOR_W / 2, FLOOR + DOOR_H)]));
+          for (const x of WINDOWS_X) s.holes.push(roundedRect(d.w, d.h, d.r, holesAt(x), cy));
+          return keep(new THREE.ShapeGeometry(s, 8));
+        };
+        // The platform side faces into the car (−z): turned round, so its holes are mirrored.
+        const near = new THREE.Mesh(inner((x) => -x, true), mats.wall);
+        near.rotation.y = Math.PI;
+        near.position.z = SIDE - 0.08;
+        shell.cabin.add(near);
+        const far = new THREE.Mesh(inner((x) => x, false), mats.wall);
+        far.position.z = FAR;
+        shell.cabin.add(far);
+        // Window parts, glass and curtains, each in the ride's eye space.
+        WINDOWS_X.forEach((x, i) => {
+          for (const side of ["near", "far"] as const) {
+            const mine = side === "near" && x === SEAT_X;
+            const g = new THREE.Group();
+            if (side === "near") {
+              g.rotation.y = Math.PI;
+              g.position.set(x, EYE_Y, EYE_Z);
+            } else g.position.set(x, EYE_Y, FAR + D);
+            const parts = windowParts(d, { frame: mats.frame, table: mats.table, glass: mine ? mats.glass : null });
+            partsList.push(parts);
+            g.add(parts.group);
+            if (mine) {
+              seatGlass = parts.glass;
+              seatGlass!.visible = false;
+              mats.glass.uniforms.uWin.value.set(d.w, d.h);
+              clothBack.winMin.set(x - d.w / 2, cy - d.h / 2);
+              clothBack.winMax.set(x + d.w / 2, cy + d.h / 2);
+            }
+            // Your curtain hangs exactly as the ride's will; the others each their own way.
+            const curtain = new Curtain(mine ? mats.cloth : mats.plainCloth, { ...parts.curtain, cover: CURTAIN_REST, seed: mine ? undefined : 31 + i * 7 + (side === "near" ? 3 : 0) });
+            curtains.push(curtain);
+            g.add(curtain.mesh);
+            shell.cabin.add(g);
+            // The outer glass, flush with the skin; your own is left out of the view through it.
+            const pane = new THREE.Mesh(keep(new THREE.PlaneGeometry(d.w + 0.06, d.h + 0.06)), side === "near" ? paneMat : farPaneMat);
+            pane.position.set(x, cy, side === "near" ? SIDE - 0.03 : FAR - 0.01);
+            if (mine) pane.layers.set(MAIN_ONLY);
+            shell.outside.add(pane);
+          }
+        });
+        built = {
+          dispose: () => {
+            geos.forEach((g) => g.dispose());
+            curtains.forEach((c) => c.dispose());
+            partsList.forEach((p) => p.dispose());
+          },
+        };
+      };
+
       // The door frame.
-      for (const x of [-DOOR_W / 2 - 0.02, DOOR_W / 2 + 0.02]) {
-        const jamb = new THREE.Mesh(box(0.04, DOOR_H + 0.04, 0.1), trim);
-        jamb.position.set(x, FLOOR + DOOR_H / 2, SIDE - 0.04);
-        scene.add(jamb);
-      }
-      const lintel = new THREE.Mesh(box(DOOR_W + 0.08, 0.04, 0.1), trim);
-      lintel.position.set(0, FLOOR + DOOR_H + 0.02, SIDE - 0.04);
-      scene.add(lintel);
-      const step = new THREE.Mesh(box(DOOR_W, 0.03, 0.22), trim);
-      step.position.set(0, FLOOR - 0.015, SIDE + 0.02);
-      scene.add(step);
+      for (const x of [-DOOR_W / 2 - 0.02, DOOR_W / 2 + 0.02]) addTo(outside, new THREE.Mesh(box(0.04, DOOR_H + 0.04, 0.1), trim), x, FLOOR + DOOR_H / 2, SIDE - 0.04);
+      addTo(outside, new THREE.Mesh(box(DOOR_W + 0.08, 0.04, 0.1), trim), 0, FLOOR + DOOR_H + 0.02, SIDE - 0.04);
+      addTo(outside, new THREE.Mesh(box(DOOR_W, 0.03, 0.22), trim), 0, FLOOR - 0.015, SIDE + 0.02);
 
       // The car number and the line's name, painted beside the door.
       const label = (text: string, w: number, h: number, font: string, color: string) => {
@@ -295,11 +303,11 @@ export default function BoardingScene3D({ stage, carriage, car, stationName = ""
         const t = track(new THREE.CanvasTexture(c));
         t.colorSpace = THREE.SRGBColorSpace;
         const m = new THREE.Mesh(track(new THREE.PlaneGeometry(w, h)), track(new THREE.MeshBasicMaterial({ map: t, transparent: true, depthWrite: false })));
-        scene.add(m);
+        outside.add(m);
         return m;
       };
       label(car, 0.34, 0.2, "500 64px 'IBM Plex Mono', ui-monospace, monospace", "#23282c").position.set(DOOR_W / 2 + 0.38, 1.82, SIDE + 0.004);
-      label("NOCTURNE", 1.2, 0.12, "400 30px 'IBM Plex Mono', ui-monospace, monospace", "rgba(35,40,44,0.7)").position.set(-3.15, 1.68, SIDE + 0.004);
+      label("NOCTURNE", 1.2, 0.12, "400 30px 'IBM Plex Mono', ui-monospace, monospace", "rgba(35,40,44,0.7)").position.set(-3.15, 1.72, SIDE + 0.004);
 
       // The night on the far side of the train, seen through its windows.
       const night = document.createElement("canvas");
@@ -335,71 +343,13 @@ export default function BoardingScene3D({ stage, carriage, car, stationName = ""
       }
       const nightTex = track(new THREE.CanvasTexture(night));
       nightTex.colorSpace = THREE.SRGBColorSpace;
-      const backdrop = new THREE.Mesh(track(new THREE.PlaneGeometry(40, 12)), track(new THREE.MeshBasicMaterial({ map: nightTex, fog: false })));
       // Its horizon a little below eye level for someone sitting down.
-      backdrop.position.set(0, 2.4, FAR - 9);
-      scene.add(backdrop);
-      const farGlass = track(new THREE.MeshStandardMaterial({ color: 0x0b1117, roughness: 0.3, metalness: 0, transparent: true, opacity: 0.32 }));
-
-      // Windows: glass with the lit carriage behind.
-      const glass = track(new THREE.MeshStandardMaterial({ color: 0x2a3036, roughness: 0.08, metalness: 0.1, transparent: true, opacity: 0.28 }));
-      for (const x of WINDOWS) {
-        const pane = new THREE.Mesh(track(new THREE.PlaneGeometry(1.36, 1.0)), glass);
-        pane.position.set(x, 1.535, SIDE - 0.03);
-        scene.add(pane);
-        const far = new THREE.Mesh(track(new THREE.PlaneGeometry(1.36, 1.0)), farGlass);
-        far.position.set(x, 1.535, FAR - 0.01);
-        scene.add(far);
-      }
-
-      // Inside, each window sits in an aluminium frame, a curtain gathered
-      // at its left — the same frame and cloth as at your seat on the ride.
-      const opening = (hw: number, hh: number, r: number) =>
-        new THREE.Path()
-          .absarc(-hw + r, hh - r, r, Math.PI, Math.PI / 2, true)
-          .absarc(hw - r, hh - r, r, Math.PI / 2, 0, true)
-          .absarc(hw - r, -hh + r, r, 0, -Math.PI / 2, true)
-          .absarc(-hw + r, -hh + r, r, -Math.PI / 2, -Math.PI, true);
-      const ringShape = new THREE.Shape(opening(WIN_HW + 0.05, WIN_HH + 0.05, 0.13).getPoints(12));
-      ringShape.holes.push(opening(WIN_HW, WIN_HH, 0.08));
-      const ringGeo = track(new THREE.ExtrudeGeometry(ringShape, { depth: 0.03, bevelEnabled: true, bevelThickness: 0.008, bevelSize: 0.006, bevelSegments: 2, curveSegments: 12 }));
-      const frameMat = mat({ color: 0xa4a9a8, roughness: 0.38, metalness: floatOK ? 0.5 : 0.3 });
-      const cloth = track(clothMaterial({ color: CURTAIN_COLOR[carriage], map: tex(curtainFabric()), normalMap: kit.relief("fabric", [9, 8]) }));
-      const curtains: Curtain[] = [];
-      WINDOWS.forEach((x, i) => {
-        for (const near of [true, false]) {
-          // Facing into the car: the platform side looks toward +z, the far side toward −z.
-          const g = new THREE.Group();
-          g.position.set(x, 0, near ? SIDE - 0.08 : FAR);
-          if (near) g.rotation.y = Math.PI;
-          const ring = new THREE.Mesh(ringGeo, frameMat);
-          ring.position.set(0, WIN_CY, 0);
-          g.add(ring);
-          const railY = WIN_CY + WIN_HH + 0.11;
-          const curtain = new Curtain(cloth, {
-            left: -WIN_HW - 0.1,
-            railY,
-            length: railY - (WIN_CY - WIN_HH - 0.03),
-            width: 2 * WIN_HW + 0.14,
-            parked: 0.14,
-            z: 0.035,
-            wallGap: 0.045,
-            floorY: WIN_CY - WIN_HH - 0.035,
-            cover: CURTAIN_REST,
-            hooks: frameMat,
-            seed: 31 + i * 7 + (near ? 3 : 0),
-          });
-          curtains.push(curtain);
-          g.add(curtain.mesh);
-          scene.add(g);
-        }
-      });
-      disposables.push(...curtains);
+      addTo(outside, new THREE.Mesh(track(new THREE.PlaneGeometry(40, 12)), track(new THREE.MeshBasicMaterial({ map: nightTex, fog: false }))), 0, 2.2, FAR - 9);
 
       // The door leaves, in the pocket between the skins: a frame round a
       // tall window, so the lit vestibule shows through even when shut.
       const leafMat = mat({ color: 0xa7adb1, roughness: 0.38, metalness: floatOK ? 0.8 : 0.35 });
-      const leafGlass = track(new THREE.MeshStandardMaterial({ color: 0x3a3a34, roughness: 0.1, transparent: true, opacity: 0.3 }));
+      const leafGlass = track(new THREE.MeshStandardMaterial({ color: 0x3a3a34, roughness: 0.1, transparent: true, opacity: 0.3, depthWrite: false }));
       const rubber = mat({ color: 0x0a0b0c, roughness: 1 });
       const LW = DOOR_W / 2;
       const WIN_W = 0.42;
@@ -426,58 +376,43 @@ export default function BoardingScene3D({ stage, carriage, car, stationName = ""
         const seal = new THREE.Mesh(box(0.02, DOOR_H, 0.04), rubber);
         seal.position.x = -side * (LW / 2 - 0.01);
         g.add(seal);
-        g.position.set((side * DOOR_W) / 4, FLOOR + DOOR_H / 2, SIDE - 0.04);
-        scene.add(g);
+        addTo(outside, g, (side * DOOR_W) / 4, FLOOR + DOOR_H / 2, SIDE - 0.04);
         return { g, side };
       });
 
       // Door lamp and the ticket reader.
       const lampMat = glow(0x3a3f44, 1);
-      const lamp = new THREE.Mesh(track(new THREE.SphereGeometry(0.045, 16, 12)), lampMat);
-      lamp.position.set(0, FLOOR + DOOR_H + 0.14, SIDE + 0.03);
-      scene.add(lamp);
-      const lampLight = new THREE.PointLight(lin(1, 0.66, 0.3), 0, 2.2, 2);
-      lampLight.position.set(0, FLOOR + DOOR_H + 0.1, SIDE + 0.25);
-      scene.add(lampLight);
-      const reader = new THREE.Mesh(box(0.13, 0.22, 0.05), mat({ color: 0x0e1216, roughness: 0.5, metalness: 0.4 }));
-      reader.position.set(DOOR_W / 2 + 0.24, 1.25, SIDE + 0.025);
-      scene.add(reader);
+      addTo(outside, new THREE.Mesh(track(new THREE.SphereGeometry(0.045, 16, 12)), lampMat), 0, FLOOR + DOOR_H + 0.14, SIDE + 0.03);
+      const lampLight = addTo(outside, new THREE.PointLight(lin(1, 0.66, 0.3), 0, 2.2, 2), 0, FLOOR + DOOR_H + 0.1, SIDE + 0.25);
+      addTo(outside, new THREE.Mesh(box(0.13, 0.22, 0.05), mat({ color: 0x0e1216, roughness: 0.5, metalness: 0.4 })), DOOR_W / 2 + 0.24, 1.25, SIDE + 0.025);
       const ringMat = glow(0x2a3a33, 1);
-      const ring = new THREE.Mesh(track(new THREE.TorusGeometry(0.035, 0.006, 8, 32)), ringMat);
-      ring.position.set(DOOR_W / 2 + 0.24, 1.28, SIDE + 0.052);
-      scene.add(ring);
+      addTo(outside, new THREE.Mesh(track(new THREE.TorusGeometry(0.035, 0.006, 8, 32)), ringMat), DOOR_W / 2 + 0.24, 1.28, SIDE + 0.052);
 
       // =================================================================== INSIDE
-      const floor = new THREE.Mesh(
-        track(new THREE.PlaneGeometry(24, CAR_W)),
-        mat({ map: tex(bt.floor(), [6, 1]), normalMap: kit.relief("rough", [24, 3]), normalScale: new THREE.Vector2(0.25, 0.25), roughness: 0.62 }),
-      );
+      const floor = addTo(cabin, new THREE.Mesh(track(new THREE.PlaneGeometry(24, CAR_W)), mat({ map: tex(bt.floor(), [6, 1]), normalMap: kit.relief("rough", [24, 3]), normalScale: new THREE.Vector2(0.25, 0.25), roughness: 0.62 })), 0, FLOOR, SIDE - CAR_W / 2);
       floor.rotation.x = -Math.PI / 2;
-      floor.position.set(0, FLOOR, SIDE - CAR_W / 2);
-      scene.add(floor);
-      const ceiling = new THREE.Mesh(
-        track(new THREE.PlaneGeometry(24, CAR_W)),
-        mat({ color: 0xbdb39e, roughness: 0.95, normalMap: kit.relief("ribs", [40, 3], Math.PI / 2), normalScale: new THREE.Vector2(0.25, 0.25) }),
-      );
+      const ceiling = addTo(cabin, new THREE.Mesh(track(new THREE.PlaneGeometry(24, CAR_W)), mat({ color: 0xbdb39e, roughness: 0.95, normalMap: kit.relief("ribs", [40, 3], Math.PI / 2), normalScale: new THREE.Vector2(0.25, 0.25) })), 0, CEIL, SIDE - CAR_W / 2);
       ceiling.rotation.x = Math.PI / 2;
-      ceiling.position.set(0, CEIL, SIDE - CAR_W / 2);
-      scene.add(ceiling);
       const stripMat = glow(0xfff1d8, 0.9);
-      for (const z of [SIDE - 0.75, FAR + 0.75]) {
-        const strip = new THREE.Mesh(box(20, 0.03, 0.12), stripMat);
-        strip.position.set(0, CEIL - 0.02, z);
-        scene.add(strip);
-      }
+      for (const z of [SIDE - 0.75, FAR + 0.75]) addTo(cabin, new THREE.Mesh(box(20, 0.03, 0.12), stripMat), 0, CEIL - 0.02, z);
       const WARM = lin(1, 0.84, 0.62);
-      const carLights = [-6, -2, 2, 6].map((x) => {
-        const l = new THREE.PointLight(WARM.clone(), 2, 5.5, 1.8);
-        l.position.set(x, CEIL - 0.25, SIDE - CAR_W / 2);
-        scene.add(l);
-        return l;
-      });
-      // Seats in bays of two facing each other, by the windows; a table between.
-      // Moquette cushions with piped edges, a two-part back, a linen headrest
-      // cover, an armrest on the aisle, on a steel plinth.
+      const carLights = [-6, -2, 2, 6].map((x) => addTo(cabin, new THREE.PointLight(WARM.clone(), 2, 5.5, 1.8), x, CEIL - 0.25, SIDE - CAR_W / 2));
+      const carFill = new THREE.HemisphereLight(lin(0.12, 0.13, 0.16), lin(0.02, 0.02, 0.02), 1);
+      cabin.add(carFill);
+      // The ride's own light at your seat, faded up as you sit.
+      const seatLights = cabinLights(CABIN_TINT[carriage].clone());
+      const seatRoot = new THREE.Group();
+      seatRoot.rotation.y = Math.PI;
+      seatRoot.position.set(SEAT_X, EYE_Y, EYE_Z);
+      seatRoot.add(seatLights.group);
+      cabin.add(seatRoot, seatLights.fill);
+      const spill = seatLights.platformSpill();
+      const seatBase = { main: seatLights.main.intensity, reading: seatLights.reading.intensity, fill: seatLights.fill.intensity };
+
+      // Seats in bays of two facing each other, by the windows. Moquette
+      // cushions with piped edges, a two-part back, a linen headrest cover,
+      // an armrest on the aisle, on a steel plinth — each kind of part drawn
+      // for every seat at once.
       const moq = bt.moquette(SEAT[carriage]);
       const fabric = mat({ map: tex(moq, [2.5, 2.5]), normalMap: kit.relief("fabric", [5, 5]), normalScale: new THREE.Vector2(0.9, 0.9), roughness: 0.95 });
       const fabricBack = mat({ map: tex(moq, [2.5, 3]), normalMap: kit.relief("fabric", [5, 6]), normalScale: new THREE.Vector2(0.9, 0.9), roughness: 0.95 });
@@ -485,77 +420,81 @@ export default function BoardingScene3D({ stage, carriage, car, stationName = ""
       const linen = mat({ color: 0xe4dccb, roughness: 0.92, normalMap: kit.relief("fabric", [3, 3]), normalScale: new THREE.Vector2(0.6, 0.6) });
       const plinth = mat({ color: 0x1d2024, roughness: 0.5, metalness: floatOK ? 0.6 : 0.3 });
       const armMat = mat({ color: 0x191b1e, roughness: 0.55 });
-      const tableMat = mat({ color: 0x2a2f31, roughness: 0.4 });
-      const cushionGeo = rounded(0.5, 0.14, 0.94, 0.05);
-      const lowerGeo = rounded(0.12, 0.42, 0.94, 0.045);
-      const upperGeo = rounded(0.12, 0.34, 0.94, 0.045);
-      const coverGeo = rounded(0.03, 0.2, 0.46, 0.012);
-      const pipeGeo = track(new THREE.CylinderGeometry(0.011, 0.011, 0.9, 8));
-      const armGeo = rounded(0.42, 0.05, 0.075, 0.02);
-      const put = (m: THREE.Mesh, x: number, y: number, z: number) => {
-        m.position.set(x, y, z);
-        scene.add(m);
-        return m;
+      const kinds = {
+        plinth: { geo: box(0.42, 0.32, 0.86), mat: plinth },
+        cushion: { geo: rounded(0.5, 0.14, 0.94, 0.05), mat: fabric },
+        pipe: { geo: track(new THREE.CylinderGeometry(0.011, 0.011, 0.9, 8)), mat: piping },
+        lower: { geo: rounded(0.12, 0.42, 0.94, 0.045), mat: fabricBack },
+        upper: { geo: rounded(0.12, 0.34, 0.94, 0.045), mat: fabricBack },
+        cover: { geo: rounded(0.03, 0.2, 0.46, 0.012), mat: linen },
+        arm: { geo: rounded(0.42, 0.05, 0.075, 0.02), mat: armMat },
+        rack: { geo: track(new THREE.CylinderGeometry(0.012, 0.012, 1.9, 8)), mat: trim },
+      };
+      const placed = new Map<keyof typeof kinds, THREE.Matrix4[]>();
+      const dummy = new THREE.Object3D();
+      const place = (kind: keyof typeof kinds, x: number, y: number, z: number, rx = 0, rz = 0) => {
+        dummy.position.set(x, y, z);
+        dummy.rotation.set(rx, 0, rz);
+        dummy.updateMatrix();
+        if (!placed.has(kind)) placed.set(kind, []);
+        placed.get(kind)!.push(dummy.matrix.clone());
       };
       const bay = (x: number, wallZ: number, dir: 1 | -1) => {
         const zc = wallZ + dir * 0.52;
         for (const facing of [-1, 1] as const) {
           const sx = x + facing * 0.62;
-          put(new THREE.Mesh(box(0.42, 0.32, 0.86), plinth), sx, FLOOR + 0.18, zc);
-          put(new THREE.Mesh(cushionGeo, fabric), sx, FLOOR + 0.43, zc);
-          // Piping along the front edge of the cushion.
-          const pipe = put(new THREE.Mesh(pipeGeo, piping), sx - facing * 0.25, FLOOR + 0.49, zc);
-          pipe.rotation.x = Math.PI / 2;
+          place("plinth", sx, FLOOR + 0.18, zc);
+          place("cushion", sx, FLOOR + 0.43, zc);
+          place("pipe", sx - facing * 0.25, FLOOR + 0.49, zc, Math.PI / 2);
           const bx = sx + facing * 0.24;
-          const lower = put(new THREE.Mesh(lowerGeo, fabricBack), bx, FLOOR + 0.73, zc);
-          lower.rotation.z = -facing * 0.08;
-          const upper = put(new THREE.Mesh(upperGeo, fabricBack), bx + facing * 0.03, FLOOR + 1.11, zc);
-          upper.rotation.z = -facing * 0.1;
-          const cover = put(new THREE.Mesh(coverGeo, linen), bx - facing * 0.045, FLOOR + 1.2, zc);
-          cover.rotation.z = -facing * 0.1;
-          put(new THREE.Mesh(armGeo, armMat), sx, FLOOR + 0.66, wallZ + dir * 0.99);
+          place("lower", bx, FLOOR + 0.73, zc, 0, -facing * 0.08);
+          place("upper", bx + facing * 0.03, FLOOR + 1.11, zc, 0, -facing * 0.1);
+          place("cover", bx - facing * 0.045, FLOOR + 1.2, zc, 0, -facing * 0.1);
+          place("arm", sx, FLOOR + 0.66, wallZ + dir * 0.99);
         }
-        put(new THREE.Mesh(rounded(0.52, 0.035, 0.36, 0.012), tableMat), x, FLOOR + 0.72, wallZ + dir * 0.2);
         // A tubular luggage rack over the window.
-        for (const dz of [0.1, 0.28]) {
-          const bar = put(new THREE.Mesh(track(new THREE.CylinderGeometry(0.012, 0.012, 1.9, 8)), trim), x, CEIL - 0.3, wallZ + dir * dz);
-          bar.rotation.z = Math.PI / 2;
-        }
+        for (const dz of [0.1, 0.28]) place("rack", x, CEIL - 0.3, wallZ + dir * dz, 0, Math.PI / 2);
       };
-      for (const x of [-6.6, -4.3, -2.0, 2.0, 4.3, 6.6]) {
+      for (const x of WINDOWS_X) {
         bay(x, FAR, 1);
         if (Math.abs(x) > 1.5) bay(x, SIDE - 0.08, -1);
       }
+      placed.forEach((matrices, kind) => {
+        const inst = new THREE.InstancedMesh(kinds[kind].geo, kinds[kind].mat, matrices.length);
+        matrices.forEach((m, i) => inst.setMatrixAt(i, m));
+        inst.computeBoundingSphere();
+        cabin.add(inst);
+      });
       // Grab poles by the door and a rail along the ceiling over the aisle.
-      for (const px of [-0.78, 0.78]) {
-        put(new THREE.Mesh(track(new THREE.CylinderGeometry(0.017, 0.017, CEIL - FLOOR, 12)), trim), px, (CEIL + FLOOR) / 2, SIDE - 0.45);
-      }
-      const rail = put(new THREE.Mesh(track(new THREE.CylinderGeometry(0.014, 0.014, 18, 10)), trim), 0, CEIL - 0.14, SIDE - CAR_W / 2);
-      rail.rotation.z = Math.PI / 2;
-      // The end of the car: a gangway door with a dark window.
-      for (const x of [-10, 10]) {
-        const end = new THREE.Mesh(track(new THREE.PlaneGeometry(CAR_W, CEIL - FLOOR)), plainInside);
-        end.rotation.y = x < 0 ? Math.PI / 2 : -Math.PI / 2;
-        end.position.set(x, (CEIL + FLOOR) / 2, SIDE - CAR_W / 2);
-        scene.add(end);
-      }
+      for (const px of [-0.78, 0.78]) addTo(cabin, new THREE.Mesh(track(new THREE.CylinderGeometry(0.017, 0.017, CEIL - FLOOR, 12)), trim), px, (CEIL + FLOOR) / 2, SIDE - 0.45);
+      addTo(cabin, new THREE.Mesh(track(new THREE.CylinderGeometry(0.014, 0.014, 18, 10)), trim), 0, CEIL - 0.14, SIDE - CAR_W / 2).rotation.z = Math.PI / 2;
+      // The ends of the car.
+      for (const x of [-10, 10]) addTo(cabin, new THREE.Mesh(track(new THREE.PlaneGeometry(CAR_W, CEIL - FLOOR)), plainInside), x, (CEIL + FLOOR) / 2, SIDE - CAR_W / 2).rotation.y = x < 0 ? Math.PI / 2 : -Math.PI / 2;
 
-      // Metal needs something to reflect: a soft room, where float targets allow it.
+      // Metal needs something to reflect: a soft room, where float targets
+      // allow it. It fades as you sit, since the ride has none.
+      const ENV = 0.18;
       if (floatOK) {
         const pmrem = new THREE.PMREMGenerator(renderer);
         const room = new RoomEnvironment();
-        scene.environment = track(pmrem.fromScene(room, 0.04).texture);
-        scene.environmentIntensity = 0.18;
+        const env = track(pmrem.fromScene(room, 0.04).texture);
+        outside.environment = env;
+        cabin.environment = env;
+        outside.environmentIntensity = cabin.environmentIntensity = ENV;
         room.dispose();
         pmrem.dispose();
       }
 
       // ==================================================================== POST
+      // The ride's passes, in the ride's order.
       const target = pickTarget(renderer, floatOK);
       const hdr = target.texture.type === THREE.HalfFloatType;
       const composer = new EffectComposer(renderer, target);
-      composer.addPass(new RenderPass(scene, camera));
-      const bloom = new UnrealBloomPass(new THREE.Vector2(256, 256), 0.32, 0.4, 0.95);
+      composer.addPass(new RenderPass(cabin, camera));
+      const overPass = new RenderPass(outside, camera);
+      overPass.clear = false;
+      composer.addPass(overPass);
+      const bloom = new UnrealBloomPass(new THREE.Vector2(256, 256), 0.32, 0.35, hdr ? 1.0 : 0.85);
       bloom.enabled = hdr;
       composer.addPass(bloom);
       composer.addPass(new OutputPass());
@@ -563,47 +502,31 @@ export default function BoardingScene3D({ stage, carriage, car, stationName = ""
       const fxaa = new FXAAPass();
       fxaa.enabled = target.samples === 0;
       composer.addPass(fxaa);
-      disposables.push(bloom, fxaa, composer);
+      const grade = new ShaderPass(GradeShader);
+      grade.uniforms.uVignette.value = 0.25;
+      composer.addPass(grade);
+      disposables.push(bloom, fxaa, grade, composer, outTarget);
       let level = 0;
-      let seatD = 1.2;
-
-      const layout = () => {
-        const w = mount.clientWidth || 1;
-        const h = mount.clientHeight || 1;
-        const dpr = Math.min(window.devicePixelRatio || 1, QUALITY[level], Math.sqrt(2.6e6 / (w * h)));
-        renderer.setPixelRatio(dpr);
-        renderer.setSize(w, h, false);
-        composer.setPixelRatio(dpr);
-        composer.setSize(w, h);
-        camera.aspect = w / h;
-        // The ride's lens throughout, so the walk ends on the ride's first frame.
-        camera.fov = rideFov(camera.aspect);
-        camera.updateProjectionMatrix();
-        // Sit where the window fills the view about as it does on the ride.
-        seatD = Math.min(1.4, Math.max(0.9, (2 * WIN_HH * 1.18) / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)))));
-        path.points[path.points.length - 1].set(SEAT_X, SEAT_EYE, SIDE - 0.11 - seatD);
-        path.updateArcLengths();
-      };
+      let builtFor = "";
 
       // ===================================================================== WALK
       // Platform → threshold → vestibule → along the aisle → your seat, and
       // you settle facing the window, looking back out at the platform.
-      const SEAT_EYE = WIN_CY - 0.04;
       const path = new THREE.CatmullRomCurve3([
-        new THREE.Vector3(0, 1.62, 4.3),
         new THREE.Vector3(0, 1.62, 2.2),
-        new THREE.Vector3(0, 1.64, 0.35),
+        new THREE.Vector3(0, 1.62, 1.2),
+        new THREE.Vector3(0, 1.64, 0.3),
         new THREE.Vector3(0.05, 1.66, SIDE - 0.9),
-        new THREE.Vector3(0.9, 1.64, SIDE - 1.5),
-        new THREE.Vector3(1.75, 1.58, SIDE - 1.75),
-        new THREE.Vector3(SEAT_X, SEAT_EYE, SIDE - 0.11 - 1.2),
+        new THREE.Vector3(0.9, 1.62, SIDE - 1.5),
+        new THREE.Vector3(1.75, 1.45, SIDE - 1.6),
+        new THREE.Vector3(SEAT_X, EYE_Y, EYE_Z),
       ]);
       const looks = [
         { t: 0, at: new THREE.Vector3(0, 1.3, SIDE) },
         { t: 0.3, at: new THREE.Vector3(0, 1.35, SIDE - 2) },
         { t: 0.55, at: new THREE.Vector3(3.2, 1.45, SIDE - 1.9) },
-        { t: 0.8, at: new THREE.Vector3(SEAT_X + 0.5, SEAT_EYE, SIDE - 0.4) },
-        { t: 1, at: new THREE.Vector3(SEAT_X, SEAT_EYE, SIDE) },
+        { t: 0.8, at: new THREE.Vector3(SEAT_X + 0.35, EYE_Y + 0.05, SIDE) },
+        { t: 1, at: new THREE.Vector3(SEAT_X, EYE_Y, EYE_Z + 1) },
       ];
       const lookAt = new THREE.Vector3();
       const lookAtFor = (u: number) => {
@@ -616,15 +539,39 @@ export default function BoardingScene3D({ stage, carriage, car, stationName = ""
         }
         return lookAt.copy(looks[looks.length - 1].at);
       };
-      let arrived = false;
 
+      const layout = () => {
+        const w = mount.clientWidth || 1;
+        const h = mount.clientHeight || 1;
+        const dpr = Math.min(window.devicePixelRatio || 1, QUALITY[level], Math.sqrt(2.4e6 / (w * h)));
+        renderer.setPixelRatio(dpr);
+        renderer.setSize(w, h, false);
+        composer.setPixelRatio(dpr);
+        composer.setSize(w, h);
+        const px = [Math.round(w * dpr), Math.round(h * dpr)] as const;
+        outTarget.setSize(...px);
+        mats.glass.uniforms.uRes.value.set(...px);
+        clothBack.res.set(...px);
+        grade.uniforms.uRes.value.set(w * dpr, h * dpr);
+        camera.aspect = w / h;
+        // The ride's lens throughout, so the walk ends on the ride's first frame.
+        camera.fov = rideFov(camera.aspect);
+        camera.updateProjectionMatrix();
+        const shape = `${w}x${h}`;
+        if (shape !== builtFor) {
+          builtFor = shape;
+          buildShell(windowDims(camera.fov, camera.aspect));
+        }
+      };
+
+      let arrived = false;
+      let settle = 0;
       const update = (now: number) => {
         const { stage: s, at } = stageRef.current;
         const since = (now - at) / 1000;
         const lit = s !== "waiting";
         lampMat.emissive.set(lit ? 0xf0b35e : 0x3a3f44);
         lampMat.emissiveIntensity = lit ? 2.4 + (s === "opening" || s === "entering" ? Math.sin(now / 180) * 0.6 : 0) : 1;
-        lampLight.intensity = lit ? 1.4 : 0;
         ringMat.emissive.set(s === "waiting" ? 0x2a3a33 : 0x8fd0a8);
         ringMat.emissiveIntensity = s === "waiting" ? 1 : 2.2;
 
@@ -632,6 +579,7 @@ export default function BoardingScene3D({ stage, carriage, car, stationName = ""
         const o = reduce && (s === "opening" || s === "entering") ? 1 : open;
         for (const { g, side } of leaves) g.position.x = (side * DOOR_W) / 4 + side * (DOOR_W / 2 + 0.04) * o;
 
+        settle = 0;
         if (s === "entering" && !reduce) {
           const u = Math.min(1, since / WALK);
           // Walk at an even pace, easing only at the start and at the seat.
@@ -640,13 +588,7 @@ export default function BoardingScene3D({ stage, carriage, car, stationName = ""
           const stride = Math.sin(since * 9.5) * 0.007 * (1 - ease((u - 0.6) / 0.25));
           camera.position.set(p.x, p.y + stride, p.z);
           camera.lookAt(lookAtFor(k));
-          // Settling in, the car's light turns to the ride's.
-          const settle = ease((u - 0.55) / 0.45);
-          for (const l of carLights) {
-            l.color.copy(WARM).lerp(CABIN_TINT[carriage], settle);
-            l.intensity = 2 - 1.35 * settle;
-          }
-          renderer.toneMappingExposure = 1.05 - 0.1 * settle;
+          settle = ease((u - 0.55) / 0.45);
           if (u >= 1 && !arrived) {
             arrived = true;
             insideRef.current?.();
@@ -654,15 +596,41 @@ export default function BoardingScene3D({ stage, carriage, car, stationName = ""
         } else {
           // Standing on the platform, breathing.
           const sway = reduce ? 0 : Math.sin(now / 1400) * 0.012;
-          camera.position.set(0 + sway, 1.62 + (reduce ? 0 : Math.sin(now / 1900) * 0.006), 4.3);
+          camera.position.set(sway, 1.62 + (reduce ? 0 : Math.sin(now / 1900) * 0.006), path.points[0].z);
           camera.lookAt(looks[0].at);
         }
+        lampLight.intensity = lit ? 1.4 * (1 - settle) : 0;
+        // Settling in, the car's lights give way to the ride's light at your seat.
+        for (const l of carLights) l.intensity = 2 * (1 - settle);
+        carFill.intensity = 1 - settle;
+        seatLights.main.intensity = seatBase.main * settle;
+        seatLights.reading.intensity = seatBase.reading * settle;
+        seatLights.sweep.intensity = spill * settle;
+        seatLights.fill.intensity = seatBase.fill * settle;
+        outside.environmentIntensity = cabin.environmentIntensity = ENV * (1 - settle);
+        renderer.toneMappingExposure = 1.05 - 0.05 * settle;
+        grade.uniforms.uVignette.value = 0.25 + 0.25 * settle;
+        grade.uniforms.uTime.value = now / 1000;
+        // The ride's glass keeps the page's clock, so its drops are where the ride's will be.
+        mats.glass.uniforms.uTime.value = performance.now() / 1000;
+        mats.glass.uniforms.uRain.value = (carriage === "rain" ? 1 : 0) * settle;
+        // The ride's glass takes over from the plain pane as you sit; its reflection comes up with it.
+        mats.glass.uniforms.uReflect.value = 0.08 * settle;
+        if (seatGlass) seatGlass.visible = settle > 0;
       };
 
       let broken = false;
       const draw = () => {
         if (broken) return;
         try {
+          if (seatGlass?.visible) {
+            // What's outside your window, for its glass and curtain, as the ride draws it.
+            camera.layers.disable(MAIN_ONLY);
+            renderer.setRenderTarget(outTarget);
+            renderer.render(outside, camera);
+            renderer.setRenderTarget(null);
+            camera.layers.enable(MAIN_ONLY);
+          }
           composer.render();
         } catch (err) {
           broken = true;
@@ -705,6 +673,11 @@ export default function BoardingScene3D({ stage, carriage, car, stationName = ""
       layout();
       const ro = new ResizeObserver(layout);
       ro.observe(mount);
+      // Warm up: draw once with your window's glass showing, so its shader
+      // compiles now and not as you sit down. Only the second frame, drawn
+      // in the same task, reaches the screen.
+      if (seatGlass) (seatGlass as THREE.Mesh).visible = true;
+      draw();
       update(performance.now());
       draw();
       raf = requestAnimationFrame(frame);
@@ -712,6 +685,7 @@ export default function BoardingScene3D({ stage, carriage, car, stationName = ""
       return () => {
         cancelAnimationFrame(raf);
         ro.disconnect();
+        built?.dispose();
         disposables.forEach((d) => d.dispose());
         target.dispose();
         log.dispose();

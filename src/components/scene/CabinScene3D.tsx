@@ -9,12 +9,14 @@ import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
 import { ShaderPass } from "three/examples/jsm/postprocessing/ShaderPass.js";
 import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
 import type { CarriageId } from "@/core/types";
-import { farLightsMaterial, fieldMaterial, glassMaterial, trackGroundMaterial, tunnelWallMaterial } from "./cabin/shaders";
+import { farLightsMaterial, fieldMaterial, trackGroundMaterial, tunnelWallMaterial } from "./cabin/shaders";
 import * as ct from "./cabin/textures";
 import { Curtain } from "./cabin/curtain";
-import { CABIN_TINT as TINT, CURTAIN_COLOR as CURTAIN, CURTAIN_REST, clothMaterial, type ClothBacklight } from "./cabin/cloth";
+import { CABIN_TINT as TINT, CURTAIN_COLOR as CURTAIN, CURTAIN_REST, type ClothBacklight } from "./cabin/cloth";
+import { sceneKit } from "./cabin/kit";
+import { PT, buildPlatform } from "./cabin/platform";
+import { D, cabinLights, rideFov, roundedRect, windowDims, windowMaterials, windowParts } from "./cabin/window";
 import { SCENE_READY, describe, floatSupport, pickTarget, sceneLog } from "./gl";
-import { surfaceKit, withCavity } from "./surfaces";
 import { GradeShader, MAX_LIGHTS, hazeMaterial, rainMaterial, skyMaterial } from "./platform/shaders";
 import * as tx from "./platform/textures";
 
@@ -35,14 +37,11 @@ export interface CabinSceneProps {
 
 // Metres, relative to your eyes. The train runs toward +x, so the world
 // slides toward -x past the window.
-const D = 0.7; // from the eyes to the glass
 const GROUND = -2.35; // ballast, just below rail level
-const PT = -1.25; // platform top: level with the carriage floor
 const CRUISE = 13;
 const TUNNEL_CRUISE = 15;
 const BRAKE = 1.4;
 const ACCEL = 0.7;
-const PLAT_LEN = 150;
 const LAMP_EVERY = 25; // tunnel lamps
 
 /** Steps down, one at a time, while frames keep arriving late: sharpness first, then glow, then frame rate. */
@@ -60,21 +59,6 @@ const WHITE = new THREE.Color(1, 1, 1);
 /** Wrap x into [-span/2, span/2). */
 const wrap = (x: number, span: number) => ((((x + span / 2) % span) + span) % span) - span / 2;
 
-function roundedRect(w: number, h: number, r: number, cx = 0, cy = 0) {
-  const s = new THREE.Shape();
-  const x = cx - w / 2;
-  const y = cy - h / 2;
-  s.moveTo(x + r, y);
-  s.lineTo(x + w - r, y);
-  s.quadraticCurveTo(x + w, y, x + w, y + r);
-  s.lineTo(x + w, y + h - r);
-  s.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
-  s.lineTo(x + r, y + h);
-  s.quadraticCurveTo(x, y + h, x, y + h - r);
-  s.lineTo(x, y + r);
-  s.quadraticCurveTo(x, y, x + r, y);
-  return s;
-}
 
 /**
  * The view from your seat on a late local train, in 3D: the window beside
@@ -135,16 +119,8 @@ export default function CabinScene3D({ mode, carriage, stationName = "", termina
         disposables.push(x);
         return x;
       };
-      const lambert = (p: THREE.MeshLambertMaterialParameters) => track(new THREE.MeshLambertMaterial(p));
-      const basic = (p: THREE.MeshBasicMaterialParameters) => track(new THREE.MeshBasicMaterial(p));
-      const tex = (c: HTMLCanvasElement, repeat?: [number, number]) => track(tx.texture(c, { repeat }));
-      const fonts = tx.pageFonts();
-      const kit = surfaceKit(track);
-      const std = (p: THREE.MeshStandardMaterialParameters, cavity = 0) => {
-        const m = track(new THREE.MeshStandardMaterial(p));
-        return cavity ? withCavity(m, cavity) : m;
-      };
-      const nv = (x: number, y = x) => new THREE.Vector2(x, y);
+      const K = sceneKit(track);
+      const { lambert, basic, tex, kit, std, nv, put, mesh, box } = K;
 
       // Two scenes: the world outside, rendered to a texture the glass looks
       // through, and the carriage around you.
@@ -156,15 +132,6 @@ export default function CabinScene3D({ mode, carriage, stationName = "", termina
       const camera = new THREE.PerspectiveCamera(55, 1, 0.03, 1400);
       const outCam = new THREE.PerspectiveCamera(55, 1, 0.3, 1400);
 
-      const put = <T extends THREE.Object3D>(parent: THREE.Object3D, o: T, x = 0, y = 0, z = 0) => {
-        o.position.set(x, y, z);
-        parent.add(o);
-        return o;
-      };
-      const mesh = (parent: THREE.Object3D, geo: THREE.BufferGeometry, m: THREE.Material | THREE.Material[], x = 0, y = 0, z = 0) =>
-        put(parent, new THREE.Mesh(track(geo), m), x, y, z);
-      const box = (parent: THREE.Object3D, w: number, h: number, d: number, m: THREE.Material, x: number, y: number, z: number) =>
-        mesh(parent, new THREE.BoxGeometry(w, h, d), m, x, y, z);
 
       const fallbacks = new Map<THREE.Material, () => void>();
       const hide = (m: THREE.Material) => () =>
@@ -424,71 +391,14 @@ export default function CabinScene3D({ mode, carriage, stationName = "", termina
       });
 
       // ----------------------------------------------------------- platform
-      const plat = new THREE.Group();
+      // The same platform the walk onto the train crossed.
+      const platform = buildPlatform(K, target.current.stationName);
+      const plat = platform.group;
       plat.visible = false;
       outside.add(plat);
-      const half = PLAT_LEN / 2;
-      mesh(plat, new THREE.BoxGeometry(PLAT_LEN, 0.3, 5), std({ map: tex(tx.concrete(), [PLAT_LEN / 2.6, 2]), roughness: 0.6, roughnessMap: kit.roughness(0.8, 0.15, 17, [PLAT_LEN / 3, 2]), normalMap: kit.relief("concrete", [PLAT_LEN / 2, 2.5]), normalScale: nv(0.6) }, 0.5), 0, PT - 0.15, -3.7);
-      box(plat, PLAT_LEN, 0.12, 0.4, std({ color: 0x8c8a82, roughness: 0.8, normalMap: kit.relief("concrete", [PLAT_LEN / 2, 0.3]), normalScale: nv(0.6) }, 0.5), 0, PT - 0.05, -1.4);
-      box(plat, PLAT_LEN, 1.2, 0.2, std({ color: 0x1e1d1b, roughness: 0.95, normalMap: kit.relief("rough", [PLAT_LEN / 2, 1]) }, 0.4), 0, PT - 0.75, -1.45);
-      const line = mesh(plat, new THREE.PlaneGeometry(PLAT_LEN, 0.08), lambert({ color: 0xc9c3b2 }), 0, PT + 0.012, -1.3);
-      line.rotation.x = -Math.PI / 2;
-      const tactile = mesh(plat, new THREE.PlaneGeometry(PLAT_LEN, 0.3), lambert({ color: 0x8a6d1c }), 0, PT + 0.012, -1.85);
-      tactile.rotation.x = -Math.PI / 2;
-      const roof = mesh(plat, new THREE.PlaneGeometry(PLAT_LEN, 4.6), std({ map: tex(tx.roofSheet(), [PLAT_LEN / 0.24, 1]), roughness: 0.55, metalness: 0.25, normalMap: kit.relief("ribs", [PLAT_LEN / 0.96, 1]), normalScale: nv(0.6) }, 0.3), 0, PT + 3.2, -3.95);
-      roof.rotation.x = Math.PI / 2;
-      // The roof sheet's ribs should run across the platform here.
-      ((roof.material as THREE.MeshLambertMaterial).map as THREE.Texture).rotation = Math.PI / 2;
-      box(plat, PLAT_LEN, 0.4, 0.07, lambert({ color: 0xb4ae9c }), 0, PT + 3.1, -1.66);
-      const paint = std({ color: 0xb4ae9c, roughness: 0.6, normalMap: kit.relief("plaster", [1, 2]), normalScale: nv(0.4) }, 0.35);
-      const beam = std({ color: 0x4d514b, roughness: 0.55, metalness: 0.3, normalMap: kit.relief("brushed", [2, 2]), normalScale: nv(0.4) });
-      for (let x = -half + 4.5; x < half; x += 9) {
-        mesh(plat, new THREE.CylinderGeometry(0.085, 0.095, 3.2, 12), paint, x, PT + 1.6, -4.8);
-        box(plat, 0.12, 0.2, 4.6, beam, x, PT + 3.08, -3.95);
-      }
-      const tubeMat = basic({ color: lin(2.6, 2.35, 1.95) });
-      const housing = lambert({ color: 0xc9c8c0 });
-      const tubeGeo = track(new THREE.CylinderGeometry(0.022, 0.022, 1.24, 8));
-      tubeGeo.rotateZ(Math.PI / 2);
-      for (let x = -half + 2.25; x < half; x += 4.5) {
-        box(plat, 1.36, 0.07, 0.2, housing, x, PT + 3.02, -3.0);
-        put(plat, new THREE.Mesh(tubeGeo, tubeMat), x, PT + 2.96, -3.0);
-      }
-      const platLights = [-6.75, -2.25, 2.25, 6.75].map((x) => put(plat, new THREE.PointLight(lin(1, 0.88, 0.72), 9, 11, 2), x, PT + 2.8, -3.0));
-      // The building behind: painted boards, two lit windows, a door.
-      const wall = mesh(plat, new THREE.PlaneGeometry(PLAT_LEN, 3.4), std({ map: tex(tx.woodWall(), [PLAT_LEN / 3, 1]), roughness: 0.8, normalMap: kit.relief("boards", [(PLAT_LEN / 3) * 1.8, 1]), normalScale: nv(0.9) }, 0.5), 0, PT + 1.7, -6.2);
-      wall.name = "wall";
-      const winTex = tex(tx.windowGlow());
-      for (const x of [-9, -5, 11, 15]) mesh(plat, new THREE.PlaneGeometry(1.5, 1.1), basic({ map: winTex, color: lin(1.4, 1.3, 1.2) }), x, PT + 1.55, -6.18);
-      for (const x of [-3.6, 13]) {
-        const bench = new THREE.Group();
-        box(bench, 1.5, 0.06, 0.42, lambert({ color: 0x3f6a70 }), 0, PT + 0.44, 0);
-        box(bench, 1.5, 0.4, 0.05, lambert({ color: 0x3f6a70 }), 0, PT + 0.7, -0.2);
-        box(bench, 1.4, 0.05, 0.05, beam, 0, PT + 0.2, 0);
-        put(plat, bench, x, 0, -5.7);
-      }
-      const vending = mesh(plat, new THREE.BoxGeometry(1, 1.84, 0.72), std({ color: 0xdfe2de, roughness: 0.35, metalness: 0.15 }), 3.4, PT + 0.92, -5.8);
-      mesh(plat, new THREE.PlaneGeometry(0.96, 1.8), basic({ map: tex(tx.vendingFace("#dfe2de", 61)), color: lin(1.2, 1.25, 1.3) }), 3.4, PT + 0.92, -5.43);
-      vending.name = "vending";
-      // The station name board, facing the train.
-      let signCanvas = tx.stationSign(target.current.stationName || "NOCTURNE", fonts);
-      const signTex = tex(signCanvas);
-      box(plat, 2.08, 0.6, 0.1, lambert({ color: 0x2b2a26 }), 0, PT + 1.62, -4.35);
-      mesh(plat, new THREE.PlaneGeometry(2, 0.5), basic({ map: signTex, color: lin(1, 1, 0.96) }), 0, PT + 1.62, -4.29);
-      for (const dx of [-0.9, 0.9]) box(plat, 0.06, 1.35, 0.06, beam, dx, PT + 0.67, -4.35);
-      const drawSign = (name: string, end: boolean) => {
-        signCanvas = tx.stationSign(name || "NOCTURNE", tx.pageFonts(), end ? "END OF THE LINE" : "NOCTURNE LINE");
-        (signTex.image as HTMLCanvasElement).getContext("2d")!.drawImage(signCanvas, 0, 0);
-        signTex.needsUpdate = true;
-      };
-      // The clock, hanging from the roof.
-      const clockCanvas = tx.clockCanvas();
-      tx.drawClock(clockCanvas, new Date());
-      const clockTex = tex(clockCanvas);
-      let clockMinute = new Date().getMinutes();
-      mesh(plat, new THREE.CylinderGeometry(0.25, 0.25, 0.07, 32), lambert({ color: 0x2b2a26 }), 3.2, PT + 2.5, -3.4).rotation.x = Math.PI / 2;
-      mesh(plat, new THREE.CircleGeometry(0.23, 40), lambert({ map: clockTex, emissive: lin(0.25, 0.25, 0.24), emissiveMap: clockTex }), 3.2, PT + 2.5, -3.36);
-      box(plat, 0.03, 0.62, 0.03, beam, 3.2, PT + 2.9, -3.4);
+      const half = platform.half;
+      const platLights = platform.lights;
+      const drawSign = platform.drawSign;
 
       // ------------------------------------------------------------------ rain
       const rainLights = Array.from({ length: MAX_LIGHTS }, () => new THREE.Vector4(0, -100, 0, 0));
@@ -515,90 +425,46 @@ export default function CabinScene3D({ mode, carriage, stationName = "", termina
 
       // ================================================================= CABIN
       const tint = TINT[target.current.carriage].clone();
-      const cabinLight = put(cabin, new THREE.PointLight(tint, 3.2, 5, 2), 0.3, 1.45, 0.25);
-      const sweep = put(cabin, new THREE.PointLight(lin(1, 0.7, 0.4), 0, 5, 2), 0, 0.4, -1.6);
-      cabin.add(new THREE.HemisphereLight(lin(0.05, 0.05, 0.05), lin(0.01, 0.01, 0.01), 1));
-      // The carriage: moulded panel, brushed aluminium, a woven curtain.
-      const wallMat = std({ map: tex(ct.wallPanel(), [1, 1]), roughness: 0.85, normalMap: kit.relief("fabric", [9, 9]), normalScale: nv(0.12) });
-      const frameMat = std({ color: 0xa4a9a8, roughness: 0.38, metalness: 0.5 });
+      const lights = cabinLights(tint);
+      cabin.add(lights.group, lights.fill);
+      const cabinLight = lights.main;
+      const sweep = lights.sweep;
       // Lit from behind by whatever is outside the glass (set up with the post passes).
       const clothBack: ClothBacklight = { outside: null as unknown as THREE.Texture, res: new THREE.Vector2(1, 1), winMin: new THREE.Vector2(), winMax: new THREE.Vector2(), strength: 0.45 };
-      const curtainMat = track(clothMaterial({ color: CURTAIN[target.current.carriage], map: tex(ct.curtainFabric()), normalMap: kit.relief("fabric", [9, 8]), backlight: clothBack }));
-      // A little reading light over the seat catches the curtain's folds.
-      put(cabin, new THREE.PointLight(lin(1, 0.86, 0.66), 0.9, 1.8, 2), -0.35, 0.55, -0.15);
-      const glassMat = track(glassMaterial());
-      glassMat.uniforms.tReflect.value = tex(ct.cabinReflection());
+      // The carriage: moulded panel, brushed aluminium, a woven curtain.
+      const mats = windowMaterials(K, target.current.carriage, clothBack);
+      const curtainMat = mats.cloth;
+      const glassMat = mats.glass;
       const interior = new THREE.Group();
       cabin.add(interior);
       // The curtain survives a relayout; it keeps how far it was drawn.
       let curtain: Curtain | null = null;
       let curtainCover = CURTAIN_REST;
       let curtainZ = -D + 0.05;
+      let parts: ReturnType<typeof windowParts> | null = null;
+      let wallGeo: THREE.BufferGeometry | null = null;
 
-      const buildInterior = (halfW: number, halfH: number) => {
-        interior.children.slice().forEach((c) => {
-          interior.remove(c);
-          (c as THREE.Mesh).geometry?.dispose();
-        });
-        const w = Math.min(Math.max(halfW * 2 * 0.84, 0.95), 1.3);
-        const h = Math.min(halfH * 2 * 0.74, 0.86);
-        const cy = halfH * 0.1;
-        const r = 0.08;
+      const buildInterior = () => {
+        const d = windowDims(camera.fov, camera.aspect);
+        parts?.dispose();
+        wallGeo?.dispose();
+        interior.clear();
         // The wall, with the window cut out of it.
         const wallShape = new THREE.Shape([new THREE.Vector2(-3, -2.5), new THREE.Vector2(3, -2.5), new THREE.Vector2(3, 2.5), new THREE.Vector2(-3, 2.5)]);
-        wallShape.holes.push(roundedRect(w, h, r, 0, cy));
-        const wallMesh = new THREE.Mesh(new THREE.ShapeGeometry(wallShape, 12), wallMat);
-        wallMesh.position.z = -D;
-        interior.add(wallMesh);
-        // The aluminium frame, set into the wall.
-        const ring = roundedRect(w + 0.1, h + 0.1, r + 0.05, 0, cy);
-        ring.holes.push(roundedRect(w, h, r, 0, cy));
-        const frame = new THREE.Mesh(new THREE.ExtrudeGeometry(ring, { depth: 0.05, bevelEnabled: true, bevelThickness: 0.01, bevelSize: 0.008, bevelSegments: 2, curveSegments: 12 }), frameMat);
-        frame.position.z = -D - 0.04;
-        interior.add(frame);
-        // The glass, a little behind the frame's face.
-        const glass = new THREE.Mesh(new THREE.PlaneGeometry(w, h), glassMat);
-        glass.position.set(0, cy, -D - 0.035);
-        glassMat.uniforms.uWin.value.set(w, h);
-        interior.add(glass);
-        // Sill and the little fold-down table.
-        const bottom = cy - h / 2;
-        const sill = new THREE.Mesh(new THREE.BoxGeometry(w + 0.24, 0.025, 0.14), frameMat);
-        sill.position.set(0, bottom - 0.06, -D + 0.06);
-        interior.add(sill);
-        const table = new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.022, 0.26), std({ color: 0x2a2f31, roughness: 0.4 }));
-        table.position.set(0, bottom - 0.16, -D + 0.14);
-        interior.add(table);
-        // The curtain hangs straight from a rail over the window, gathered
-        // at the left; it can be pulled across the glass.
-        const tanH = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * camera.aspect;
-        const cz = -D + 0.05;
-        curtainZ = cz;
-        const edgeL = -(-cz * tanH);
-        const railY = cy + h / 2 + 0.11;
-        const left = Math.max(edgeL + 0.015, -w / 2 - 0.1);
-        const rail = new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.006, w / 2 + 0.08 - left, 8), frameMat);
-        rail.rotation.z = Math.PI / 2;
-        rail.position.set((left + w / 2 + 0.08) / 2, railY + 0.012, cz + 0.035);
-        interior.add(rail);
-        clothBack.winMin.set(-w / 2, cy - h / 2);
-        clothBack.winMax.set(w / 2, cy + h / 2);
+        wallShape.holes.push(roundedRect(d.w, d.h, d.r, 0, d.cy));
+        wallGeo = new THREE.ShapeGeometry(wallShape, 12);
+        put(interior, new THREE.Mesh(wallGeo, mats.wall), 0, 0, -D);
+        parts = windowParts(d, mats);
+        interior.add(parts.group);
+        glassMat.uniforms.uWin.value.set(d.w, d.h);
+        curtainZ = parts.curtain.z;
+        clothBack.winMin.set(-d.w / 2, d.cy - d.h / 2);
+        clothBack.winMax.set(d.w / 2, d.cy + d.h / 2);
         if (curtain) {
           curtainCover = curtain.target;
           curtain.dispose();
         }
-        curtain = new Curtain(curtainMat, {
-          left,
-          railY,
-          length: railY - (bottom - 0.03),
-          width: w / 2 + 0.04 - left,
-          parked: Math.min(0.1, (w / 2 + 0.04 - left) * 0.12),
-          z: cz,
-          wallGap: 0.045,
-          floorY: bottom - 0.035,
-          cover: curtainCover,
-          hooks: frameMat,
-        });
+        curtain = new Curtain(curtainMat, { ...parts.curtain, cover: curtainCover });
         interior.add(curtain.mesh);
       };
 
@@ -637,14 +503,19 @@ export default function CabinScene3D({ mode, carriage, stationName = "", termina
         jolt: 0,
         joint: 0,
         reflect: start === "tunnel" ? 0.14 : 0.08,
-        rain: 0,
+        // Already wet in the rain carriage: the glass you sat down at was.
+        rain: target.current.carriage === "rain" ? 1 : 0,
         lastV: 0,
         drawn: 0,
       };
       st.lastV = st.v;
+      // Starting at a platform, its light is already in the carriage (as it was as you sat down).
+      if (st.plat.on) sweep.intensity = lights.platformSpill();
       if (st.plat.on) drawSign(target.current.stationName, st.plat.end);
       let level = 0;
+      let clockAt = 0;
       let halfW = 1;
+      let builtFor = "";
 
       const layout = () => {
         const w = mount.clientWidth || 1;
@@ -663,12 +534,16 @@ export default function CabinScene3D({ mode, carriage, stationName = "", termina
         farMat.uniforms.uPixelRatio.value = dpr;
         const aspect = w / h;
         camera.aspect = outCam.aspect = aspect;
-        camera.fov = outCam.fov = aspect < 0.8 ? 62 : aspect < 1.2 ? 56 : 48;
+        camera.fov = outCam.fov = rideFov(aspect);
         camera.updateProjectionMatrix();
         outCam.updateProjectionMatrix();
-        const halfH = D * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
-        halfW = halfH * aspect;
-        buildInterior(halfW, halfH);
+        halfW = D * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * aspect;
+        // Rebuild the window only when its shape changes, not on a quality step.
+        const shape = `${w}x${h}`;
+        if (shape !== builtFor) {
+          builtFor = shape;
+          buildInterior();
+        }
         if (reduce) draw();
       };
 
@@ -854,7 +729,8 @@ export default function CabinScene3D({ mode, carriage, stationName = "", termina
         st.reflect += (reflectGoal - st.reflect) * Math.min(1, dt * 1.5);
         glassMat.uniforms.uReflect.value = st.reflect;
         glassMat.uniforms.uTint.value.copy(tint);
-        glassMat.uniforms.uTime.value = st.time;
+        // The page's clock, shared with the boarding view, so the drops carry straight on.
+        glassMat.uniforms.uTime.value = performance.now() / 1000;
         glassMat.uniforms.uRain.value = st.rain;
         glassMat.uniforms.uSlant.value = -Math.min(1.4, (st.v / CRUISE) * 1.2);
         grade.uniforms.uTime.value = st.time;
@@ -863,11 +739,9 @@ export default function CabinScene3D({ mode, carriage, stationName = "", termina
         outCam.position.set(0, -0.004 * st.jolt + Math.sin(st.time * 1.7) * 0.0015 * (st.v / CRUISE), 0);
         outCam.rotation.set(Math.sin(st.time * 0.9) * 0.0012 * (st.v / CRUISE), 0, Math.sin(st.time * 0.6) * 0.0015 * (st.v / CRUISE));
 
-        const minute = new Date().getMinutes();
-        if (minute !== clockMinute) {
-          clockMinute = minute;
-          tx.drawClock(clockCanvas, new Date());
-          clockTex.needsUpdate = true;
+        if (st.time - clockAt > 1) {
+          clockAt = st.time;
+          platform.tick(new Date());
         }
       };
 
