@@ -12,6 +12,7 @@ import type { CarriageId } from "@/core/types";
 import { farLightsMaterial, fieldMaterial, glassMaterial, trackGroundMaterial, tunnelWallMaterial } from "./cabin/shaders";
 import * as ct from "./cabin/textures";
 import { Curtain } from "./cabin/curtain";
+import { clothMaterial, type ClothBacklight } from "./cabin/cloth";
 import { describe, floatSupport, pickTarget, sceneLog } from "./gl";
 import { surfaceKit, withCavity } from "./surfaces";
 import { GradeShader, MAX_LIGHTS, hazeMaterial, rainMaterial, skyMaterial } from "./platform/shaders";
@@ -53,6 +54,7 @@ const QUALITY = [
 ];
 
 const lin = (r: number, g: number, b: number) => new THREE.Color().setRGB(r, g, b);
+const WHITE = new THREE.Color(1, 1, 1);
 
 /** The carriage light, per carriage. */
 const TINT: Record<CarriageId, THREE.Color> = {
@@ -527,7 +529,9 @@ export default function CabinScene3D({ mode, carriage, stationName = "", termina
       // The carriage: moulded panel, brushed aluminium, a woven curtain.
       const wallMat = std({ map: tex(ct.wallPanel(), [1, 1]), roughness: 0.85, normalMap: kit.relief("fabric", [9, 9]), normalScale: nv(0.12) });
       const frameMat = std({ color: 0xa4a9a8, roughness: 0.38, metalness: 0.5 });
-      const curtainMat = std({ color: CURTAIN[target.current.carriage], side: THREE.DoubleSide, roughness: 0.88, normalMap: kit.relief("fabric", [6, 8]), normalScale: nv(0.8) }, 0.35);
+      // Lit from behind by whatever is outside the glass (set up with the post passes).
+      const clothBack: ClothBacklight = { outside: null as unknown as THREE.Texture, res: new THREE.Vector2(1, 1), winMin: new THREE.Vector2(), winMax: new THREE.Vector2(), strength: 0.45 };
+      const curtainMat = track(clothMaterial({ color: CURTAIN[target.current.carriage], map: tex(ct.curtainFabric()), normalMap: kit.relief("fabric", [9, 8]), backlight: clothBack }));
       // A little reading light over the seat catches the curtain's folds.
       put(cabin, new THREE.PointLight(lin(1, 0.86, 0.66), 0.9, 1.8, 2), -0.35, 0.55, -0.15);
       const glassMat = track(glassMaterial());
@@ -585,7 +589,12 @@ export default function CabinScene3D({ mode, carriage, stationName = "", termina
         rail.rotation.z = Math.PI / 2;
         rail.position.set((left + w / 2 + 0.08) / 2, railY + 0.012, cz + 0.035);
         interior.add(rail);
-        if (curtain) curtainCover = curtain.target;
+        clothBack.winMin.set(-w / 2, cy - h / 2);
+        clothBack.winMax.set(w / 2, cy + h / 2);
+        if (curtain) {
+          curtainCover = curtain.target;
+          curtain.dispose();
+        }
         curtain = new Curtain(curtainMat, {
           left,
           railY,
@@ -596,6 +605,7 @@ export default function CabinScene3D({ mode, carriage, stationName = "", termina
           wallGap: 0.045,
           floorY: bottom - 0.035,
           cover: curtainCover,
+          hooks: frameMat,
         });
         interior.add(curtain.mesh);
       };
@@ -606,6 +616,7 @@ export default function CabinScene3D({ mode, carriage, stationName = "", termina
       const hdr = target3.texture.type === THREE.HalfFloatType;
       log.set("frame buffer", `${hdr ? "half float" : "8-bit"}, msaa ${target3.samples}`);
       glassMat.uniforms.tOutside.value = outTarget.texture;
+      clothBack.outside = outTarget.texture;
       const composer = new EffectComposer(renderer, target3);
       composer.addPass(new RenderPass(cabin, camera));
       const bloom = new UnrealBloomPass(new THREE.Vector2(256, 256), 0.32, 0.35, hdr ? 1.0 : 0.85);
@@ -656,6 +667,7 @@ export default function CabinScene3D({ mode, carriage, stationName = "", termina
         bloom.enabled = q.bloom && hdr;
         grade.uniforms.uRes.value.set(w * dpr, h * dpr);
         glassMat.uniforms.uRes.value.set(Math.round(w * dpr), Math.round(h * dpr));
+        clothBack.res.set(Math.round(w * dpr), Math.round(h * dpr));
         farMat.uniforms.uPixelRatio.value = dpr;
         const aspect = w / h;
         camera.aspect = outCam.aspect = aspect;
@@ -845,6 +857,7 @@ export default function CabinScene3D({ mode, carriage, stationName = "", termina
         tint.lerp(TINT[c], Math.min(1, dt * 2));
         cabinLight.color.copy(tint);
         curtainMat.color.lerp(new THREE.Color(CURTAIN[c]), Math.min(1, dt * 2));
+        curtainMat.sheenColor.copy(curtainMat.color).lerp(WHITE, 0.35);
         const reflectGoal = st.tunnel.on && covered ? 0.14 : st.plat.on && Math.abs(st.plat.x) < half ? 0.04 : 0.08;
         st.reflect += (reflectGoal - st.reflect) * Math.min(1, dt * 1.5);
         glassMat.uniforms.uReflect.value = st.reflect;

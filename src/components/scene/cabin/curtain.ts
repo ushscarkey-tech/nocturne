@@ -12,12 +12,12 @@ import * as THREE from "three";
  * joints, and ripples where you brush it (a damped wave across the cloth).
  */
 export interface CurtainOptions {
-  /** Left end of the rail (the curtain's parked edge), in cabin space. */
+  /** Left end of the rail (the curtain's parked edge), in the parent's space. */
   left: number;
   /** Rail height and the curtain's hanging length. */
   railY: number;
   length: number;
-  /** The fabric's full width, and how narrow it gathers when pushed aside. */
+  /** How far the leading edge reaches when drawn right across, and how narrow it gathers when pushed aside. */
   width: number;
   parked: number;
   /** Plane the rail hangs in. The fabric never goes behind this. */
@@ -28,31 +28,53 @@ export interface CurtainOptions {
   floorY: number;
   /** 0 = pushed aside … 1 = drawn right across. */
   cover: number;
+  /** The gliders that run in the rail, one per fold; left out if not given. */
+  hooks?: THREE.Material;
+  /** Which curtain this is: each hangs in its own folds. */
+  seed?: number;
 }
 
-const COLS = 33;
-const ROWS = 24;
+/** Cloth is cut wider than the window, so it still falls in folds when drawn. */
+const FULLNESS = 1.5;
+/** Fabric in one wave of the heading tape. */
+const WAVE = 0.17;
+/** Vertices across one wave, and down the drop. */
+const PER_WAVE = 10;
+const ROWS = 26;
 const STEP = 1 / 60;
-const MAX_PLEAT = 0.028;
+const MAX_FOLD = 0.03;
 /** The pendulum: how fast the drape settles, and how far it may lean. */
 const OMEGA = 2.4;
 const ZETA = 0.75;
 const MAX_LEAN = 0.045;
 /** The ripple field. */
-const WAVE_SPEED = 30;
+const WAVE_SPEED = 60;
 const WAVE_SPRING = 22;
 const WAVE_DAMP = 5.5;
+
+const smooth = (a: number, b: number, x: number) => {
+  const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
+  return t * t * (3 - 2 * t);
+};
 
 export class Curtain {
   readonly mesh: THREE.Mesh;
   cover: number;
   target: number;
   private readonly o: CurtainOptions;
+  private readonly cols: number;
+  private readonly waves: number;
+  private readonly fabric: number;
   private readonly pos: Float32Array;
+  // Ambient light reaching each point: less deep in a fold.
+  private readonly shade: Float32Array;
   private readonly geo: THREE.BufferGeometry;
-  private readonly rest: number;
+  private readonly hooks: THREE.InstancedMesh | null = null;
+  // Each fold's own depth and how far it wanders from true below the heading.
+  private readonly depthOf: Float32Array;
+  private readonly driftOf: Float32Array;
   private acc = 0;
-  // Lean of the hem along the rails (x) and toward the room (z), and their velocities.
+  // Lean of the hem along the rail, and a slight sway toward the room.
   private lean = 0;
   private leanV = 0;
   private sway = 0;
@@ -68,31 +90,46 @@ export class Curtain {
   constructor(material: THREE.Material, o: CurtainOptions) {
     this.o = o;
     this.cover = this.target = this.lastCover = o.cover;
-    const n = COLS * ROWS;
+    this.fabric = o.width * FULLNESS;
+    this.waves = Math.max(4, Math.round(this.fabric / WAVE));
+    this.cols = this.waves * PER_WAVE + 1;
+    const cols = this.cols;
+    const n = cols * ROWS;
     this.pos = new Float32Array(n * 3);
+    this.shade = new Float32Array(n * 3);
     this.bump = new Float32Array(n);
     this.bumpV = new Float32Array(n);
-    this.rest = o.width / (COLS - 1);
+    let seed = o.seed ?? 11;
+    const rnd = () => ((seed = (seed * 16807) % 2147483647) - 1) / 2147483646;
+    this.depthOf = new Float32Array(this.waves + 2).map(() => 0.72 + rnd() * 0.5);
+    this.driftOf = new Float32Array(this.waves + 2).map(() => (rnd() - 0.5) * 2.2);
 
     const geo = new THREE.BufferGeometry();
     geo.setAttribute("position", new THREE.BufferAttribute(this.pos, 3).setUsage(THREE.DynamicDrawUsage));
     const uv = new Float32Array(n * 2);
     const index: number[] = [];
     for (let r = 0; r < ROWS; r++) {
-      for (let c = 0; c < COLS; c++) {
-        uv.set([c / (COLS - 1), 1 - r / (ROWS - 1)], (r * COLS + c) * 2);
-        if (r < ROWS - 1 && c < COLS - 1) {
-          const a = r * COLS + c;
-          index.push(a, a + COLS, a + 1, a + 1, a + COLS, a + COLS + 1);
+      for (let c = 0; c < cols; c++) {
+        uv.set([c / (cols - 1), 1 - r / (ROWS - 1)], (r * cols + c) * 2);
+        if (r < ROWS - 1 && c < cols - 1) {
+          const a = r * cols + c;
+          index.push(a, a + cols, a + 1, a + 1, a + cols, a + cols + 1);
         }
       }
     }
     geo.setAttribute("uv", new THREE.BufferAttribute(uv, 2));
+    geo.setAttribute("color", new THREE.BufferAttribute(this.shade, 3).setUsage(THREE.DynamicDrawUsage));
     geo.setIndex(index);
     this.geo = geo;
-    this.layout();
     this.mesh = new THREE.Mesh(geo, material);
     this.mesh.frustumCulled = false;
+    if (o.hooks) {
+      const hook = new THREE.BoxGeometry(0.009, 0.016, 0.012);
+      this.hooks = new THREE.InstancedMesh(hook, o.hooks, this.waves + 1);
+      this.hooks.frustumCulled = false;
+      this.mesh.add(this.hooks);
+    }
+    this.layout();
   }
 
   /** The curtain's leading edge, where a hand would take hold of it. */
@@ -135,7 +172,7 @@ export class Curtain {
 
   /** Push the ripple field around a point (velocity toward the room is positive). */
   private poke(x: number, y: number, v: number, radius: number) {
-    for (let i = 0; i < COLS * ROWS; i++) {
+    for (let i = 0; i < this.cols * ROWS; i++) {
       const d = Math.hypot(this.pos[i * 3] - x, this.pos[i * 3 + 1] - y);
       if (d < radius) this.bumpV[i] += v * (1 - d / radius);
     }
@@ -181,6 +218,7 @@ export class Curtain {
     // The ripple field: a damped wave, never deep enough to fold the cloth.
     const b = this.bump;
     const v = this.bumpV;
+    const COLS = this.cols;
     for (let r = 0; r < ROWS; r++) {
       for (let c = 0; c < COLS; c++) {
         const i = r * COLS + c;
@@ -200,35 +238,72 @@ export class Curtain {
     for (let i = 0; i < b.length; i++) b[i] = Math.max(-0.008, Math.min(0.03, b[i] + v[i] * STEP));
   }
 
-  /** Lay the fabric out from the hooks, the lean and the ripples. */
+  /** A fold's value at a point across the cloth, eased between folds. */
+  private along(values: Float32Array, s: number) {
+    const i = Math.floor(s);
+    const f = s - i;
+    const k = f * f * (3 - 2 * f);
+    return values[i] * (1 - k) + values[Math.min(values.length - 1, i + 1)] * k;
+  }
+
+  /**
+   * Lay the cloth out. The heading tape holds it in even waves; below, each
+   * fold keeps its own depth and wanders a little, the hem swings out a
+   * touch, and the lean, sway and ripples ride on top.
+   */
   private layout() {
     const o = this.o;
+    const cols = this.cols;
     const span = o.parked + this.cover * (o.width - o.parked);
-    const gap = span / (COLS - 1);
-    // Gathered hooks make deep pleats; drawn across, the cloth is almost flat.
-    const depth = Math.max(0.004, Math.min(MAX_PLEAT, 0.5 * Math.sqrt(Math.max(0, this.rest * this.rest - gap * gap))));
+    const wave = this.fabric / this.waves;
+    const pitch = span / this.waves;
+    // The fabric in one wave, folded into less rail: the deeper the gather,
+    // the deeper the folds (a zig-zag of that length, softened).
+    const depth = Math.min(MAX_FOLD, 0.17 * Math.sqrt(Math.max(0, wave * wave - pitch * pitch)) + 0.003);
     const dy = o.length / (ROWS - 1);
     const mid = o.left + span / 2;
     for (let r = 0; r < ROWS; r++) {
       const t = r / (ROWS - 1);
       const hang = t * t;
-      // The fabric flares a little toward the hem.
-      const flare = 1 + 0.05 * t;
-      for (let c = 0; c < COLS; c++) {
-        const i = (r * COLS + c) * 3;
-        const hookX = o.left + gap * c;
-        const pleat = depth * (1 + Math.sin((c * Math.PI) / 2));
-        this.pos[i] = mid + (hookX - mid) * flare + this.lean * hang;
-        this.pos[i + 1] = Math.max(o.floorY, o.railY - r * dy);
+      const loose = smooth(0.04, 0.55, t);
+      const flare = 1 + 0.045 * t;
+      for (let c = 0; c < cols; c++) {
+        const i = r * cols + c;
+        const u = c / (cols - 1);
+        const s = u * this.waves;
+        const theta = 2 * Math.PI * s + loose * this.along(this.driftOf, s);
+        const d = depth * (1 + loose * (this.along(this.depthOf, s) - 1)) * (1 + 0.2 * t);
+        const fold = Math.sin(theta);
+        // Folds bow toward the room, rounder in front than behind.
+        const front = d * (1 + fold);
+        const belly = hang * 0.01 * (0.5 + 0.5 * Math.sin(2 * Math.PI * u * 1.15 + 1.3));
+        const j = i * 3;
+        this.pos[j] = mid + (o.left + span * u - mid) * flare + this.lean * hang + Math.cos(theta) * d * 0.25 * loose;
+        // The hem lifts a little where the folds turn back.
+        this.pos[j + 1] = Math.max(o.floorY, o.railY - r * dy + t ** 6 * (1 - fold) * d * 0.35);
         // Always in front of the rail's plane (and so of the frame and wall).
-        this.pos[i + 2] = o.z + 0.012 + Math.max(0, pleat + this.bump[r * COLS + c] + this.sway * hang);
+        this.pos[j + 2] = o.z + 0.012 + Math.max(0, front + belly + this.bump[i] + this.sway * hang);
+        // Deep in a fold less light reaches; the crests catch it all.
+        const ao = 0.62 + 0.38 * Math.sqrt(0.5 + 0.5 * fold);
+        this.shade[j] = this.shade[j + 1] = this.shade[j + 2] = ao;
       }
     }
     (this.geo.attributes.position as THREE.BufferAttribute).needsUpdate = true;
+    (this.geo.attributes.color as THREE.BufferAttribute).needsUpdate = true;
     this.geo.computeVertexNormals();
+    if (this.hooks) {
+      const m = new THREE.Matrix4();
+      for (let k = 0; k <= this.waves; k++) {
+        const u = Math.min(1, (k + 0.25) / this.waves);
+        m.makeTranslation(mid + (o.left + span * u - mid), o.railY + 0.006, o.z + 0.012 + depth * 2 * (k < this.waves ? 1 : 0.5));
+        this.hooks.setMatrixAt(k, m);
+      }
+      this.hooks.instanceMatrix.needsUpdate = true;
+    }
   }
 
   dispose() {
     this.geo.dispose();
+    this.hooks?.geometry.dispose();
   }
 }
