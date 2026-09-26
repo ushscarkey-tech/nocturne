@@ -5,7 +5,7 @@
  */
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { AuthError, authorize, authorizeComplete, authorizeInfo, authorizationServer, bearer, idTokenFor, preflight, protectedResource, register, token } from "./auth";
-import { Firestore } from "./firestore";
+import { ConflictError, Firestore } from "./firestore";
 import { Ctx, TOOLS, ToolError } from "./tools";
 
 const SERVER = { name: "nocturne", title: "Nocturne", version: "1.0.0" };
@@ -40,7 +40,19 @@ function unauthorized(origin: string, message = "Sign in to Nocturne to use this
   });
 }
 
-async function handleRpc(msg: Rpc, ctx: () => Promise<Ctx>): Promise<object | null> {
+/** Run a tool again on freshly loaded data when a parallel call saved first. */
+export async function withRetry<T>(run: (attempt: number) => Promise<T>, attempts = 6): Promise<T> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await run(attempt);
+    } catch (e) {
+      if (!(e instanceof ConflictError) || attempt + 1 >= attempts) throw e;
+      await new Promise((r) => setTimeout(r, 60 + Math.random() * 240 * (attempt + 1)));
+    }
+  }
+}
+
+async function handleRpc(msg: Rpc, ctx: (fresh?: boolean) => Promise<Ctx>): Promise<object | null> {
   const id = msg.id ?? null;
   const isNote = msg.id === undefined;
   try {
@@ -65,7 +77,8 @@ async function handleRpc(msg: Rpc, ctx: () => Promise<Ctx>): Promise<object | nu
         const tool = TOOLS.find((t) => t.name === name);
         if (!tool) return fail(id, -32602, `Unknown tool: ${name}`);
         try {
-          const result = await tool.run(await ctx(), (msg.params?.arguments as Record<string, unknown>) ?? {});
+          const args = (msg.params?.arguments as Record<string, unknown>) ?? {};
+          const result = await withRetry(async (attempt) => tool.run(await ctx(attempt > 0), args));
           return ok(id, { content: [{ type: "text", text: JSON.stringify(result, null, 2) }], structuredContent: result });
         } catch (e) {
           if (e instanceof AuthError) throw e;
@@ -98,11 +111,10 @@ async function mcp(req: Request, origin: string): Promise<Response> {
     return Response.json(fail(null, -32700, "Parse error"), { status: 400 });
   }
   let context: Ctx | null = null;
-  const ctx = async () => {
-    if (!context) {
-      const { token: idToken, uid } = await idTokenFor(who.rt);
-      context = new Ctx(new Firestore(uid, idToken));
-    }
+  let signedIn: { token: string; uid: string } | null = null;
+  const ctx = async (fresh = false) => {
+    signedIn ??= await idTokenFor(who.rt);
+    if (!context || fresh) context = new Ctx(new Firestore(signedIn.uid, signedIn.token));
     return context;
   };
   try {

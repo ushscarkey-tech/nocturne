@@ -24,7 +24,11 @@ type FsValue =
 interface FsDoc {
   name: string;
   fields?: Record<string, FsValue>;
+  updateTime?: string;
 }
+
+/** Someone else saved this traveller's data after we loaded it: load again and redo the change. */
+export class ConflictError extends Error {}
 
 const base = () => `https://firestore.googleapis.com/v1/projects/${FIREBASE.projectId}/databases/(default)/documents`;
 
@@ -66,6 +70,9 @@ function encodeFields(o: Record<string, unknown>): Record<string, FsValue> {
 }
 
 export class Firestore {
+  /** When the profile document last changed as we loaded it; every save is checked against it. */
+  private revision: string | null = null;
+
   constructor(
     private readonly uid: string,
     private readonly idToken: string,
@@ -77,7 +84,11 @@ export class Firestore {
       headers: { Authorization: `Bearer ${this.idToken}`, "Content-Type": "application/json", ...(init.headers ?? {}) },
     });
     if (res.status === 404) return null;
-    if (!res.ok) throw new Error(`Firestore ${res.status}: ${(await res.text()).slice(0, 300)}`);
+    if (!res.ok) {
+      const text = await res.text();
+      if (text.includes("FAILED_PRECONDITION")) throw new ConflictError("Nocturne changed while this was being saved.");
+      throw new Error(`Firestore ${res.status}: ${text.slice(0, 300)}`);
+    }
     return (await res.json()) as T;
   }
 
@@ -117,6 +128,7 @@ export class Firestore {
   async load(): Promise<NocturneData | null> {
     const profile = await this.call<FsDoc>(this.docPath(null));
     if (!profile) return null;
+    this.revision = profile.updateTime ?? null;
     const since = new Date(Date.now() - HISTORY_DAYS * 86_400_000).toISOString().slice(0, 10);
     const entries = await Promise.all(
       COLLECTIONS.map(async (name) => [name, name === "sessions" || name === "journeys" ? await this.since(name, since) : await this.list(name)] as const),
@@ -129,15 +141,28 @@ export class Firestore {
   async save(prev: NocturneData, next: NocturneData): Promise<number> {
     const changes = diffData(prev, next);
     if (isEmptyChange(changes)) return 0;
-    const writes: object[] = [];
-    if (changes.profile) writes.push({ update: { name: this.fullName(null), fields: encodeFields({ ...changes.profile }) } });
+    // Claude may run several tools at once. Each save stamps the profile, on
+    // condition that nobody else has since we loaded, so parallel changes
+    // never quietly overwrite each other's route.
+    const stamp: Record<string, FsValue> = { mcpSavedAt: { stringValue: new Date().toISOString() } };
+    const guard = {
+      update: { name: this.fullName(null), fields: changes.profile ? { ...encodeFields({ ...changes.profile }), ...stamp } : stamp },
+      ...(changes.profile ? {} : { updateMask: { fieldPaths: ["mcpSavedAt"] } }),
+      currentDocument: this.revision ? { updateTime: this.revision } : { exists: true },
+    };
+    const writes: object[] = [guard];
     for (const name of COLLECTIONS) {
       for (const e of (changes.upserts[name] ?? []) as { id: string }[]) writes.push({ update: { name: this.fullName(name, e.id), fields: encodeFields({ ...e }) } });
       for (const id of changes.deletes[name] ?? []) writes.push({ delete: this.fullName(name, id) });
     }
     for (let i = 0; i < writes.length; i += BATCH_LIMIT) {
-      await this.call(`:commit`, { method: "POST", body: JSON.stringify({ writes: writes.slice(i, i + BATCH_LIMIT) }) });
+      const r = await this.call<{ writeResults?: { updateTime?: string }[] }>(`:commit`, {
+        method: "POST",
+        body: JSON.stringify({ writes: writes.slice(i, i + BATCH_LIMIT) }),
+      });
+      if (i === 0) this.revision = r?.writeResults?.[0]?.updateTime ?? this.revision;
     }
-    return writes.length;
+    return writes.length - 1;
   }
+
 }
