@@ -10,7 +10,7 @@ import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
 import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
 import { ShaderPass } from "three/examples/jsm/postprocessing/ShaderPass.js";
 import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
-import { complete, describe, floatSupport, isApple, pickTarget, sceneLog } from "./gl";
+import { complete, describe, floatSupport, isApple, pickTarget, sceneLog, frameMeter } from "./gl";
 import { surfaceKit, withCavity } from "./surfaces";
 import { GradeShader, MAX_LIGHTS, bokehMaterial, hazeMaterial, rainMaterial, skyMaterial, wetFloor } from "./platform/shaders";
 import * as tx from "./platform/textures";
@@ -84,6 +84,7 @@ export default function PlatformScene3D({ mood = "waiting", rain = true, station
     }
     const log = sceneLog("platform");
     describe(renderer, log);
+    const meter = frameMeter(log, renderer);
     // Built in one go; if anything in it fails on this device, the page
     // keeps its quiet gradient instead of a broken canvas.
     const setup = (): (() => void) => {
@@ -122,6 +123,20 @@ export default function PlatformScene3D({ mood = "waiting", rain = true, station
       };
       const mesh = (geo: THREE.BufferGeometry, mat: THREE.Material | THREE.Material[], x = 0, y = 0, z = 0) => add(new THREE.Mesh(track(geo), mat), x, y, z);
       const box = (w: number, h: number, d: number, mat: THREE.Material, x: number, y: number, z: number) => mesh(new THREE.BoxGeometry(w, h, d), mat, x, y, z);
+      /** Many copies of one part in a single draw: position and rotation (x, y, z) for each. */
+      const many = (geo: THREE.BufferGeometry, mat: THREE.Material, at: [number, number, number, number?, number?, number?][]) => {
+        const inst = new THREE.InstancedMesh(track(geo), mat, at.length);
+        const o = new THREE.Object3D();
+        at.forEach(([x, y, z, rx = 0, ry = 0, rz = 0], i) => {
+          o.position.set(x, y, z);
+          o.rotation.set(rx, ry, rz);
+          o.updateMatrix();
+          inst.setMatrixAt(i, o.matrix);
+        });
+        inst.computeBoundingSphere();
+        scene.add(inst);
+        return inst;
+      };
       const lambert = (p: THREE.MeshLambertMaterialParameters) => track(new THREE.MeshLambertMaterial(p));
       const basic = (p: THREE.MeshBasicMaterialParameters) => track(new THREE.MeshBasicMaterial(p));
       const tex = (c: HTMLCanvasElement, repeat?: [number, number]) => track(tx.texture(c, { repeat }));
@@ -244,6 +259,13 @@ export default function PlatformScene3D({ mood = "waiting", rain = true, station
       // Wet concrete with a real (blurred) reflection of everything above it.
       const floor = new Reflector(track(new THREE.PlaneGeometry(PL_W, floorLen)), { textureWidth: 256, textureHeight: 256, multisample: 0 });
       const reflectTarget = floor.getRenderTarget();
+      // The reflection is soft and the camera all but still: redraw it every
+      // other frame, not every frame (it is a second pass over the whole scene).
+      const reflectNow = floor.onBeforeRender.bind(floor);
+      let reflectFrame = 0;
+      floor.onBeforeRender = (...args: Parameters<typeof reflectNow>) => {
+        if (reflectFrame++ % 2 === 0) reflectNow(...args);
+      };
       // Mipmapped half-float needs a colour-buffer extension; bytes otherwise.
       // Half float keeps the lamps bright in puddles; 8-bit (mipmaps on it work
       // everywhere) on Apple and on GPUs without float targets.
@@ -312,25 +334,24 @@ export default function PlatformScene3D({ mood = "waiting", rain = true, station
       const gutter = mesh(new THREE.CylinderGeometry(0.05, 0.05, roofLen, 10), mat.metal, ROOF_EDGE - 0.07, ROOF_Y + 0.06, roofZ);
       gutter.rotation.x = Math.PI / 2;
       box(0.14, 0.24, roofLen, mat.beam, COLUMN_X, ROOF_Y - 0.12, roofZ);
-      for (const z of COLUMNS) {
-        mesh(new THREE.CylinderGeometry(0.085, 0.095, ROOF_Y, 16), mat.paint, COLUMN_X, ROOF_Y / 2, z);
-        mesh(new THREE.CylinderGeometry(0.16, 0.18, 0.08, 16), mat.beam, COLUMN_X, 0.04, z);
-        box(roofW, 0.22, 0.12, mat.beam, ROOF_EDGE + roofW / 2, ROOF_Y - 0.11, z);
-        // Diagonal brace toward the platform edge.
-        const brace = box(1.5, 0.08, 0.08, mat.beam, COLUMN_X - 0.62, ROOF_Y - 0.42, z);
-        brace.rotation.z = -0.5;
-        const shadow = mesh(new THREE.PlaneGeometry(0.9, 0.9), mat.shadow, COLUMN_X, 0.003, z);
-        shadow.rotation.x = -Math.PI / 2;
-      }
+      // Columns, each with its foot, cross beam, a diagonal brace toward the edge, and a soft shadow.
+      many(new THREE.CylinderGeometry(0.085, 0.095, ROOF_Y, 16), mat.paint, COLUMNS.map((z) => [COLUMN_X, ROOF_Y / 2, z]));
+      many(new THREE.CylinderGeometry(0.16, 0.18, 0.08, 16), mat.beam, COLUMNS.map((z) => [COLUMN_X, 0.04, z]));
+      many(new THREE.BoxGeometry(roofW, 0.22, 0.12), mat.beam, COLUMNS.map((z) => [ROOF_EDGE + roofW / 2, ROOF_Y - 0.11, z]));
+      many(new THREE.BoxGeometry(1.5, 0.08, 0.08), mat.beam, COLUMNS.map((z) => [COLUMN_X - 0.62, ROOF_Y - 0.42, z, 0, 0, -0.5]));
+      many(new THREE.PlaneGeometry(0.9, 0.9), mat.shadow, COLUMNS.map((z) => [COLUMN_X, 0.003, z, -Math.PI / 2]));
 
       // Fluorescent fittings. Each tube has its own material so it can dim.
       const tubeColor = lin(2.6, 2.35, 1.95);
       const tubeGeo = track(new THREE.CylinderGeometry(0.022, 0.022, 1.24, 10));
       tubeGeo.rotateX(Math.PI / 2);
+      many(new THREE.BoxGeometry(0.2, 0.07, 1.36), mat.housing, TUBES.map((z) => [TUBE_X, TUBE_Y + 0.06, z]));
+      many(
+        new THREE.BoxGeometry(0.03, ROOF_Y - TUBE_Y - 0.08, 0.03),
+        mat.metal,
+        TUBES.flatMap((z) => [-0.5, 0.5].map((dz) => [TUBE_X, (ROOF_Y + TUBE_Y + 0.08) / 2, z + dz] as [number, number, number])),
+      );
       TUBES.forEach((z, i) => {
-        box(0.2, 0.07, 1.36, mat.housing, TUBE_X, TUBE_Y + 0.06, z);
-        box(0.03, ROOF_Y - TUBE_Y - 0.08, 0.03, mat.metal, TUBE_X, (ROOF_Y + TUBE_Y + 0.08) / 2, z - 0.5);
-        box(0.03, ROOF_Y - TUBE_Y - 0.08, 0.03, mat.metal, TUBE_X, (ROOF_Y + TUBE_Y + 0.08) / 2, z + 0.5);
         // Old tubes never quite match: one runs a little green, one a little pink.
         const tint = i === 2 ? lin(0.94, 1, 0.9) : i === 5 ? lin(1, 0.95, 0.96) : lin(1, 1, 1);
         const color = tubeColor.clone().multiply(tint);
@@ -408,19 +429,13 @@ export default function PlatformScene3D({ mood = "waiting", rain = true, station
       // Benches: moulded seats on a steel rail, facing the track.
       const seatGeo = track(new RoundedBoxGeometry(0.46, 0.06, 0.42, 2, 0.025));
       const backGeo = track(new RoundedBoxGeometry(0.46, 0.4, 0.05, 2, 0.02));
-      for (const zc of [-11.5, -22.5]) {
-        box(0.08, 0.06, 1.6, mat.metal, PL_W - 0.5, 0.38, zc);
-        for (const dz of [-0.62, 0.62]) box(0.06, 0.38, 0.06, mat.metal, PL_W - 0.5, 0.19, zc + dz);
-        for (const dz of [-0.5, 0, 0.5]) {
-          const seat = add(new THREE.Mesh(seatGeo, mat.seat), PL_W - 0.52, 0.44, zc + dz);
-          seat.rotation.y = Math.PI / 2;
-          const back = add(new THREE.Mesh(backGeo, mat.seat), PL_W - 0.3, 0.68, zc + dz);
-          back.rotation.y = Math.PI / 2;
-          back.rotation.x = -0.12;
-        }
-        const s = mesh(new THREE.PlaneGeometry(1.1, 2.2), mat.shadow, PL_W - 0.5, 0.003, zc);
-        s.rotation.x = -Math.PI / 2;
-      }
+      const benchZ = [-11.5, -22.5];
+      const seatsAt = benchZ.flatMap((zc) => [-0.5, 0, 0.5].map((dz) => zc + dz));
+      many(new THREE.BoxGeometry(0.08, 0.06, 1.6), mat.metal, benchZ.map((zc) => [PL_W - 0.5, 0.38, zc]));
+      many(new THREE.BoxGeometry(0.06, 0.38, 0.06), mat.metal, benchZ.flatMap((zc) => [-0.62, 0.62].map((dz) => [PL_W - 0.5, 0.19, zc + dz] as [number, number, number])));
+      many(seatGeo, mat.seat, seatsAt.map((z) => [PL_W - 0.52, 0.44, z, 0, Math.PI / 2]));
+      many(backGeo, mat.seat, seatsAt.map((z) => [PL_W - 0.3, 0.68, z, -0.12, Math.PI / 2]));
+      many(new THREE.PlaneGeometry(1.1, 2.2), mat.shadow, benchZ.map((zc) => [PL_W - 0.5, 0.003, zc, -Math.PI / 2]));
 
       // The hanging station sign, a lightbox.
       const signCanvas = tx.stationSign(nameRef.current, fonts);
@@ -440,6 +455,7 @@ export default function PlatformScene3D({ mood = "waiting", rain = true, station
       tx.drawClock(clockCanvas, new Date());
       const clockTex = tex(clockCanvas);
       let clockMinute = new Date().getMinutes();
+      let clockAt = -1;
       mesh(new THREE.CylinderGeometry(0.25, 0.25, 0.07, 32), mat.frame, COLUMN_X, 2.45, COLUMNS[1] + 0.14).rotation.x = Math.PI / 2;
       mesh(new THREE.CircleGeometry(0.23, 40), lambert({ map: clockTex, emissive: lin(0.25, 0.25, 0.24), emissiveMap: clockTex }), COLUMN_X, 2.45, COLUMNS[1] + 0.18);
       box(0.05, 0.05, 0.12, mat.metal, COLUMN_X, 2.45, COLUMNS[1] + 0.06);
@@ -465,7 +481,9 @@ export default function PlatformScene3D({ mood = "waiting", rain = true, station
       });
 
       // A fence, and dark shrubs behind it.
-      for (let z = WALL_TO - 1; z > Z_FAR; z -= 2.4) box(0.05, 1.1, 0.05, mat.metal, PL_W - 0.1, 0.55, z);
+      const fence: [number, number, number][] = [];
+      for (let z = WALL_TO - 1; z > Z_FAR; z -= 2.4) fence.push([PL_W - 0.1, 0.55, z]);
+      many(new THREE.BoxGeometry(0.05, 1.1, 0.05), mat.metal, fence);
       for (const y of [0.55, 1.05]) box(0.035, 0.035, WALL_TO - Z_FAR, mat.metal, PL_W - 0.1, y, (WALL_TO + Z_FAR) / 2);
       const silhouette = (c: HTMLCanvasElement, color: THREE.Color) => basic({ alphaMap: tex(c), color, transparent: true, alphaTest: 0.35, depthWrite: true });
       const shrubsMesh = mesh(new THREE.PlaneGeometry(WALL_TO - Z_FAR, 2.2), silhouette(tx.shrubs(71), lin(0.006, 0.009, 0.008)), PL_W + 1.6, 1.0, (WALL_TO + Z_FAR) / 2);
@@ -476,10 +494,8 @@ export default function PlatformScene3D({ mood = "waiting", rain = true, station
       // ------------------------------------------------- beyond the track, left
       // Utility poles with sagging wires.
       const poleZ = [16, -16, -48, -80, -112, -144];
-      poleZ.forEach((z) => {
-        mesh(new THREE.CylinderGeometry(0.1, 0.13, 9, 8), mat.dark, -7.2, BED_Y + 4.5, z);
-        box(1.7, 0.1, 0.1, mat.dark, -7.2, BED_Y + 8.2, z);
-      });
+      many(new THREE.CylinderGeometry(0.1, 0.13, 9, 8), mat.dark, poleZ.map((z) => [-7.2, BED_Y + 4.5, z]));
+      many(new THREE.BoxGeometry(1.7, 0.1, 0.1), mat.dark, poleZ.map((z) => [-7.2, BED_Y + 8.2, z]));
       const wireMat = track(new THREE.LineBasicMaterial({ color: lin(0.003, 0.004, 0.005), transparent: true, opacity: 0.85 }));
       for (const dx of [-0.75, 0.75]) {
         const pts: THREE.Vector3[] = [];
@@ -696,11 +712,14 @@ export default function PlatformScene3D({ mood = "waiting", rain = true, station
         signalLens.color.lerpColors(signalGo, signalStop, final ? 1 : 0);
         signalGlow.color.lerpColors(glowGo, glowStop, final ? 1 : 0);
 
-        const minute = new Date().getMinutes();
-        if (minute !== clockMinute) {
-          clockMinute = minute;
-          tx.drawClock(clockCanvas, new Date());
-          clockTex.needsUpdate = true;
+        if (time - clockAt > 1) {
+          clockAt = time;
+          const now = new Date();
+          if (now.getMinutes() !== clockMinute) {
+            clockMinute = now.getMinutes();
+            tx.drawClock(clockCanvas, now);
+            clockTex.needsUpdate = true;
+          }
         }
       };
 
@@ -764,8 +783,10 @@ export default function PlatformScene3D({ mood = "waiting", rain = true, station
         const step = Math.min(acc, 0.1);
         acc = 0;
         time += step;
-        update(step);
-        draw();
+        meter(() => {
+          update(step);
+          draw();
+        });
 
         // If frames keep arriving late, drop a quality step.
         warm += step;
@@ -773,7 +794,8 @@ export default function PlatformScene3D({ mood = "waiting", rain = true, station
         if (warm > 2 && level < QUALITY.length - 1) {
           slowFor = interval > (q.fps >= 60 ? 1 / 45 : 1 / 26) ? slowFor + step : 0;
           if (slowFor > 2.5) {
-            level += 1;
+            // Far too slow: drop two steps at once rather than stutter through each.
+            level = Math.min(QUALITY.length - 1, level + (interval > 2 / 60 ? 2 : 1));
             log.set("quality", `step ${level}`);
             slowFor = 0;
             warm = 0;

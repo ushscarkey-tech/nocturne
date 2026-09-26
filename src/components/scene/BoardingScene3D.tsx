@@ -17,7 +17,7 @@ import { Curtain } from "./cabin/curtain";
 import { lin, sceneKit } from "./cabin/kit";
 import { PT, buildPlatform } from "./cabin/platform";
 import { D, cabinLights, rideFov, roundedRect, windowDims, windowMaterials, windowParts, type WindowDims } from "./cabin/window";
-import { describe, floatSupport, pickTarget, sceneLog } from "./gl";
+import { describe, floatSupport, pickTarget, sceneLog, frameMeter } from "./gl";
 import { GradeShader } from "./platform/shaders";
 
 export type BoardingStage = "waiting" | "reading" | "opening" | "entering";
@@ -93,13 +93,15 @@ export default function BoardingScene3D({ stage, carriage, car, stationName = ""
     const log = sceneLog("boarding");
     let renderer: THREE.WebGLRenderer;
     try {
-      renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: "high-performance" });
+      // The same GPU as the ride and the platform: on a Mac with two, switching between them stalls.
+      renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: "low-power" });
     } catch (err) {
       log.note(`no WebGL: ${String(err)}`);
       failRef.current?.();
       return () => log.dispose();
     }
     describe(renderer, log);
+    const meter = frameMeter(log, renderer);
 
     const setup = (): (() => void) => {
       const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -655,14 +657,17 @@ export default function BoardingScene3D({ stage, carriage, car, stationName = ""
         if (acc < 1 / 60 - 0.004) return;
         const step = Math.min(acc, 0.1);
         acc = 0;
-        update(now);
-        draw();
+        meter(() => {
+          update(now);
+          draw();
+        });
         warm += step;
         interval = interval * 0.94 + dt * 0.06;
         if (warm > 1 && level < QUALITY.length - 1) {
           slowFor = interval > 1 / 45 ? slowFor + step : 0;
           if (slowFor > 1) {
-            level += 1;
+            // Far too slow: drop two steps at once rather than stutter through each.
+            level = Math.min(QUALITY.length - 1, level + (interval > 2 / 60 ? 2 : 1));
             slowFor = 0;
             warm = 0;
             log.set("quality", `step ${level}`);

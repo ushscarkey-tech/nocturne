@@ -38,9 +38,10 @@ function Lines({ lines }: { lines: string[] }) {
  */
 export function RescuePlan({ data, now }: { data: NocturneData; now: Date }) {
   const { t, fmt } = useI18n();
-  const minute = Math.floor(now.getTime() / 60_000);
-  // Re-plan only when the data or the minute changes.
-  const plan = useMemo(() => rescuePlan(data, new Date(minute * 60_000)), [data, minute]);
+  // It weighs every remedy by planning the days again, which takes a moment:
+  // re-plan when the data changes, and otherwise every ten minutes, not every minute.
+  const slot = Math.floor(now.getTime() / 600_000);
+  const plan = useMemo(() => rescuePlan(data, new Date(slot * 600_000)), [data, slot]);
   if (!plan) return null;
   const today = serviceDate(now);
   const titleOf = (id: string) => data.tasks.find((x) => x.id === id)?.title ?? "—";

@@ -16,7 +16,7 @@ import { CABIN_TINT as TINT, CURTAIN_COLOR as CURTAIN, CURTAIN_REST, type ClothB
 import { sceneKit } from "./cabin/kit";
 import { PT, buildPlatform } from "./cabin/platform";
 import { D, cabinLights, rideFov, roundedRect, windowDims, windowMaterials, windowParts } from "./cabin/window";
-import { SCENE_READY, describe, floatSupport, pickTarget, sceneLog } from "./gl";
+import { SCENE_READY, describe, floatSupport, pickTarget, sceneLog, frameMeter } from "./gl";
 import { GradeShader, MAX_LIGHTS, hazeMaterial, rainMaterial, skyMaterial } from "./platform/shaders";
 import * as tx from "./platform/textures";
 
@@ -55,6 +55,8 @@ const QUALITY = [
 
 const lin = (r: number, g: number, b: number) => new THREE.Color().setRGB(r, g, b);
 const WHITE = new THREE.Color(1, 1, 1);
+/** A colour to work in, so the frame loop allocates nothing. */
+const scratch = new THREE.Color();
 
 /** Wrap x into [-span/2, span/2). */
 const wrap = (x: number, span: number) => ((((x + span / 2) % span) + span) % span) - span / 2;
@@ -95,6 +97,7 @@ export default function CabinScene3D({ mode, carriage, stationName = "", termina
       return () => log.dispose();
     }
     describe(renderer, log);
+    const meter = frameMeter(log, renderer);
     const fail = (why: string, err?: unknown) => {
       console.warn(`[nocturne] 3D cabin ${why}:`, err);
       log.note(`${why}: ${err instanceof Error ? err.message : String(err ?? "")}`);
@@ -723,7 +726,7 @@ export default function CabinScene3D({ mode, carriage, stationName = "", termina
         // The carriage: its light, curtain colour, the glass.
         tint.lerp(TINT[c], Math.min(1, dt * 2));
         cabinLight.color.copy(tint);
-        curtainMat.color.lerp(new THREE.Color(CURTAIN[c]), Math.min(1, dt * 2));
+        curtainMat.color.lerp(scratch.setHex(CURTAIN[c]), Math.min(1, dt * 2));
         curtainMat.sheenColor.copy(curtainMat.color).lerp(WHITE, 0.35);
         const reflectGoal = st.tunnel.on && covered ? 0.14 : st.plat.on && Math.abs(st.plat.x) < half ? 0.04 : 0.08;
         st.reflect += (reflectGoal - st.reflect) * Math.min(1, dt * 1.5);
@@ -805,14 +808,17 @@ export default function CabinScene3D({ mode, carriage, stationName = "", termina
         if (acc < 1 / q.fps - 0.004) return;
         const step = Math.min(acc, 0.1);
         acc = 0;
-        update(step);
-        draw();
+        meter(() => {
+          update(step);
+          draw();
+        });
         warm += step;
         interval = interval * 0.94 + dt * 0.06;
         if (warm > 2 && level < QUALITY.length - 1) {
           slowFor = interval > (q.fps >= 60 ? 1 / 45 : 1 / 26) ? slowFor + step : 0;
           if (slowFor > 2.5) {
-            level += 1;
+            // Far too slow: drop two steps at once rather than stutter through each.
+            level = Math.min(QUALITY.length - 1, level + (interval > 2 / 60 ? 2 : 1));
             slowFor = 0;
             warm = 0;
             log.set("quality", `step ${level}`);

@@ -101,3 +101,30 @@ export function describe(renderer: THREE.WebGLRenderer, log: SceneLog) {
 
 /** Fired on window once a scene has drawn its first real frame (shaders compiled, textures up). */
 export const SCENE_READY = "nocturne:scene-ready";
+
+/**
+ * With the 3D debug log on (?debug3d=1), how long each frame's own work
+ * takes on the main thread and how many draws it makes — for finding
+ * where a slow machine stutters. Costs nothing when the log is off.
+ */
+export function frameMeter(log: SceneLog, renderer: THREE.WebGLRenderer) {
+  if (!debugOn()) return (work: () => void) => work();
+  let ms = 0;
+  let worst = 0;
+  let shown = 0;
+  // Count the whole frame's draws, not just the last pass's.
+  renderer.info.autoReset = false;
+  return (work: () => void) => {
+    renderer.info.reset();
+    const t0 = performance.now();
+    work();
+    const t = performance.now() - t0;
+    ms = ms * 0.9 + t * 0.1;
+    worst = Math.max(worst * 0.995, t);
+    if (t0 - shown > 1000) {
+      shown = t0;
+      const info = renderer.info.render;
+      log.set("frame", `${ms.toFixed(1)} ms cpu (worst ${worst.toFixed(0)}), ${info.calls} draws, ${Math.round(info.triangles / 1000)}k tris`);
+    }
+  };
+}

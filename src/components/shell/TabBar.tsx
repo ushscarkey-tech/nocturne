@@ -149,7 +149,7 @@ function RailNav({ current, onSettings }: { current: number; onSettings: boolean
       <button
         type="button"
         onClick={() => useQuickAdd.getState().show()}
-        className="flex h-10 w-fit items-center gap-2.5 rounded-full border border-rule bg-night-850/70 pl-3.5 pr-4 text-sm text-paper-dim backdrop-blur transition-colors duration-500 hover:border-lamp/50 hover:text-paper"
+        className="flex h-10 w-fit items-center gap-2.5 rounded-full border border-rule bg-night-850/90 pl-3.5 pr-4 text-sm text-paper-dim transition-colors duration-500 hover:border-lamp/50 hover:text-paper"
       >
         <Icon name="plus" size={15} />
         {t("tonight.addTask")}
