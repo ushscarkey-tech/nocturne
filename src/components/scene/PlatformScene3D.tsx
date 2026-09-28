@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
+import { makeCat, makeSeal, type Companion } from "./companions";
 import { Reflector } from "three/examples/jsm/objects/Reflector.js";
 import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";
 import { FXAAPass } from "three/examples/jsm/postprocessing/FXAAPass.js";
@@ -434,6 +435,19 @@ export default function PlatformScene3D({ mood = "waiting", rain = true, station
       many(new THREE.BoxGeometry(0.08, 0.06, 1.6), mat.metal, benchZ.map((zc) => [PL_W - 0.5, 0.38, zc]));
       many(new THREE.BoxGeometry(0.06, 0.38, 0.06), mat.metal, benchZ.flatMap((zc) => [-0.62, 0.62].map((dz) => [PL_W - 0.5, 0.19, zc + dz] as [number, number, number])));
       many(seatGeo, mat.seat, seatsAt.map((z) => [PL_W - 0.52, 0.44, z, 0, Math.PI / 2]));
+      // Someone else waiting for the night train, close enough to keep you
+      // company: Mongsil with a notebook on the platform, Bori curled up
+      // asleep beside her.
+      const benchSeal = makeSeal();
+      benchSeal.group.scale.setScalar(0.6);
+      benchSeal.group.position.set(COLUMN_X - 0.6, 0, 2.2);
+      benchSeal.group.rotation.y = -0.35;
+      const benchCat = makeCat();
+      benchCat.group.scale.setScalar(0.45);
+      benchCat.group.position.set(COLUMN_X - 0.12, 0, 2.0);
+      benchCat.group.rotation.y = 0.7;
+      const companions: Companion[] = [benchCat, benchSeal];
+      for (const c of companions) scene.add(c.group);
       many(backGeo, mat.seat, seatsAt.map((z) => [PL_W - 0.3, 0.68, z, -0.12, Math.PI / 2]));
       many(new THREE.PlaneGeometry(1.1, 2.2), mat.shadow, benchZ.map((zc) => [PL_W - 0.5, 0.003, zc, -Math.PI / 2]));
 
@@ -676,6 +690,7 @@ export default function PlatformScene3D({ mood = "waiting", rain = true, station
       const glowStop = lin(0.7, 0.05, 0.03);
 
       const update = (step: number) => {
+        for (const c of companions) c.update();
         const final = moodRef.current === "final";
         camera.position.set(base.x + Math.sin(time * 0.07) * 0.05, base.y + Math.sin(time * 0.19) * 0.012, base.z + Math.sin(time * 0.05) * 0.08);
         camera.lookAt(look.x + Math.sin(time * 0.04) * 0.3, look.y, look.z);
@@ -857,6 +872,7 @@ export default function PlatformScene3D({ mood = "waiting", rain = true, station
         ro.disconnect();
         io.disconnect();
         document.removeEventListener("visibilitychange", onVisibility);
+        companions.forEach((c) => c.dispose());
         disposables.forEach((d) => d.dispose());
         target.dispose();
         renderer.dispose();

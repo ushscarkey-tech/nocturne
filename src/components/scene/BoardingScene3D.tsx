@@ -17,6 +17,7 @@ import { Curtain } from "./cabin/curtain";
 import { lin, sceneKit } from "./cabin/kit";
 import { PT, buildPlatform } from "./cabin/platform";
 import { D, cabinLights, rideFov, roundedRect, windowDims, windowMaterials, windowParts, type WindowDims } from "./cabin/window";
+import { makeCat, makeSeal, sillCompanion, type Companion } from "./companions";
 import { describe, floatSupport, pickTarget, sceneLog, frameMeter } from "./gl";
 import { GradeShader } from "./platform/shaders";
 
@@ -187,6 +188,7 @@ export default function BoardingScene3D({ stage, carriage, car, stationName = ""
       cabin.add(shell.cabin);
       let built: { dispose: () => void } | null = null;
       let seatGlass: THREE.Mesh | null = null;
+      let sill: Companion | null = null;
 
       const buildShell = (d: WindowDims) => {
         built?.dispose();
@@ -269,6 +271,10 @@ export default function BoardingScene3D({ stage, carriage, car, stationName = ""
             partsList.push(parts);
             g.add(parts.group);
             if (mine) {
+              // Hodu on your sill, exactly where the ride will show her.
+              sill?.dispose();
+              sill = sillCompanion(d, D);
+              g.add(sill.group);
               seatGlass = parts.glass;
               seatGlass!.visible = false;
               mats.glass.uniforms.uWin.value.set(d.w, d.h);
@@ -475,6 +481,18 @@ export default function BoardingScene3D({ stage, carriage, car, stationName = ""
         bay(x, FAR, 1);
         if (Math.abs(x) > 1.5) bay(x, SIDE - 0.08, -1);
       }
+      // Fellow travellers already on board: Mongsil studying in a bay down
+      // the aisle, Bori asleep across a seat opposite.
+      const seal = makeSeal();
+      seal.group.scale.setScalar(0.55);
+      seal.group.position.set(4.3 - 0.62, FLOOR + 0.5, FAR + 0.52);
+      seal.group.rotation.y = Math.PI / 2;
+      const cat = makeCat();
+      cat.group.scale.setScalar(0.5);
+      cat.group.position.set(2.0 + 0.55, FLOOR + 0.5, FAR + 0.5);
+      cat.group.rotation.y = -Math.PI / 2 + 0.5;
+      const passengers: Companion[] = [seal, cat];
+      for (const c of passengers) cabin.add(c.group);
       placed.forEach((matrices, kind) => {
         const inst = new THREE.InstancedMesh(kinds[kind].geo, kinds[kind].mat, matrices.length);
         matrices.forEach((m, i) => inst.setMatrixAt(i, m));
@@ -629,6 +647,8 @@ export default function BoardingScene3D({ stage, carriage, car, stationName = ""
           camera.lookAt(looks[0].at);
         }
         lampLight.intensity = lit ? 1.4 * (1 - settle) : 0;
+        sill?.update();
+        for (const c of passengers) c.update();
         // Standing close under them, the station lamps would glare off the
         // steel; they come up to the ride's strength as you take your seat.
         for (const l of platform.lights) l.intensity = platformLamp * (0.4 + 0.6 * settle);
@@ -731,6 +751,8 @@ export default function BoardingScene3D({ stage, carriage, car, stationName = ""
         cancelAnimationFrame(raf);
         ro.disconnect();
         built?.dispose();
+        sill?.dispose();
+        passengers.forEach((c) => c.dispose());
         disposables.forEach((d) => d.dispose());
         target.dispose();
         log.dispose();

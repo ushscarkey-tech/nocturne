@@ -16,6 +16,7 @@ import { CABIN_TINT as TINT, CURTAIN_COLOR as CURTAIN, CURTAIN_REST, type ClothB
 import { sceneKit } from "./cabin/kit";
 import { PT, buildPlatform } from "./cabin/platform";
 import { D, cabinLights, rideFov, roundedRect, windowDims, windowMaterials, windowParts } from "./cabin/window";
+import { sillCompanion, type Companion } from "./companions";
 import { SCENE_READY, describe, floatSupport, pickTarget, sceneLog, frameMeter } from "./gl";
 import { GradeShader, MAX_LIGHTS, hazeMaterial, rainMaterial, skyMaterial } from "./platform/shaders";
 import * as tx from "./platform/textures";
@@ -445,6 +446,7 @@ export default function CabinScene3D({ mode, carriage, stationName = "", termina
       let curtainCover = CURTAIN_REST;
       let curtainZ = -D + 0.05;
       let parts: ReturnType<typeof windowParts> | null = null;
+      let sill: Companion | null = null;
       let wallGeo: THREE.BufferGeometry | null = null;
 
       const buildInterior = () => {
@@ -469,6 +471,10 @@ export default function CabinScene3D({ mode, carriage, stationName = "", termina
         }
         curtain = new Curtain(curtainMat, { ...parts.curtain, cover: curtainCover });
         interior.add(curtain.mesh);
+        // Hodu, reading on the sill: company for the night.
+        sill?.dispose();
+        sill = sillCompanion(d, D);
+        interior.add(sill.group);
       };
 
       // ================================================================= POST
@@ -605,6 +611,7 @@ export default function CabinScene3D({ mode, carriage, stationName = "", termina
         const accel = dt > 0 ? (st.v - st.lastV) / dt : 0;
         st.lastV = st.v;
         if (curtain) {
+          sill?.update();
           curtain.update(dt, accel, knock, Math.sin(st.time * 0.9) * (st.v / CRUISE) + Math.sin(st.time * 2.3) * 0.3 * (st.v / CRUISE));
           const drawn = Math.max(0, (curtain.cover - CURTAIN_REST) / (1 - CURTAIN_REST));
           if (Math.abs(drawn - st.drawn) > 0.01) {
@@ -947,6 +954,7 @@ export default function CabinScene3D({ mode, carriage, stationName = "", termina
         cursor("");
         curtainRef.current?.(0);
         interior.children.forEach((c) => (c as THREE.Mesh).geometry?.dispose());
+        sill?.dispose();
         disposables.forEach((d) => d.dispose());
         target3.dispose();
         log.dispose();
