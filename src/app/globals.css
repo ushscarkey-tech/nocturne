@@ -167,6 +167,13 @@
   letter-spacing: 0.08em;
 }
 
+/* The rail and tab labels are tracked capitals in Latin scripts; in CJK they are words. */
+:root:lang(ko) .nav-label,
+:root:lang(ja) .nav-label,
+:root:lang(zh) .nav-label {
+  letter-spacing: 0.06em;
+}
+
 /* Station names are words in Korean, not tracked capitals: give them size. */
 :root:lang(ko) .station-label {
   font-size: 0.75rem;

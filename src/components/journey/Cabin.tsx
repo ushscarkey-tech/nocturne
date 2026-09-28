@@ -121,8 +121,10 @@ export function Cabin({
         <ExitSign className={`mt-1 self-end transition-opacity duration-[2000ms] ${departing ? "opacity-0" : "opacity-100"}`} />
 
         <main className="flex flex-1 flex-col items-center justify-center text-center">
-          <div className={`transition-opacity duration-[2500ms] ${departing ? "opacity-0" : tunnel ? "opacity-75 delay-[1200ms]" : "opacity-100"}`}>
-            <p className={`eyebrow text-paper-dim/50 transition-opacity duration-[2000ms] ${chrome}`}>→ {fmt.station(active.stationName)}</p>
+          <div className={`relative isolate transition-opacity duration-[2500ms] ${departing ? "opacity-0" : tunnel ? "opacity-75 delay-[1200ms]" : "opacity-100"}`}>
+            {/* A soft pool of shade so the words stay readable over a lit platform. */}
+            <div className="pointer-events-none absolute -inset-x-24 -inset-y-16 -z-10 bg-[radial-gradient(closest-side,rgba(5,7,10,0.68),rgba(5,7,10,0.35)_55%,transparent)]" aria-hidden />
+            <p className={`eyebrow text-paper-dim/70 transition-opacity duration-[2000ms] ${chrome}`}>→ {fmt.station(active.stationName)}</p>
             <h1 className="mt-3 line-clamp-3 max-w-lg break-words font-display text-[1.9rem] leading-tight [text-shadow:0_2px_24px_rgba(0,0,0,0.7)] sm:text-4xl">
               {task?.title ?? "—"}
             </h1>

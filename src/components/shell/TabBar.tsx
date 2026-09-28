@@ -64,7 +64,7 @@ export function TabBar() {
                     aria-hidden
                   />
                   <span
-                    className={`font-mono text-[0.625rem] uppercase tracking-[0.2em] transition-colors duration-500 ${
+                    className={`nav-label font-mono text-[0.625rem] uppercase tracking-[0.2em] transition-colors duration-500 ${
                       active ? "text-paper" : "text-haze group-hover:text-mist"
                     }`}
                   >
@@ -132,7 +132,7 @@ function RailNav({ current, onSettings }: { current: number; onSettings: boolean
                   />
                 </span>
                 <span
-                  className={`font-mono text-[0.6875rem] uppercase tracking-[0.22em] transition-colors duration-500 ${
+                  className={`nav-label font-mono text-[0.6875rem] uppercase tracking-[0.22em] transition-colors duration-500 ${
                     active ? "text-paper" : "text-haze group-hover:text-mist"
                   }`}
                 >
@@ -157,7 +157,7 @@ function RailNav({ current, onSettings }: { current: number; onSettings: boolean
       <Link
         href="/settings"
         aria-current={onSettings ? "page" : undefined}
-        className={`mt-5 flex items-center gap-3 font-mono text-[0.6875rem] uppercase tracking-[0.22em] transition-colors duration-500 ${
+        className={`mt-5 flex items-center gap-3 nav-label font-mono text-[0.6875rem] uppercase tracking-[0.22em] transition-colors duration-500 ${
           onSettings ? "text-lamp" : "text-haze hover:text-mist"
         }`}
       >
