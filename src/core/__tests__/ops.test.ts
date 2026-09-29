@@ -56,6 +56,8 @@ function endedMorning(): NocturneData {
   d = board(d, { focus: "steady", carriage: "rain" }, at(8)).data;
   d = endJourney(d, at(8, 20)).data;
   expect(journeyFor(d, TODAY)?.phase).toBe("final");
+  // Ending the night is an arrival: the ticket and the final platform show when.
+  expect(journeyFor(d, TODAY)?.completedAt).toBe(at(8, 20).toISOString());
   return d;
 }
 

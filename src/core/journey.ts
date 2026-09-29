@@ -515,7 +515,8 @@ export function endJourney(data: NocturneData, now: Date): EngineResult {
   };
   const journey = journeyFor(next, date);
   if (!journey) return { data: next, change: null };
-  return { data: replaceJourney(next, { ...journey, phase: "final", stopEndsAt: null }), change: null };
+  // The train stops here, now: that is its arrival, even with nothing ridden.
+  return { data: replaceJourney(next, { ...journey, phase: "final", stopEndsAt: null, completedAt: journey.completedAt ?? iso(now) }), change: null };
 }
 
 export function issueTicket(data: NocturneData, journeyId: string, now: Date): { data: NocturneData; ticket: Ticket } {
