@@ -137,11 +137,12 @@ void main() {
     vec2 e = vec2(0.0015, 0.0);
     float cx = drops(uv + e, t, l0, l1, l2);
     float cy = drops(uv + e.yx, t, l0, l1, l2);
-    offset = vec2(cx - c, cy - c) * 0.3;
+    offset = vec2(cx - c, cy - c) * 0.16;
   }
   vec3 col = texture2D(tOutside, screen + offset).rgb;
-  // Drops gather the carriage light at their edges.
-  col += uTint * c * 0.035;
+  // Drops gather light: a touch brighter than the glass round them, and the carriage's at their edges.
+  col = mix(col, col * 1.12 + 0.012, clamp(c, 0.0, 1.0) * 0.6);
+  col += uTint * c * 0.03;
   // The carriage in the glass, stronger where the outside is dark.
   vec3 refl = texture2D(tReflect, vUv).rgb * uTint;
   float dark = 1.0 - smoothstep(0.02, 0.5, dot(col, vec3(0.3, 0.5, 0.2)));
@@ -247,16 +248,17 @@ varying vec3 vWorld;
 ${NOISE}
 ${FOG}
 vec3 wall(float x, float y) {
-  vec3 c = vec3(0.05, 0.05, 0.048) * (0.55 + 0.7 * c_fbm(vec2(x, y) * 0.9));
+  // Soot-dark concrete: in a tunnel the only light is the lamps' and the carriage's.
+  vec3 c = vec3(0.0125, 0.0125, 0.012) * (0.55 + 0.7 * c_fbm(vec2(x, y) * 0.9));
   c *= 0.75 + 0.25 * smoothstep(0.0, 0.06, abs(fract(x / 10.0) - 0.5) * 2.0);
   float tray = step(0.28, y) * step(y, 0.36) + step(0.52, y) * step(y, 0.57);
-  c = mix(c, vec3(0.02), tray);
-  c += step(0.355, y) * step(y, 0.365) * 0.03;
+  c = mix(c, vec3(0.005), tray);
+  c += step(0.355, y) * step(y, 0.365) * 0.008;
   // Lamps: a small warm box and the light it throws on the wall.
   float lx = mod(x, 25.0) - 12.5;
   float box = step(abs(lx), 0.22) * step(abs(y - 0.95), 0.07);
   float pool = exp(-lx * lx * 0.35) * exp(-(y - 0.95) * (y - 0.95) * 1.2);
-  c += uLamp * pool * 0.12;
+  c += uLamp * pool * 0.04;
   c += uLamp * box * 6.0;
   return c;
 }
@@ -269,7 +271,8 @@ void main() {
   // The mouth: daylight-less, but the concrete edge is a little lighter.
   float edge = min(vWorld.x - uStart, uEnd - vWorld.x);
   col += vec3(0.02, 0.022, 0.024) * (1.0 - smoothstep(0.0, 1.2, edge));
-  gl_FragColor = vec4(applyFog(col, length(vWorld - cameraPosition)), 1.0);
+  // Two metres away: no haze from the open country in here.
+  gl_FragColor = vec4(col, 1.0);
 }`,
   });
 }

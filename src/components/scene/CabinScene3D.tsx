@@ -57,7 +57,7 @@ export interface CabinSceneProps {
   onCurtain?: (amount: number) => void;
 }
 
-const TUNNEL_EXPOSURE = 1.25;
+const TUNNEL_EXPOSURE = 1.05;
 
 /** Steps down, one at a time, while frames keep arriving late: sharpness first, then glow, then frame rate. */
 const QUALITY = [
@@ -535,7 +535,7 @@ export default function CabinScene3D({ mode, carriage, stationName = "", termina
         curtainMat.color.lerp(scratch.setHex(CURTAIN[c]), Math.min(1, dt * 2));
         curtainMat.sheenColor.copy(curtainMat.color).lerp(WHITE, 0.35);
         const atPlatform = plat.visible && Math.abs(platX) < half;
-        const reflectGoal = THREE.MathUtils.lerp(atPlatform ? Math.min(atm.reflect, 0.05) : atm.reflect, 0.16, st.tunnel);
+        const reflectGoal = THREE.MathUtils.lerp(atPlatform ? Math.min(atm.reflect, 0.05) : atm.reflect, 0.1, st.tunnel);
         st.reflect += (reflectGoal - st.reflect) * Math.min(1, dt * 1.5);
         glassMat.uniforms.uReflect.value = st.reflect;
         glassMat.uniforms.uTint.value.copy(tint);
