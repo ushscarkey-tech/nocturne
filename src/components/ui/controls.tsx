@@ -167,12 +167,12 @@ export function Toggle({
         {description && <span className="block text-xs text-mist">{description}</span>}
       </span>
       <span
-        className={`relative h-6 w-10 shrink-0 rounded-full border transition-colors duration-500 ${
+        className={`relative h-6 w-10 shrink-0 rounded-[3px] border transition-colors duration-500 ${
           checked ? "border-lamp/60 bg-lamp/20" : "border-rule bg-night-800"
         }`}
       >
         <span
-          className={`absolute top-1/2 h-4 w-4 -translate-y-1/2 rounded-full transition-all duration-500 ease-[var(--ease-glide)] ${
+          className={`absolute top-1/2 h-4 w-4 -translate-y-1/2 rounded-[2px] shadow-[inset_0_-1px_0_rgba(0,0,0,0.3)] transition-all duration-500 ease-[var(--ease-glide)] ${
             checked ? "left-5 bg-lamp" : "left-1 bg-mist"
           }`}
         />
