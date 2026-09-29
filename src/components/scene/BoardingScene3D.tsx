@@ -265,7 +265,7 @@ export default function BoardingScene3D({ stage, carriage, car, stationName = ""
               g.rotation.y = Math.PI;
               g.position.set(x, EYE_Y, EYE_Z);
             } else g.position.set(x, EYE_Y, FAR + D);
-            const parts = windowParts(d, { frame: mats.frame, table: mats.table, glass: mine ? mats.glass : null });
+            const parts = windowParts(d, { ...mats, glass: mine ? mats.glass : null }, { seat: mine });
             partsList.push(parts);
             g.add(parts.group);
             if (mine) {

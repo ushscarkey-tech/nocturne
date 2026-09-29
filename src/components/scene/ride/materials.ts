@@ -205,10 +205,10 @@ vec3 facadeEmit = vec3(0.0);`,
       diffuseColor.rgb = mix(glass, vec3(0.5), mull * 0.6);
       // By night, some rooms lit: warm lamps mostly, the blue of a television now and then.
       float on = step(r, lit);
-      vec3 warm = mix(vec3(1.0, 0.6, 0.28), vec3(1.0, 0.86, 0.66), w_hash(id + 3.1));
+      vec3 warm = mix(vec3(1.0, 0.55, 0.22), vec3(1.0, 0.8, 0.55), w_hash(id + 3.1));
       warm = mix(warm, vec3(0.62, 0.78, 1.0), step(0.88, w_hash(id + 7.7)));
       float flicker = 1.0 - 0.25 * step(0.97, w_hash(id + 9.0)) * step(0.5, fract(uTime * 0.7 + r));
-      facadeEmit = warm * on * uNight * (0.7 + 0.9 * w_hash(id + 1.3)) * flicker * 1.35;
+      facadeEmit = warm * on * uNight * (0.45 + 0.55 * w_hash(id + 1.3)) * flicker * 0.5;
     }
   }
 }`,

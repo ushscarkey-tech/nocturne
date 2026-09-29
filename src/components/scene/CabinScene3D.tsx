@@ -14,7 +14,7 @@ import { Curtain } from "./cabin/curtain";
 import { CABIN_TINT as TINT, CURTAIN_COLOR as CURTAIN, CURTAIN_REST, type ClothBacklight } from "./cabin/cloth";
 import { sceneKit } from "./cabin/kit";
 import { PT, buildPlatform } from "./cabin/platform";
-import { D, cabinLights, rideFov, roundedRect, windowDims, windowMaterials, windowParts } from "./cabin/window";
+import { D, cabinLights, rideFov, upperWall, windowDims, windowMaterials, windowParts } from "./cabin/window";
 import { SCENE_READY, describe, floatSupport, pickTarget, sceneLog, frameMeter } from "./gl";
 import { GradeShader, MAX_LIGHTS, rainMaterial } from "./platform/shaders";
 import * as tx from "./platform/textures";
@@ -48,6 +48,8 @@ export interface CabinSceneProps {
   seed?: number;
   /** Which hour the window shows: the clock's, or dusk to dawn across the ride. */
   sky?: SkyMode;
+  /** Car and seat, engraved on the plate by the window (e.g. "CAR 07 · 12A"). */
+  seat?: string;
   className?: string;
   /** Called if this device can't draw the scene; the caller shows the 2D one. */
   onFail?: () => void;
@@ -82,12 +84,13 @@ const heading = (s: number) => 0.014 * Math.sin(s / 1100 + 1.3) + 0.009 * Math.s
  * starts, stops when you pause, and brakes into the next platform as the
  * timer ends.
  */
-export default function CabinScene3D({ mode, carriage, stationName = "", terminal = false, leg = null, seed = 1, sky = "local", className = "", onFail, onCurtain }: CabinSceneProps) {
+export default function CabinScene3D({ mode, carriage, stationName = "", terminal = false, leg = null, seed = 1, sky = "local", seat = "", className = "", onFail, onCurtain }: CabinSceneProps) {
   const mountRef = useRef<HTMLDivElement>(null);
   const target = useRef({ mode, carriage, stationName, terminal, leg, sky });
   const failRef = useRef(onFail);
   const curtainRef = useRef(onCurtain);
   const seedRef = useRef(seed);
+  const plateRef = useRef<[string, string]>(["NOCTURNE", seat || "CAR 07"]);
   useEffect(() => {
     curtainRef.current = onCurtain;
   }, [onCurtain]);
@@ -232,7 +235,7 @@ export default function CabinScene3D({ mode, carriage, stationName = "", termina
       cabin.add(daylight);
       // Lit from behind by whatever is outside the glass (set up with the post passes).
       const clothBack: ClothBacklight = { outside: null as unknown as THREE.Texture, res: new THREE.Vector2(1, 1), winMin: new THREE.Vector2(), winMax: new THREE.Vector2(), strength: 0.45 };
-      const mats = windowMaterials(K, target.current.carriage, clothBack);
+      const mats = windowMaterials(K, target.current.carriage, clothBack, plateRef.current);
       const curtainMat = mats.cloth;
       const glassMat = mats.glass;
       const interior = new THREE.Group();
@@ -249,12 +252,10 @@ export default function CabinScene3D({ mode, carriage, stationName = "", termina
         parts?.dispose();
         wallGeo?.dispose();
         interior.clear();
-        // The wall, with the window cut out of it.
-        const wallShape = new THREE.Shape([new THREE.Vector2(-3, -2.5), new THREE.Vector2(3, -2.5), new THREE.Vector2(3, 2.5), new THREE.Vector2(-3, 2.5)]);
-        wallShape.holes.push(roundedRect(d.w, d.h, d.r, 0, d.cy));
-        wallGeo = new THREE.ShapeGeometry(wallShape, 12);
+        // The upper wall, with the window cut out of it; below the sill, the bay's wood panel.
+        wallGeo = upperWall(d);
         put(interior, new THREE.Mesh(wallGeo, mats.wall), 0, 0, -D);
-        parts = windowParts(d, mats);
+        parts = windowParts(d, mats, { seat: true });
         interior.add(parts.group);
         glassMat.uniforms.uWin.value.set(d.w, d.h);
         curtainZ = parts.curtain.z;
@@ -277,7 +278,7 @@ export default function CabinScene3D({ mode, carriage, stationName = "", termina
       clothBack.outside = outTarget.texture;
       const composer = new EffectComposer(renderer, target3);
       composer.addPass(new RenderPass(cabin, camera));
-      const bloom = new UnrealBloomPass(new THREE.Vector2(256, 256), 0.32, 0.35, hdr ? 1.0 : 0.85);
+      const bloom = new UnrealBloomPass(new THREE.Vector2(256, 256), 0.22, 0.3, hdr ? 1.0 : 0.85);
       composer.addPass(bloom);
       const output = new OutputPass();
       composer.addPass(output);
@@ -527,7 +528,7 @@ export default function CabinScene3D({ mode, carriage, stationName = "", termina
         tint.lerp(TINT[c], Math.min(1, dt * 2));
         cabinLight.color.copy(tint);
         cabinLight.intensity = 3.2 * (0.55 + 0.45 * dark);
-        reading.intensity = 0.9 * (0.4 + 0.6 * dark);
+        reading.intensity = 0.45 * (0.3 + 0.7 * dark);
         daylight.color.copy(atm.daylight).multiplyScalar(1 - st.tunnel);
         daylight.groundColor.copy(atm.daylight).multiplyScalar(0.35 * (1 - st.tunnel));
         daylight.intensity = 2.2;
