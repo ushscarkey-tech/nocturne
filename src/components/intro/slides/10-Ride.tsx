@@ -97,7 +97,7 @@ const COPY: Record<Locale, Copy> = {
     confirm: "Confirm route",
     ticket: "Ticket",
     toStation: "→ Midnight",
-    arrivesAt: "arr. 22:40",
+    arrivesAt: "· arrives 22:40",
     carSeat: "Car 07 · 10B",
     stop: "Stop",
     depart: "Depart",
