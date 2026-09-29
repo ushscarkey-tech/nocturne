@@ -15,7 +15,7 @@ import { CABIN_TINT as TINT, CURTAIN_COLOR as CURTAIN, CURTAIN_REST, type ClothB
 import { sceneKit } from "./cabin/kit";
 import { PT, buildPlatform } from "./cabin/platform";
 import { D, cabinLights, rideFov, upperWall, windowDims, windowMaterials, windowParts } from "./cabin/window";
-import { SCENE_READY, describe, floatSupport, pickTarget, sceneLog, frameMeter } from "./gl";
+import { SCENE_READY, describe, floatSupport, pickTarget, saveQuality, savedQuality, sceneLog, frameMeter } from "./gl";
 import { GradeShader, MAX_LIGHTS, rainMaterial } from "./platform/shaders";
 import * as tx from "./platform/textures";
 import { atmosphere, atmosphereAt, forcedHour, hourFor, type SkyMode } from "./ride/atmosphere";
@@ -61,11 +61,11 @@ const TUNNEL_EXPOSURE = 1.05;
 
 /** Steps down, one at a time, while frames keep arriving late: sharpness first, then glow, then frame rate. */
 const QUALITY = [
-  { dpr: 1.5, bloom: true, fps: 60, rain: 1 },
-  { dpr: 1.2, bloom: true, fps: 60, rain: 1 },
-  { dpr: 1, bloom: true, fps: 60, rain: 0.7 },
-  { dpr: 1, bloom: false, fps: 30, rain: 0.5 },
-  { dpr: 0.75, bloom: false, fps: 30, rain: 0.35 },
+  { dpr: 1.5, pixels: 2.0e6, outside: 0.8, bloom: true, fps: 60, rain: 1 },
+  { dpr: 1.25, pixels: 1.5e6, outside: 0.7, bloom: true, fps: 60, rain: 0.8 },
+  { dpr: 1, pixels: 1.1e6, outside: 0.65, bloom: false, fps: 60, rain: 0.6 },
+  { dpr: 1, pixels: 0.9e6, outside: 0.6, bloom: false, fps: 30, rain: 0.5 },
+  { dpr: 0.75, pixels: 0.6e6, outside: 0.6, bloom: false, fps: 30, rain: 0.35 },
 ];
 
 const lin = (r: number, g: number, b: number) => new THREE.Color().setRGB(r, g, b);
@@ -123,6 +123,10 @@ export default function CabinScene3D({ mode, carriage, stationName = "", termina
     };
 
     const setup = (): (() => void) => {
+      // Where the start-up time goes (shown in the ?debug3d readout).
+      const t0 = performance.now();
+      const phases: string[] = [];
+      const phase = (name: string) => phases.push(`${name} ${Math.round(performance.now() - t0)}`);
       const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
       renderer.outputColorSpace = THREE.SRGBColorSpace;
       renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -175,7 +179,9 @@ export default function CabinScene3D({ mode, carriage, stationName = "", termina
       const hemi = new THREE.HemisphereLight(0x223040, 0x080808, 1);
       outside.add(hemi);
 
+      phase("sky");
       const world = buildWorld(seedRef.current, track);
+      phase("world");
       outside.add(world.root);
       outside.add((world as unknown as { catenary: THREE.Object3D }).catenary);
 
@@ -223,6 +229,7 @@ export default function CabinScene3D({ mode, carriage, stationName = "", termina
       fallbacks.set(rainMat, hide(rainMat));
       const lampScratch = Array.from({ length: MAX_LIGHTS }, () => new THREE.Vector4());
 
+      phase("platform+rain");
       // ================================================================= CABIN
       const tint = TINT[target.current.carriage].clone();
       const lights = cabinLights(tint);
@@ -269,8 +276,10 @@ export default function CabinScene3D({ mode, carriage, stationName = "", termina
         interior.add(curtain.mesh);
       };
 
+      phase("cabin");
       // ================================================================= POST
-      const outTarget = pickTarget(renderer, floatOK);
+      // The world outside is seen through glass, rain and motion: no MSAA, and fewer pixels than the carriage.
+      const outTarget = pickTarget(renderer, floatOK, false);
       const target3 = pickTarget(renderer, floatOK);
       const hdr = target3.texture.type === THREE.HalfFloatType;
       log.set("frame buffer", `${hdr ? "half float" : "8-bit"}, msaa ${target3.samples}`);
@@ -279,6 +288,9 @@ export default function CabinScene3D({ mode, carriage, stationName = "", termina
       const composer = new EffectComposer(renderer, target3);
       composer.addPass(new RenderPass(cabin, camera));
       const bloom = new UnrealBloomPass(new THREE.Vector2(256, 256), 0.22, 0.3, hdr ? 1.0 : 0.85);
+      // The glow is soft anyway: work it out at half size.
+      const bloomSize = bloom.setSize.bind(bloom);
+      bloom.setSize = (w: number, h: number) => bloomSize(Math.max(1, Math.round(w / 2)), Math.max(1, Math.round(h / 2)));
       composer.addPass(bloom);
       const output = new OutputPass();
       composer.addPass(output);
@@ -322,7 +334,8 @@ export default function CabinScene3D({ mode, carriage, stationName = "", termina
         sweep.intensity = lights.platformSpill();
         drawSign(target.current.stationName, start === "still" || target.current.terminal);
       }
-      let level = 0;
+      let level = savedQuality("ride", QUALITY.length - 1);
+      log.set("quality", `step ${level}`);
       let clockAt = 0;
       let halfW = 1;
       let builtFor = "";
@@ -332,12 +345,12 @@ export default function CabinScene3D({ mode, carriage, stationName = "", termina
         const w = mount.clientWidth || 1;
         const h = mount.clientHeight || 1;
         const q = QUALITY[level];
-        const dpr = Math.min(window.devicePixelRatio || 1, q.dpr, Math.sqrt(2.4e6 / (w * h)));
+        const dpr = Math.min(window.devicePixelRatio || 1, q.dpr, Math.sqrt(q.pixels / (w * h)));
         renderer.setPixelRatio(dpr);
         renderer.setSize(w, h, false);
         composer.setPixelRatio(dpr);
         composer.setSize(w, h);
-        outTarget.setSize(Math.round(w * dpr), Math.round(h * dpr));
+        outTarget.setSize(Math.round(w * dpr * q.outside), Math.round(h * dpr * q.outside));
         bloom.enabled = q.bloom && hdr;
         grade.uniforms.uRes.value.set(w * dpr, h * dpr);
         glassMat.uniforms.uRes.value.set(Math.round(w * dpr), Math.round(h * dpr));
@@ -620,7 +633,9 @@ export default function CabinScene3D({ mode, carriage, stationName = "", termina
         }
         acc += dt;
         const q = QUALITY[level];
-        if (acc < 1 / q.fps - 0.004) return;
+        // Standing at a platform or paused, little moves: half the frames will do (not while the curtain's in hand).
+        const fps = train.v < 0.05 && !tookHold ? Math.min(q.fps, 30) : q.fps;
+        if (acc < 1 / fps - 0.004) return;
         const step = Math.min(acc, 0.1);
         acc = 0;
         meter(() => {
@@ -637,6 +652,7 @@ export default function CabinScene3D({ mode, carriage, stationName = "", termina
             slowFor = 0;
             warm = 0;
             log.set("quality", `step ${level}`);
+            saveQuality("ride", level);
             layout();
           }
         }
@@ -658,18 +674,45 @@ export default function CabinScene3D({ mode, carriage, stationName = "", termina
           }
         });
       }
-      draw();
+      phase("layout");
+      // Compile every shader up front, the ones that only show up later included, in
+      // parallel where the browser can (KHR_parallel_shader_compile), rather than
+      // stalling the page on a first draw. Each scene is compiled for the target it's
+      // drawn into, so the programs match.
+      renderer.setRenderTarget(outTarget);
+      const compiling: Promise<unknown>[] = [renderer.compileAsync(outside, outCam)];
+      renderer.setRenderTarget(composer.readBuffer);
+      compiling.push(renderer.compileAsync(cabin, camera));
+      renderer.setRenderTarget(null);
+      const textures = new Set<THREE.Texture>();
+      for (const s of [outside, cabin])
+        s.traverse((o) => {
+          const m = (o as THREE.Mesh).material as THREE.Material | THREE.Material[] | undefined;
+          for (const mat of Array.isArray(m) ? m : m ? [m] : [])
+            for (const v of Object.values(mat)) if (v instanceof THREE.Texture) textures.add(v);
+        });
       hidden.forEach((o) => (o.visible = false));
       update(0.016);
-      draw();
-      // Ready to be seen once the surface maps are in (before, surfaces shade black).
+      phase("compile queued");
+      // Shown with a fade once the first real frame is drawn: no black flash, no half-built frame.
+      const canvasEl = renderer.domElement;
+      canvasEl.style.opacity = "0";
+      canvasEl.style.transition = "opacity 900ms cubic-bezier(0.22, 1, 0.36, 1)";
       let gone = false;
-      void kit.ready().then(() => {
+      const giveUp = new Promise((r) => setTimeout(r, 6000));
+      void Promise.race([Promise.all([...compiling, kit.ready()]), giveUp]).then(() => {
         if (gone || broken) return;
+        phase("shaders + maps");
+        // Upload every texture now (the tunnel's and the platform's too), not when they first appear.
+        textures.forEach((t) => renderer.initTexture(t));
         draw();
+        phase("first frame");
+        log.set("start-up ms", phases.join(" · "));
+        canvasEl.style.opacity = "1";
         requestAnimationFrame(() => !gone && window.dispatchEvent(new Event(SCENE_READY)));
+        last = performance.now();
+        if (!reduce) raf = requestAnimationFrame(frame);
       });
-      if (!reduce) raf = requestAnimationFrame(frame);
       pokeRef.current = () => {
         if (reduce) {
           update(0.016);

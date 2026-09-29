@@ -10,7 +10,7 @@ import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
 import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
 import { ShaderPass } from "three/examples/jsm/postprocessing/ShaderPass.js";
 import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
-import { complete, describe, floatSupport, isApple, pickTarget, sceneLog, frameMeter } from "./gl";
+import { complete, describe, floatSupport, isApple, pickTarget, saveQuality, savedQuality, sceneLog, frameMeter } from "./gl";
 import { surfaceKit, withCavity } from "./surfaces";
 import { GradeShader, MAX_LIGHTS, bokehMaterial, hazeMaterial, rainMaterial, skyMaterial, wetFloor } from "./platform/shaders";
 import * as tx from "./platform/textures";
@@ -49,12 +49,13 @@ const POSTS = [-38, -54];
 const FLICKER = 3;
 
 /** Quality steps, dropped one at a time if the device can't keep up. */
+// The platform is a backdrop (behind the ticket machine, under a dark veil) whose camera
+// only breathes: 30 frames and a modest pixel count are all it needs.
 const QUALITY = [
-  { dpr: 1.5, reflect: 0.5, bloom: true, fps: 60 },
-  { dpr: 1.2, reflect: 0.4, bloom: true, fps: 60 },
-  { dpr: 1, reflect: 0.35, bloom: true, fps: 60 },
-  { dpr: 1, reflect: 0.35, bloom: false, fps: 30 },
-  { dpr: 0.75, reflect: 0.3, bloom: false, fps: 30 },
+  { dpr: 1.25, pixels: 1.4e6, reflect: 0.4, bloom: true, fps: 30 },
+  { dpr: 1, pixels: 1.0e6, reflect: 0.35, bloom: true, fps: 30 },
+  { dpr: 1, pixels: 0.8e6, reflect: 0.3, bloom: false, fps: 30 },
+  { dpr: 0.75, pixels: 0.5e6, reflect: 0.25, bloom: false, fps: 24 },
 ];
 
 const lin = (r: number, g: number, b: number) => new THREE.Color().setRGB(r, g, b);
@@ -673,12 +674,12 @@ export default function PlatformScene3D({ mood = "waiting", rain = true, station
       camera.layers.enable(1);
 
       // ------------------------------------------------------------------ loop
-      let level = 0;
+      let level = savedQuality("platform", QUALITY.length - 1);
       const resize = () => {
         const w = mount.clientWidth || 1;
         const h = mount.clientHeight || 1;
         const q = QUALITY[level];
-        const dpr = Math.min(window.devicePixelRatio || 1, q.dpr, Math.sqrt(2.4e6 / (w * h)));
+        const dpr = Math.min(window.devicePixelRatio || 1, q.dpr, Math.sqrt(q.pixels / (w * h)));
         renderer.setPixelRatio(dpr);
         renderer.setSize(w, h, false);
         composer.setPixelRatio(dpr);
@@ -833,6 +834,7 @@ export default function PlatformScene3D({ mood = "waiting", rain = true, station
             // Far too slow: drop two steps at once rather than stutter through each.
             level = Math.min(QUALITY.length - 1, level + (interval > 2 / 60 ? 2 : 1));
             log.set("quality", `step ${level}`);
+            saveQuality("platform", level);
             slowFor = 0;
             warm = 0;
             resize();

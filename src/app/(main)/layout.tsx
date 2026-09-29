@@ -6,6 +6,7 @@ import { TabBar } from "@/components/shell/TabBar";
 import { QuickAddButton, QuickAddSheet } from "@/components/quickadd/QuickAdd";
 import { GlossarySheet } from "@/components/help/Glossary";
 import { FeelSheet } from "@/components/quickadd/FeelSheet";
+import { ScenePrefetch } from "@/components/scene/Prefetch";
 
 export default function MainLayout({ children }: LayoutProps<"/">) {
   return (
@@ -18,6 +19,7 @@ export default function MainLayout({ children }: LayoutProps<"/">) {
       <NoticeToast />
       <GlossarySheet />
       <FeelSheet />
+      <ScenePrefetch />
     </DataGate>
   );
 }

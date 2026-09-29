@@ -579,7 +579,7 @@ export default function BoardingScene3D({ stage, carriage, car, stationName = ""
       const layout = () => {
         const w = mount.clientWidth || 1;
         const h = mount.clientHeight || 1;
-        const dpr = Math.min(window.devicePixelRatio || 1, QUALITY[level], Math.sqrt(2.4e6 / (w * h)));
+        const dpr = Math.min(window.devicePixelRatio || 1, QUALITY[level], Math.sqrt(1.8e6 / (w * h)));
         renderer.setPixelRatio(dpr);
         renderer.setSize(w, h, false);
         composer.setPixelRatio(dpr);

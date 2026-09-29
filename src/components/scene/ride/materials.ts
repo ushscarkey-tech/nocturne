@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { addGrain, cached, paintContext } from "../canvasCache";
 import { rng } from "./route";
 
 /**
@@ -400,7 +401,7 @@ export function poolMaterial(tex: THREE.Texture) {
 function tiling(size: number, draw: (g: CanvasRenderingContext2D, at: (fn: (dx: number, dy: number) => void) => void) => void) {
   const c = document.createElement("canvas");
   c.width = c.height = size;
-  const g = c.getContext("2d")!;
+  const g = paintContext(c);
   const at = (fn: (dx: number, dy: number) => void) => {
     for (const dx of [-size, 0, size]) for (const dy of [-size, 0, size]) fn(dx, dy);
   };
@@ -433,18 +434,10 @@ function blotches(g: CanvasRenderingContext2D, at: (fn: (dx: number, dy: number)
 }
 
 function grain(g: CanvasRenderingContext2D, size: number, amount: number, seed: number) {
-  const r = rng(seed);
-  const img = g.getImageData(0, 0, size, size);
-  for (let i = 0; i < img.data.length; i += 4) {
-    const n = (r() - 0.5) * amount;
-    img.data[i] += n;
-    img.data[i + 1] += n;
-    img.data[i + 2] += n;
-  }
-  g.putImageData(img, 0, 0);
+  addGrain(g, size, size, amount, rng(seed)());
 }
 
-export function grassTexture() {
+function grassTexturePaint() {
   return tiling(256, (g, at) => {
     g.fillStyle = "#56613f";
     g.fillRect(0, 0, 256, 256);
@@ -453,7 +446,7 @@ export function grassTexture() {
   });
 }
 
-export function fieldTexture() {
+function fieldTexturePaint() {
   // Paddies and dry fields in strips, the ridges between them paler.
   return tiling(256, (g, at) => {
     g.fillStyle = "#5f6242";
@@ -475,7 +468,7 @@ export function fieldTexture() {
   });
 }
 
-export function urbanTexture() {
+function urbanTexturePaint() {
   return tiling(256, (g, at) => {
     g.fillStyle = "#5c5b57";
     g.fillRect(0, 0, 256, 256);
@@ -497,7 +490,7 @@ export function urbanTexture() {
   });
 }
 
-export function gravelTexture() {
+function gravelTexturePaint() {
   return tiling(256, (g, at) => {
     g.fillStyle = "#5a5650";
     g.fillRect(0, 0, 256, 256);
@@ -512,7 +505,7 @@ export function gravelTexture() {
   });
 }
 
-export function roadTexture() {
+function roadTexturePaint() {
   // Asphalt with a broken centre line along its length (u runs along the road).
   return tiling(256, (g, at) => {
     g.fillStyle = "#3a3a3b";
@@ -528,7 +521,7 @@ export function roadTexture() {
 }
 
 /** Chain-link fence (alpha). */
-export function fenceTexture() {
+function fenceTexturePaint() {
   const c = document.createElement("canvas");
   c.width = 128;
   c.height = 64;
@@ -554,7 +547,7 @@ export function fenceTexture() {
 }
 
 /** Sound wall: ribbed concrete below, a band of clear panels above. */
-export function barrierTexture() {
+function barrierTexturePaint() {
   const c = document.createElement("canvas");
   c.width = 128;
   c.height = 256;
@@ -577,7 +570,7 @@ export function barrierTexture() {
   return c;
 }
 
-export function softDot() {
+function softDotPaint() {
   const c = document.createElement("canvas");
   c.width = c.height = 64;
   const g = c.getContext("2d")!;
@@ -589,3 +582,13 @@ export function softDot() {
   g.fillRect(0, 0, 64, 64);
   return c;
 }
+
+// Painted once per page (see canvasCache).
+export const grassTexture = cached("ride/grassTexture", grassTexturePaint);
+export const fieldTexture = cached("ride/fieldTexture", fieldTexturePaint);
+export const urbanTexture = cached("ride/urbanTexture", urbanTexturePaint);
+export const gravelTexture = cached("ride/gravelTexture", gravelTexturePaint);
+export const roadTexture = cached("ride/roadTexture", roadTexturePaint);
+export const fenceTexture = cached("ride/fenceTexture", fenceTexturePaint);
+export const barrierTexture = cached("ride/barrierTexture", barrierTexturePaint);
+export const softDot = cached("ride/softDot", softDotPaint);

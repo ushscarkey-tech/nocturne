@@ -1,10 +1,11 @@
+import { cached, paintContext } from "../canvasCache";
 import { seeded } from "../platform/textures";
 
 function canvas(w: number, h: number, draw: (g: CanvasRenderingContext2D, w: number, h: number) => void) {
   const c = document.createElement("canvas");
   c.width = w;
   c.height = h;
-  draw(c.getContext("2d")!, w, h);
+  draw(paintContext(c), w, h);
   return c;
 }
 
@@ -28,7 +29,7 @@ function blob(g: CanvasRenderingContext2D, x: number, y: number, rx: number, ry:
  * strip, the luggage rack, the windows across the aisle and the tops of the
  * seat backs with their white headrest covers. Tinted in the shader.
  */
-export function cabinReflection() {
+function cabinReflectionPaint() {
   return canvas(512, 512, (g, w, h) => {
     g.fillStyle = "#000";
     g.fillRect(0, 0, w, h);
@@ -57,7 +58,7 @@ export function cabinReflection() {
 }
 
 /** The carriage wall: moulded panel with a faint texture. */
-export function wallPanel() {
+function wallPanelPaint() {
   return canvas(256, 256, (g, w, h) => {
     g.fillStyle = "#b9b4a6";
     g.fillRect(0, 0, w, h);
@@ -71,7 +72,7 @@ export function wallPanel() {
 }
 
 /** A block of flats at night: a grid of windows, a few still lit. */
-export function flats(cols: number, rows: number, seed: number) {
+function flatsPaint(cols: number, rows: number, seed: number) {
   const rnd = seeded(seed);
   return canvas(cols * 16, rows * 16, (g, w, h) => {
     g.fillStyle = "#000";
@@ -94,7 +95,7 @@ export function flats(cols: number, rows: number, seed: number) {
  * tone-on-tone jacquard, the weave, the stitched heading, side hem and
  * weighted bottom hem, sun-fading up top and where hands take the edge.
  */
-export function curtainFabric() {
+function curtainFabricPaint() {
   return canvas(1024, 1024, (g, w, h) => {
     const rnd = seeded(417);
     g.fillStyle = "rgb(236,236,236)";
@@ -184,7 +185,7 @@ export function curtainFabric() {
  * screw at top and bottom, a faint roller texture and a few old scuffs.
  * One tile is 1.2 m wide (two panels).
  */
-export function creamPanel() {
+function creamPanelPaint() {
   return canvas(512, 512, (g, w, h) => {
     g.fillStyle = "#d8cbad";
     g.fillRect(0, 0, w, h);
@@ -233,7 +234,7 @@ export function creamPanel() {
 }
 
 /** Wood-grain laminate for the lower wall and the table: warm brown, long grain. */
-export function woodGrain(base = "#6b4a30", seed = 21) {
+function woodGrainPaint(base = "#6b4a30", seed = 21) {
   return canvas(512, 256, (g, w, h) => {
     g.fillStyle = base;
     g.fillRect(0, 0, w, h);
@@ -265,7 +266,7 @@ export function woodGrain(base = "#6b4a30", seed = 21) {
 }
 
 /** Seat moquette: a small woven check, faded where it's been sat on. */
-export function moquette(base = "#2f4a3a") {
+function moquettePaint(base = "#2f4a3a") {
   return canvas(128, 128, (g, w, h) => {
     g.fillStyle = base;
     g.fillRect(0, 0, w, h);
@@ -284,7 +285,7 @@ export function moquette(base = "#2f4a3a") {
 }
 
 /** The small engraved brass plate by the window: the car and seat. */
-export function plaque(line1: string, line2: string) {
+function plaquePaint(line1: string, line2: string) {
   return canvas(384, 144, (g, w, h) => {
     const grad = g.createLinearGradient(0, 0, w, h);
     grad.addColorStop(0, "#b8964f");
@@ -333,3 +334,13 @@ export function plaque(line1: string, line2: string) {
     }
   });
 }
+
+// Painted once per page (see canvasCache).
+export const cabinReflection = cached("cabin/cabinReflection", cabinReflectionPaint);
+export const wallPanel = cached("cabin/wallPanel", wallPanelPaint);
+export const flats = cached("cabin/flats", flatsPaint);
+export const curtainFabric = cached("cabin/curtainFabric", curtainFabricPaint);
+export const creamPanel = cached("cabin/creamPanel", creamPanelPaint);
+export const woodGrain = cached("cabin/woodGrain", woodGrainPaint);
+export const moquette = cached("cabin/moquette", moquettePaint);
+export const plaque = cached("cabin/plaque", plaquePaint);

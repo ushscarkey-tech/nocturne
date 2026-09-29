@@ -27,12 +27,12 @@ export function floatSupport(renderer: THREE.WebGLRenderer) {
  * The best frame buffer this device renders into. Multisampled half-float is
  * skipped on Apple, where it can report complete and still come out black.
  */
-export function pickTarget(renderer: THREE.WebGLRenderer, floatOK: boolean) {
+export function pickTarget(renderer: THREE.WebGLRenderer, floatOK: boolean, msaa = true) {
   const apple = isApple();
   const options: [THREE.TextureDataType, number][] = [
-    [THREE.HalfFloatType, apple ? 0 : 4],
+    [THREE.HalfFloatType, apple || !msaa ? 0 : 4],
     [THREE.HalfFloatType, 0],
-    [THREE.UnsignedByteType, 4],
+    [THREE.UnsignedByteType, msaa ? 4 : 0],
     [THREE.UnsignedByteType, 0],
   ];
   for (const [type, samples] of options) {
@@ -126,4 +126,29 @@ export function frameMeter(log: SceneLog, renderer: THREE.WebGLRenderer) {
       log.set("frame", `${ms.toFixed(1)} ms cpu (worst ${worst.toFixed(0)}), ${info.calls} draws, ${Math.round(info.triangles / 1000)}k tris`);
     }
   };
+}
+
+/**
+ * The quality step a scene last settled on, kept per device so the next visit
+ * starts there instead of stuttering down to it again.
+ */
+export function savedQuality(scene: string, max: number): number {
+  try {
+    const v = Number(window.localStorage.getItem(`nocturne:quality:${scene}`));
+    if (Number.isFinite(v) && v > 0) return Math.min(max, Math.floor(v));
+  } catch {
+    /* storage unavailable */
+  }
+  // First visit: phones and tablets, and machines with little memory, start a step down.
+  const nav = navigator as Navigator & { deviceMemory?: number };
+  const small = /iPhone|iPad|Android/.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && /Macintosh/.test(navigator.userAgent));
+  return Math.min(max, small || (nav.deviceMemory ?? 8) <= 4 ? 1 : 0);
+}
+
+export function saveQuality(scene: string, level: number) {
+  try {
+    window.localStorage.setItem(`nocturne:quality:${scene}`, String(level));
+  } catch {
+    /* storage unavailable */
+  }
 }

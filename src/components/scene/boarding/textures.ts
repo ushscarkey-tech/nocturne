@@ -1,3 +1,4 @@
+import { addGrain, cached, paintContext } from "../canvasCache";
 import { seeded } from "../platform/textures";
 
 /**
@@ -11,20 +12,12 @@ const canvas = (w: number, h: number) => {
   const c = document.createElement("canvas");
   c.width = w;
   c.height = h;
-  return { c, g: c.getContext("2d")! };
+  return { c, g: paintContext(c) };
 };
 
 /** Fine per-pixel noise, `amount` in 0…255 levels. */
 function grain(g: CanvasRenderingContext2D, w: number, h: number, amount: number, seed: number) {
-  const rnd = seeded(seed);
-  const img = g.getImageData(0, 0, w, h);
-  for (let i = 0; i < img.data.length; i += 4) {
-    const n = (rnd() - 0.5) * amount;
-    img.data[i] += n;
-    img.data[i + 1] += n;
-    img.data[i + 2] += n;
-  }
-  g.putImageData(img, 0, 0);
+  addGrain(g, w, h, amount, seeded(seed)());
 }
 
 /** Soft blotches of a colour, for grime and wear. */
@@ -46,7 +39,7 @@ function blotches(g: CanvasRenderingContext2D, rnd: () => number, n: number, col
  * Train seat moquette: a small interlocking motif in three tones of the
  * carriage colour, woven tight, with the pile's fleck.
  */
-export function moquette(base: [number, number, number], seed = 3) {
+function moquettePaint(base: [number, number, number], seed = 3) {
   const S = 256;
   const { c, g } = canvas(S, S);
   const tone = (k: number, a = 1) => `rgba(${Math.round(base[0] * k)},${Math.round(base[1] * k)},${Math.round(base[2] * k)},${a})`;
@@ -91,7 +84,7 @@ export function moquette(base: [number, number, number], seed = 3) {
 }
 
 /** Vinyl floor, speckled, worn pale along the aisle and scuffed; grime at the walls. */
-export function floor(seed = 11) {
+function floorPaint(seed = 11) {
   const W = 1024;
   const H = 256;
   const rnd = seeded(seed);
@@ -142,7 +135,7 @@ export function floor(seed = 11) {
  * Wall lining panels: warm off-white, a seam every panel, grubby toward the
  * floor and where hands go, a few scuffs from bags.
  */
-export function lining(seed = 5) {
+function liningPaint(seed = 5) {
   const W = 1024;
   const H = 512;
   const rnd = seeded(seed);
@@ -190,7 +183,7 @@ export function lining(seed = 5) {
  * rain streaks running down from the windows, brake dust and road dirt
  * thrown up along the bottom, faint panel joints.
  */
-export function bodyPaint(windows: number[], span: [number, number], seed = 9) {
+function bodyPaintPaint(windows: number[], span: [number, number], seed = 9) {
   const W = 2048;
   const H = 512;
   const rnd = seeded(seed);
@@ -234,7 +227,7 @@ export function bodyPaint(windows: number[], span: [number, number], seed = 9) {
 }
 
 /** Platform slabs: joints, stains, the odd blackened gum. */
-export function slabs(seed = 13) {
+function slabsPaint(seed = 13) {
   const S = 512;
   const rnd = seeded(seed);
   const { c, g } = canvas(S, S);
@@ -260,7 +253,7 @@ export function slabs(seed = 13) {
 }
 
 /** Tactile paving: yellow, raised dots, worn dull where people stand. Also its bump map. */
-export function tactile(bump = false, seed = 17) {
+function tactilePaint(bump = false, seed = 17) {
   const W = 512;
   const H = 64;
   const rnd = seeded(seed);
@@ -282,3 +275,11 @@ export function tactile(bump = false, seed = 17) {
   }
   return c;
 }
+
+// Painted once per page (see canvasCache).
+export const moquette = cached("boarding/moquette", moquettePaint);
+export const floor = cached("boarding/floor", floorPaint);
+export const lining = cached("boarding/lining", liningPaint);
+export const bodyPaint = cached("boarding/bodyPaint", bodyPaintPaint);
+export const slabs = cached("boarding/slabs", slabsPaint);
+export const tactile = cached("boarding/tactile", tactilePaint);

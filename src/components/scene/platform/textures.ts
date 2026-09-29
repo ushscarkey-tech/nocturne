@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { addGrain, cached, paintContext } from "../canvasCache";
 
 type Draw = (g: CanvasRenderingContext2D, w: number, h: number) => void;
 
@@ -6,7 +7,7 @@ function canvas(w: number, h: number, draw: Draw) {
   const c = document.createElement("canvas");
   c.width = w;
   c.height = h;
-  draw(c.getContext("2d")!, w, h);
+  draw(paintContext(c), w, h);
   return c;
 }
 
@@ -31,14 +32,7 @@ export function seeded(seed = 7) {
 }
 
 function grain(g: CanvasRenderingContext2D, w: number, h: number, amount: number, rnd: () => number) {
-  const img = g.getImageData(0, 0, w, h);
-  for (let i = 0; i < img.data.length; i += 4) {
-    const n = (rnd() - 0.5) * amount;
-    img.data[i] += n;
-    img.data[i + 1] += n;
-    img.data[i + 2] += n;
-  }
-  g.putImageData(img, 0, 0);
+  addGrain(g, w, h, amount, rnd());
 }
 
 function blotches(g: CanvasRenderingContext2D, w: number, h: number, color: string, count: number, rnd: () => number, alpha = 0.08, size = 60) {
@@ -53,7 +47,7 @@ function blotches(g: CanvasRenderingContext2D, w: number, h: number, color: stri
 }
 
 /** Platform concrete: slabs, joints, old stains. One tile is 2.6 m square. */
-export function concrete() {
+function concretePaint() {
   const rnd = seeded(11);
   return canvas(512, 512, (g, w, h) => {
     g.fillStyle = "#5b5a55";
@@ -76,7 +70,7 @@ export function concrete() {
   });
 }
 
-export function gravel() {
+function gravelPaint() {
   const rnd = seeded(23);
   return canvas(256, 256, (g, w, h) => {
     g.fillStyle = "#34332f";
@@ -91,7 +85,7 @@ export function gravel() {
   });
 }
 
-export function grass() {
+function grassPaint() {
   const rnd = seeded(5);
   return canvas(256, 256, (g, w, h) => {
     g.fillStyle = "#18221a";
@@ -103,7 +97,7 @@ export function grass() {
 }
 
 /** Corrugated roof sheet seen from below; ribs run across the platform. */
-export function roofSheet() {
+function roofSheetPaint() {
   return canvas(64, 64, (g, w, h) => {
     const grad = g.createLinearGradient(0, 0, 0, h);
     grad.addColorStop(0, "#5d5f59");
@@ -117,7 +111,7 @@ export function roofSheet() {
 }
 
 /** Painted vertical boards on the station building. */
-export function woodWall() {
+function woodWallPaint() {
   const rnd = seeded(31);
   return canvas(512, 512, (g, w, h) => {
     g.fillStyle = "#8d887a";
@@ -138,7 +132,7 @@ export function woodWall() {
 }
 
 /** A lit window, frosted in its lower half. */
-export function windowGlow() {
+function windowGlowPaint() {
   const rnd = seeded(41);
   return canvas(256, 256, (g, w, h) => {
     const grad = g.createRadialGradient(w * 0.45, h * 0.3, 10, w * 0.5, h * 0.5, w * 0.8);
@@ -180,7 +174,7 @@ export function windowGlow() {
 }
 
 /** Front of a vending machine: lit rows of bottles, price buttons, coin panel. */
-export function vendingFace(body: string, seed: number) {
+function vendingFacePaint(body: string, seed: number) {
   const rnd = seeded(seed);
   return canvas(256, 512, (g, w, h) => {
     g.fillStyle = body;
@@ -303,7 +297,7 @@ export function clockCanvas() {
 }
 
 /** Posters on the building wall: a sea at dusk and a mountain line. */
-export function poster(kind: 0 | 1) {
+function posterPaint(kind: 0 | 1) {
   const rnd = seeded(51 + kind);
   return canvas(128, 180, (g, w, h) => {
     const sky = g.createLinearGradient(0, 0, 0, h);
@@ -337,7 +331,7 @@ export function poster(kind: 0 | 1) {
 }
 
 /** A row of cedars, drawn as a soft-edged silhouette mask (white on clear). */
-export function treeline(seed: number) {
+function treelinePaint(seed: number) {
   const rnd = seeded(seed);
   return canvas(1024, 256, (g, w, h) => {
     g.fillStyle = "#fff";
@@ -368,7 +362,7 @@ export function treeline(seed: number) {
 }
 
 /** Low shrubs behind the fence. */
-export function shrubs(seed: number) {
+function shrubsPaint(seed: number) {
   const rnd = seeded(seed);
   return canvas(512, 128, (g, w, h) => {
     g.fillStyle = "#fff";
@@ -382,7 +376,7 @@ export function shrubs(seed: number) {
 }
 
 /** A radial falloff used for soft glows and contact shadows. */
-export function softDot() {
+function softDotPaint() {
   return canvas(128, 128, (g, w) => {
     const grad = g.createRadialGradient(w / 2, w / 2, 0, w / 2, w / 2, w / 2);
     grad.addColorStop(0, "rgba(255,255,255,1)");
@@ -410,3 +404,16 @@ export function pageFonts() {
     mono: probe("font-mono") || "ui-monospace, Menlo, monospace",
   };
 }
+
+// Painted once per page (see canvasCache).
+export const concrete = cached("platform/concrete", concretePaint);
+export const gravel = cached("platform/gravel", gravelPaint);
+export const grass = cached("platform/grass", grassPaint);
+export const roofSheet = cached("platform/roofSheet", roofSheetPaint);
+export const woodWall = cached("platform/woodWall", woodWallPaint);
+export const windowGlow = cached("platform/windowGlow", windowGlowPaint);
+export const vendingFace = cached("platform/vendingFace", vendingFacePaint);
+export const poster = cached("platform/poster", posterPaint);
+export const treeline = cached("platform/treeline", treelinePaint);
+export const shrubs = cached("platform/shrubs", shrubsPaint);
+export const softDot = cached("platform/softDot", softDotPaint);

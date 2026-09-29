@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { addGrain, cached, paintContext } from "./canvasCache";
 import { seeded } from "./platform/textures";
 
 /**
@@ -10,6 +11,8 @@ import { seeded } from "./platform/textures";
 export type Relief = "concrete" | "gravel" | "boards" | "wood" | "plaster" | "asphalt" | "brushed" | "fabric" | "rough" | "ribs";
 
 const BASE = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
+// Keep loaded relief images for the page's lifetime: the walk and the ride use the same ones.
+THREE.Cache.enabled = true;
 
 export function surfaceKit(track: <T extends { dispose(): void }>(x: T) => T) {
   const loader = new THREE.TextureLoader();
@@ -58,35 +61,7 @@ export function surfaceKit(track: <T extends { dispose(): void }>(x: T) => T) {
 
   /** Grey roughness: mostly `base`, with blotches that are smoother or rougher. */
   const roughness = (base: number, spread: number, seed: number, repeat: [number, number]) => {
-    const rnd = seeded(seed);
-    const c = document.createElement("canvas");
-    c.width = c.height = 256;
-    const g = c.getContext("2d")!;
-    const v = (x: number) => Math.round(Math.max(0, Math.min(1, x)) * 255);
-    g.fillStyle = `rgb(${v(base)},${v(base)},${v(base)})`;
-    g.fillRect(0, 0, 256, 256);
-    for (let i = 0; i < 90; i++) {
-      const r = base + (rnd() - 0.5) * 2 * spread;
-      const grad = g.createRadialGradient(0, 0, 0, 0, 0, 1);
-      grad.addColorStop(0, `rgba(${v(r)},${v(r)},${v(r)},0.5)`);
-      grad.addColorStop(1, `rgba(${v(r)},${v(r)},${v(r)},0)`);
-      g.save();
-      g.translate(rnd() * 256, rnd() * 256);
-      g.scale(10 + rnd() * 50, 8 + rnd() * 40);
-      g.fillStyle = grad;
-      g.beginPath();
-      g.arc(0, 0, 1, 0, Math.PI * 2);
-      g.fill();
-      g.restore();
-    }
-    const img = g.getImageData(0, 0, 256, 256);
-    for (let i = 0; i < img.data.length; i += 4) {
-      const n = (rnd() - 0.5) * spread * 90;
-      img.data[i] += n;
-      img.data[i + 1] += n;
-      img.data[i + 2] += n;
-    }
-    g.putImageData(img, 0, 0);
+    const c = roughnessCanvas(base, spread, seed);
     const t = track(new THREE.CanvasTexture(c));
     t.wrapS = t.wrapT = THREE.RepeatWrapping;
     t.colorSpace = THREE.NoColorSpace;
@@ -118,3 +93,30 @@ export function withCavity<T extends THREE.MeshStandardMaterial>(material: T, am
   material.customProgramCacheKey = () => "nocturne-cavity";
   return material;
 }
+
+/** The picture behind a roughness map: painted once per page for each look (see canvasCache). */
+const roughnessCanvas = cached("surfaces/roughness", (base: number, spread: number, seed: number) => {
+  const rnd = seeded(seed);
+  const c = document.createElement("canvas");
+  c.width = c.height = 256;
+  const g = paintContext(c);
+  const v = (x: number) => Math.round(Math.max(0, Math.min(1, x)) * 255);
+  g.fillStyle = `rgb(${v(base)},${v(base)},${v(base)})`;
+  g.fillRect(0, 0, 256, 256);
+  for (let i = 0; i < 90; i++) {
+    const r = base + (rnd() - 0.5) * 2 * spread;
+    const grad = g.createRadialGradient(0, 0, 0, 0, 0, 1);
+    grad.addColorStop(0, `rgba(${v(r)},${v(r)},${v(r)},0.5)`);
+    grad.addColorStop(1, `rgba(${v(r)},${v(r)},${v(r)},0)`);
+    g.save();
+    g.translate(rnd() * 256, rnd() * 256);
+    g.scale(10 + rnd() * 50, 8 + rnd() * 40);
+    g.fillStyle = grad;
+    g.beginPath();
+    g.arc(0, 0, 1, 0, Math.PI * 2);
+    g.fill();
+    g.restore();
+  }
+  addGrain(g, 256, 256, spread * 90, rnd());
+  return c;
+});
