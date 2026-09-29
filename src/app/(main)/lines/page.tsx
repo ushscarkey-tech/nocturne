@@ -52,7 +52,7 @@ export default function LinesPage() {
             <li key={line.id}>
               <Link
                 href={lineHref(line.id)}
-                className="group block lg:h-full lg:rounded-2xl lg:border lg:border-rule-soft lg:bg-night-850/40 lg:p-7 lg:transition-colors lg:hover:border-rule"
+                className="group block lg:h-full lg:rounded-[4px] lg:border lg:border-rule-soft lg:bg-night-850/40 lg:p-7 lg:transition-colors lg:hover:border-rule"
               >
                 <div className="flex items-baseline justify-between gap-4">
                   <h2 className="font-mono text-sm tracking-[0.25em] text-paper transition-colors group-hover:text-lamp">

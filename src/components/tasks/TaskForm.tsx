@@ -115,7 +115,7 @@ export function TaskForm({
                 type="button"
                 onClick={() => set("deadline", q.value)}
                 aria-pressed={active}
-                className={`rounded-full border px-3.5 py-1.5 text-sm transition-colors duration-500 ${
+                className={`rounded-[3px] border px-3.5 py-1.5 text-sm transition-colors duration-500 ${
                   active ? "border-lamp/60 text-paper" : "border-rule text-mist hover:text-paper"
                 }`}
               >
@@ -146,7 +146,7 @@ export function TaskForm({
                 key={m}
                 type="button"
                 onClick={() => set("estimatedMinutes", m)}
-                className={`rounded-full px-2.5 py-1 font-mono text-xs transition-colors ${
+                className={`rounded-[3px] px-2.5 py-1 font-mono text-xs transition-colors ${
                   d.estimatedMinutes === m ? "text-lamp" : "text-haze hover:text-mist"
                 }`}
               >
@@ -216,7 +216,7 @@ export function TaskForm({
                         k === "none" ? null : k === "daily" ? { freq: "daily" } : { freq: "weekly", days: weeklyDays.length ? weeklyDays : [dayOfWeek(today)] };
                       set("recurrence", next);
                     }}
-                    className={`rounded-full border px-3.5 py-1.5 text-sm transition-colors ${
+                    className={`rounded-[3px] border px-3.5 py-1.5 text-sm transition-colors ${
                       recurrenceKind === k ? "border-lamp/60 text-paper" : "border-rule text-mist hover:text-paper"
                     }`}
                   >

@@ -101,7 +101,7 @@ export default function RoutePage() {
         )}
 
         {(summary.departure || (!nightOver && summary.next)) && (
-          <aside className="mt-10 lg:sticky lg:top-16 lg:rounded-2xl lg:border lg:border-rule-soft lg:bg-night-850/50 lg:p-7">
+          <aside className="mt-10 lg:sticky lg:top-16 lg:rounded-[4px] lg:border lg:border-rule-soft lg:bg-night-850/50 lg:p-7">
             {summary.departure && summary.arrival && (
               <div className="hidden lg:block">
                 <p className="font-mono text-[2.5rem] font-extralight leading-none tabular text-lamp">

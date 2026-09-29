@@ -99,7 +99,7 @@ export default function ServicePage() {
                         onClick={() =>
                           setEditor({ mode: "weekly", window: w, days: [day] })
                         }
-                        className={`min-h-9 rounded-full border px-3 py-1.5 font-mono text-xs tabular transition-colors ${
+                        className={`min-h-9 rounded-[3px] border px-3 py-1.5 font-mono text-xs tabular transition-colors ${
                           w.enabled
                             ? "border-rule text-paper hover:border-mist/50"
                             : "border-rule-soft text-haze line-through"
@@ -118,7 +118,7 @@ export default function ServicePage() {
                   <button
                     type="button"
                     onClick={() => setEditor({ mode: "weekly", days: [day] })}
-                    className="-mr-2 flex h-11 w-11 items-center justify-center rounded-full text-haze hover:text-paper"
+                    className="-mr-2 flex h-11 w-11 items-center justify-center rounded-[3px] text-haze hover:text-paper"
                     aria-label={t("service.addWindowOnDay", {
                       day: fmt.weekdayOf(day),
                     })}
@@ -132,7 +132,7 @@ export default function ServicePage() {
         </section>
 
         <section
-          className="mt-12 lg:rounded-2xl lg:border lg:border-rule-soft lg:bg-night-850/40 lg:p-6"
+          className="mt-12 lg:rounded-[4px] lg:border lg:border-rule-soft lg:bg-night-850/40 lg:p-6"
           aria-labelledby="exceptions-title"
         >
           <h2 id="exceptions-title" className="eyebrow">

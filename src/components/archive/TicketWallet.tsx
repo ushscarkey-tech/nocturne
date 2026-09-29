@@ -88,7 +88,7 @@ export function TicketWallet({ months }: { months: WalletMonth[] }) {
           onClick={() => go(active - 1)}
           disabled={active === 0}
           aria-label={t("archive.newerMonth")}
-          className="-ml-3 flex h-11 w-11 items-center justify-center rounded-full text-mist transition-opacity duration-500 hover:text-paper disabled:opacity-25"
+          className="-ml-3 flex h-11 w-11 items-center justify-center rounded-[3px] text-mist transition-opacity duration-500 hover:text-paper disabled:opacity-25"
         >
           <Icon name="back" size={18} />
         </button>
@@ -103,7 +103,7 @@ export function TicketWallet({ months }: { months: WalletMonth[] }) {
           onClick={() => go(active + 1)}
           disabled={active === months.length - 1}
           aria-label={t("archive.olderMonth")}
-          className="-mr-3 flex h-11 w-11 items-center justify-center rounded-full text-mist transition-opacity duration-500 hover:text-paper disabled:opacity-25"
+          className="-mr-3 flex h-11 w-11 items-center justify-center rounded-[3px] text-mist transition-opacity duration-500 hover:text-paper disabled:opacity-25"
         >
           <Icon name="chevron" size={18} />
         </button>

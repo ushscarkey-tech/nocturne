@@ -86,7 +86,7 @@ export default function ArchivePage() {
             <button
               type="button"
               onClick={() => setStatsOpen(true)}
-              className="flex h-11 items-center gap-3 rounded-full border border-rule px-5 text-sm text-mist transition-colors duration-500 ease-[var(--ease-glide)] hover:border-mist/50 hover:text-paper"
+              className="flex h-11 items-center gap-3 rounded-[3px] border border-rule px-5 text-sm text-mist transition-colors duration-500 ease-[var(--ease-glide)] hover:border-mist/50 hover:text-paper"
             >
               <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" aria-hidden>
                 <path
@@ -106,7 +106,7 @@ export default function ArchivePage() {
         </div>
 
         <section
-          className="hidden lg:mt-10 lg:block lg:rounded-2xl lg:border lg:border-rule-soft lg:bg-night-850/40 lg:p-8"
+          className="hidden lg:mt-10 lg:block lg:rounded-[4px] lg:border lg:border-rule-soft lg:bg-night-850/40 lg:p-8"
           aria-label={t("archive.statistics")}
         >
           <h2 className="eyebrow mb-6">{t("archive.statistics")}</h2>

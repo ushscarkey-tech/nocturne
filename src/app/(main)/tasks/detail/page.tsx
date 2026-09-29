@@ -190,7 +190,7 @@ function TaskDetail() {
         <aside className="lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:pt-8">
           {task.status === "active" && (
             <section
-              className="mt-12 lg:mt-0 lg:rounded-2xl lg:border lg:border-rule-soft lg:bg-night-850/40 lg:p-6"
+              className="mt-12 lg:mt-0 lg:rounded-[4px] lg:border lg:border-rule-soft lg:bg-night-850/40 lg:p-6"
               aria-labelledby="schedule-title"
             >
               <h2 id="schedule-title" className="eyebrow">
@@ -251,7 +251,7 @@ function TaskDetail() {
 
           {history.length > 0 && (
             <section
-              className="mt-12 lg:mt-6 lg:rounded-2xl lg:border lg:border-rule-soft lg:bg-night-850/40 lg:p-6"
+              className="mt-12 lg:mt-6 lg:rounded-[4px] lg:border lg:border-rule-soft lg:bg-night-850/40 lg:p-6"
               aria-labelledby="history-title"
             >
               <h2 id="history-title" className="eyebrow">

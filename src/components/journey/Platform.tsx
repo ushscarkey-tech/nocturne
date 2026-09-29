@@ -45,7 +45,7 @@ function TopBar({ now, journey }: { now: Date; journey: Journey }) {
       </span>
       <div className="flex items-center gap-1">
         <SoundControl carriage={journey.selectedCarriage} />
-        <Link href="/" className="rounded-full p-2 text-mist hover:text-paper" aria-label={t("common.back")}>
+        <Link href="/" className="rounded-[3px] p-2 text-mist hover:text-paper" aria-label={t("common.back")}>
           <Icon name="close" size={18} />
         </Link>
       </div>
@@ -112,7 +112,7 @@ function EnergyRow({ value, onChange }: { value: FocusLevel; onChange: (v: Focus
             role="radio"
             aria-checked={value === f}
             onClick={() => onChange(f)}
-            className={`min-h-9 rounded-full border px-3 text-xs transition-colors duration-500 ${
+            className={`min-h-9 rounded-[3px] border px-3 text-xs transition-colors duration-500 ${
               value === f ? "border-lamp/50 text-paper" : "border-rule text-mist hover:text-paper"
             }`}
           >

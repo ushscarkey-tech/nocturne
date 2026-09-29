@@ -45,7 +45,7 @@ export function FinalStation({ data, journey, now, arriving = false }: { data: N
   return (
     <div className="flex h-dvh flex-col overflow-hidden px-6 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-[max(0.75rem,env(safe-area-inset-top))]">
       <header className="flex h-11 items-center justify-end">
-        <Link href="/" className="rounded-full p-2 text-mist hover:text-paper" aria-label={t("common.back")}>
+        <Link href="/" className="rounded-[3px] p-2 text-mist hover:text-paper" aria-label={t("common.back")}>
           <Icon name="close" size={18} />
         </Link>
       </header>

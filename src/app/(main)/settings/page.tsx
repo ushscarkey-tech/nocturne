@@ -89,7 +89,7 @@ export default function SettingsPage() {
                     rememberLocale(l.id);
                     updateProfile({ locale: l.id });
                   }}
-                  className={`min-h-11 rounded-xl border px-4 text-left text-sm transition-colors ${
+                  className={`min-h-11 rounded-[4px] border px-4 text-left text-sm transition-colors ${
                     p.locale === l.id
                       ? "border-lamp/60 text-paper"
                       : "border-rule text-mist hover:text-paper"
@@ -115,7 +115,7 @@ export default function SettingsPage() {
                   role="radio"
                   aria-checked={p.preferredCarriage === c}
                   onClick={() => updateProfile({ preferredCarriage: c })}
-                  className={`min-h-11 rounded-xl border px-4 text-left text-sm transition-colors ${
+                  className={`min-h-11 rounded-[4px] border px-4 text-left text-sm transition-colors ${
                     p.preferredCarriage === c
                       ? "border-lamp/60 text-paper"
                       : "border-rule text-mist hover:text-paper"
@@ -325,7 +325,7 @@ function InstallApp() {
     manual: "settings.installOther",
   };
   return (
-    <div className="mt-8 rounded-2xl border border-rule-soft p-4">
+    <div className="mt-8 rounded-[4px] border border-rule-soft p-4">
       <p className="eyebrow">{t("settings.install")}</p>
       <p className="mt-2 text-sm leading-relaxed text-mist">
         {t("settings.installBody")}
@@ -356,7 +356,7 @@ function ClaudeConnector() {
   const [copied, setCopied] = useState(false);
   const url = `${MCP_URL}/mcp`;
   return (
-    <div className="mt-8 rounded-2xl border border-rule-soft p-4">
+    <div className="mt-8 rounded-[4px] border border-rule-soft p-4">
       <p className="eyebrow">{t("settings.claude")}</p>
       <p className="mt-2 text-sm leading-relaxed text-mist">
         {t("settings.claudeBody")}

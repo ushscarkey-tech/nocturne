@@ -44,7 +44,7 @@ export function Sheet({
       className={`m-0 mt-auto w-full max-w-none max-h-[92dvh] overflow-y-auto overscroll-contain bg-transparent p-0 text-paper sm:m-auto sm:max-h-[86dvh] ${wide ? "sm:max-w-2xl" : "sm:max-w-lg"}`}
     >
       {open && (
-        <div className="animate-sheet overflow-y-auto rounded-t-3xl border border-rule bg-night-850 px-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-5 sm:rounded-3xl sm:px-8 sm:pb-8">
+        <div className="animate-sheet overflow-y-auto rounded-t-[6px] border border-rule bg-night-850 px-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-5 sm:rounded-[6px] sm:px-8 sm:pb-8">
           <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-rule sm:hidden" aria-hidden />
           <div className="mb-6 flex items-start justify-between gap-4">
             <div>
@@ -54,7 +54,7 @@ export function Sheet({
             <button
               type="button"
               onClick={onClose}
-              className="-mr-3 flex h-11 w-11 items-center justify-center rounded-full text-mist transition-colors hover:text-paper"
+              className="-mr-3 flex h-11 w-11 items-center justify-center rounded-[3px] text-mist transition-colors hover:text-paper"
               aria-label={t("shell.close")}
             >
               <Icon name="close" />

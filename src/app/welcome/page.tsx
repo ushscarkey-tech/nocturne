@@ -88,7 +88,7 @@ export default function WelcomePage() {
                       rememberLocale(l.id);
                       updateProfile({ locale: l.id });
                     }}
-                    className={`min-h-12 rounded-xl border px-4 text-left transition-colors ${locale === l.id ? "border-lamp/60 text-paper" : "border-rule text-mist hover:text-paper"}`}
+                    className={`min-h-12 rounded-[4px] border px-4 text-left transition-colors ${locale === l.id ? "border-lamp/60 text-paper" : "border-rule text-mist hover:text-paper"}`}
                   >
                     {l.name}
                   </button>
@@ -105,7 +105,7 @@ export default function WelcomePage() {
                 <span className="absolute bottom-3 left-[0.3rem] top-3 w-px bg-paper/15" aria-hidden />
                 {(["1", "2", "3"] as const).map((n, i) => (
                   <li key={n} className="relative flex animate-enter gap-4 pl-0" style={{ animationDelay: `${250 + i * 220}ms` }}>
-                    <span className={`relative mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full border ${i === 2 ? "border-lamp bg-lamp shadow-[0_0_10px_rgba(224,176,104,0.5)]" : "border-paper/60 bg-night-900"}`} aria-hidden />
+                    <span className={`relative mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full border ${i === 2 ? "border-lamp bg-lamp shadow-[0_0_0_3px_rgba(224,176,104,0.16)]" : "border-paper/60 bg-night-900"}`} aria-hidden />
                     <span>
                       <span className="block text-paper">{t(`onboarding.how${n}` as MessageKey)}</span>
                       <span className="mt-0.5 block text-sm leading-relaxed text-mist">{t(`onboarding.how${n}d` as MessageKey)}</span>
@@ -155,7 +155,7 @@ export default function WelcomePage() {
                       type="button"
                       aria-pressed={everyDay === all}
                       onClick={() => setEveryDay(all)}
-                      className={`min-h-10 rounded-full border px-4 text-sm ${everyDay === all ? "border-lamp/60 text-paper" : "border-rule text-mist"}`}
+                      className={`min-h-10 rounded-[3px] border px-4 text-sm ${everyDay === all ? "border-lamp/60 text-paper" : "border-rule text-mist"}`}
                     >
                       {all ? t("onboarding.everyDay") : t("onboarding.weekdays")}
                     </button>

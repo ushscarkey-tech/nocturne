@@ -6,14 +6,14 @@
  * warm fluorescent light, cream text and one restrained lamp-amber accent.
  * ------------------------------------------------------------------------- */
 @theme {
-  /* Black-blue night, a late local train's green seats, warm lamps. */
-  --color-night-950: #04060a;
-  --color-night-900: #070a10;
-  --color-night-850: #0b1017;
-  --color-night-800: #10171f;
-  --color-night-700: #18212a;
-  --color-rule: #1f2a30;
-  --color-rule-soft: #151d23;
+  /* An old night train: navy paint, dark green seats, beige panels, warm lamps. */
+  --color-night-950: #05080e;
+  --color-night-900: #080c14;
+  --color-night-850: #0c121c;
+  --color-night-800: #111925;
+  --color-night-700: #19222f;
+  --color-rule: #222d38;
+  --color-rule-soft: #161f29;
   --color-paper: #efe6d3;
   --color-paper-dim: #cdc3ae;
   --color-mist: #8f978f;

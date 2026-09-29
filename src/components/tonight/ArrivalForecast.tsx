@@ -50,7 +50,7 @@ export function ArrivalSheet({
     <Sheet open={open} onClose={onClose} title={t("scene.arrival.title")} eyebrow={t("scene.arrival.eyebrow")}>
       <p className="text-sm leading-relaxed text-mist">{t("scene.arrival.intro")}</p>
       {summary.neededMinutes > 0 && (
-        <dl className="mt-5 grid grid-cols-3 gap-3 rounded-xl border border-rule px-4 py-3 font-mono tabular">
+        <dl className="mt-5 grid grid-cols-3 gap-3 rounded-[4px] border border-rule px-4 py-3 font-mono tabular">
           <Figure label={t("scene.arrival.needed")} value={fmt.duration(summary.neededMinutes)} />
           <Figure label={t("scene.arrival.available")} value={fmt.duration(summary.availableMinutes)} />
           <Figure label={t("scene.arrival.spare")} value={spare >= 0 ? fmt.duration(spare) : `−${fmt.duration(-spare)}`} tone={spare >= 0 ? "ok" : "late"} />

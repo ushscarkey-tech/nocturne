@@ -94,13 +94,13 @@ export function Coach({ steps, delayMs = 2600 }: { steps: CoachStep[]; delayMs?:
     <div className="fixed inset-0 z-50 animate-fade" role="dialog" aria-modal="true" aria-label={step.title}>
       {/* The spotlight: everything else dims. */}
       <div
-        className="pointer-events-none absolute rounded-2xl border border-lamp/40 shadow-[0_0_0_200vmax_rgba(3,5,10,0.74)] transition-[top,left,width,height] duration-700 ease-[var(--ease-glide)]"
+        className="pointer-events-none absolute rounded-[4px] border border-lamp/40 shadow-[0_0_0_200vmax_rgba(3,5,10,0.74)] transition-[top,left,width,height] duration-700 ease-[var(--ease-glide)]"
         style={rect}
         aria-hidden
       />
       <div
         key={i}
-        className="absolute inset-x-4 mx-auto max-w-sm animate-enter rounded-2xl border border-rule bg-night-850 px-5 py-4 shadow-[0_20px_60px_-20px_rgba(0,0,0,0.9)]"
+        className="absolute inset-x-4 mx-auto max-w-sm animate-enter rounded-[4px] border border-rule bg-night-850 px-5 py-4 shadow-[0_20px_60px_-20px_rgba(0,0,0,0.9)]"
         style={below ? { top: rect.top + rect.height + 14 } : { top: Math.max(16, rect.top - 14 - 200) }}
       >
         <p className="font-mono text-[0.625rem] tracking-[0.22em] text-lamp/90">{t("scene.coachStep", { n: i + 1, total: steps.length })}</p>

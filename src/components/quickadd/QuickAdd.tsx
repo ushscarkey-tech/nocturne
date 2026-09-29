@@ -38,7 +38,7 @@ export function QuickAddButton() {
       type="button"
       onClick={() => show()}
       aria-label={t("quickadd.open")}
-      className="fixed bottom-[calc(5.25rem+env(safe-area-inset-bottom))] right-5 z-30 flex h-13 w-13 items-center justify-center rounded-full border border-rule bg-night-850/90 text-paper shadow-[0_12px_30px_-12px_rgba(0,0,0,0.9)] backdrop-blur transition-colors duration-500 hover:border-lamp/50 md:right-8 lg:hidden"
+      className="fixed bottom-[calc(5.25rem+env(safe-area-inset-bottom))] right-5 z-30 flex h-13 w-13 items-center justify-center rounded-[4px] border border-rule bg-night-850/90 text-paper shadow-[0_12px_30px_-12px_rgba(0,0,0,0.9)] backdrop-blur transition-colors duration-500 hover:border-lamp/50 md:right-8 lg:hidden"
     >
       <Icon name="plus" size={20} />
     </button>
@@ -342,7 +342,7 @@ export function QuickAddBody({ initialText, onDone, askFeel = true }: { initialT
                 </button>
                 {editing === r.field && <div className="animate-rise pb-3 pt-1">{r.editor}</div>}
                 {r.field === "estimate" && calibration && v.estimatedMinutes && (
-                  <div className="mb-2 animate-rise rounded-xl border border-rule-soft px-4 py-3">
+                  <div className="mb-2 animate-rise rounded-[4px] border border-rule-soft px-4 py-3">
                     <p className="text-sm text-paper-dim">
                       {calibration.ratio > 1
                         ? t("quickadd.calibrationLonger", { task: calibration.example })
@@ -402,7 +402,7 @@ function Chip({ active, onClick, children }: { active: boolean; onClick: () => v
       type="button"
       aria-pressed={active}
       onClick={onClick}
-      className={`min-h-9 rounded-full border px-3 text-xs transition-colors ${active ? "border-lamp/60 text-paper" : "border-rule text-mist hover:text-paper"}`}
+      className={`min-h-9 rounded-[3px] border px-3 text-xs transition-colors ${active ? "border-lamp/60 text-paper" : "border-rule text-mist hover:text-paper"}`}
     >
       {children}
     </button>
@@ -410,5 +410,5 @@ function Chip({ active, onClick, children }: { active: boolean; onClick: () => v
 }
 
 function UnsureMark({ label }: { label: string }) {
-  return <span className="ml-2 rounded-full border border-lamp/40 px-1.5 py-0.5 align-middle font-mono text-[0.625rem] text-lamp/90">{label}</span>;
+  return <span className="ml-2 rounded-[3px] border border-lamp/40 px-1.5 py-0.5 align-middle font-mono text-[0.625rem] text-lamp/90">{label}</span>;
 }

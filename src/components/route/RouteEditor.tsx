@@ -134,7 +134,7 @@ function SortableStation({
       rowProps={{
         ref: setNodeRef,
         style: { transform: CSS.Translate.toString(transform), transition },
-        className: isDragging ? "relative z-10 rounded-xl bg-night-800/90 shadow-[0_18px_40px_-18px_rgba(0,0,0,0.9)]" : "",
+        className: isDragging ? "relative z-10 rounded-[4px] bg-night-800/90 shadow-[0_18px_40px_-18px_rgba(0,0,0,0.9)]" : "",
       }}
       actions={
         <div className="flex shrink-0 items-center">

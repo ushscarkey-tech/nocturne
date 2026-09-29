@@ -49,7 +49,7 @@ export function RescuePlan({ data, now }: { data: NocturneData; now: Date }) {
 
   if (plan.steps.length === 0) {
     return (
-      <section className="rounded-2xl border border-lamp/30 bg-lamp/[0.04] p-5">
+      <section className="rounded-[4px] border border-lamp/30 bg-lamp/[0.04] p-5">
         <p className="text-sm leading-relaxed text-paper-dim">{t("conflict.rescueReplan")}</p>
         <Button variant="primary" size="sm" className="mt-4" onClick={() => applyRescuePlan([])}>
           {t("conflict.rescueReplanButton")}
@@ -80,7 +80,7 @@ export function RescuePlan({ data, now }: { data: NocturneData; now: Date }) {
             ];
 
   return (
-    <section aria-labelledby="rescue-title" className="rounded-2xl border border-lamp/30 bg-lamp/[0.04] p-5 sm:p-6">
+    <section aria-labelledby="rescue-title" className="rounded-[4px] border border-lamp/30 bg-lamp/[0.04] p-5 sm:p-6">
       <p id="rescue-title" className="text-sm leading-relaxed text-paper">
         {t(plan.left === 0 ? "conflict.rescueLead" : "conflict.rescueLeadPartial", {
           date: fmt.shortDate(plan.deadline),
@@ -90,7 +90,7 @@ export function RescuePlan({ data, now }: { data: NocturneData; now: Date }) {
       <ol className="mt-4 space-y-4">
         {plan.steps.map((s, i) => (
           <li key={s.kind} className="flex gap-3">
-            <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-lamp/50 font-mono text-[0.625rem] text-lamp" aria-hidden>
+            <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-[3px] border border-lamp/50 font-mono text-[0.625rem] text-lamp" aria-hidden>
               {i + 1}
             </span>
             <div className="min-w-0 flex-1">

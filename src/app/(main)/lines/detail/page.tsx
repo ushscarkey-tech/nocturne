@@ -106,7 +106,7 @@ function LineDetail() {
         </div>
 
         <section
-          className="mt-12 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:mt-8 lg:self-start lg:rounded-2xl lg:border lg:border-rule-soft lg:bg-night-850/40 lg:p-6"
+          className="mt-12 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:mt-8 lg:self-start lg:rounded-[4px] lg:border lg:border-rule-soft lg:bg-night-850/40 lg:p-6"
           aria-labelledby="line-tasks"
         >
           <div className="flex items-baseline justify-between">

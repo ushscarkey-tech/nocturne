@@ -219,7 +219,7 @@ function TicketDetail() {
               type="button"
               onClick={() => setDetailsOpen(true)}
               aria-haspopup="dialog"
-              className="flex h-11 items-center gap-2 rounded-full px-5 text-sm text-mist transition-colors duration-500 ease-[var(--ease-glide)] hover:text-paper"
+              className="flex h-11 items-center gap-2 rounded-[3px] px-5 text-sm text-mist transition-colors duration-500 ease-[var(--ease-glide)] hover:text-paper"
             >
               {t("archive.journeyDetails")}
               <Icon name="chevron" size={14} className="-rotate-90" />

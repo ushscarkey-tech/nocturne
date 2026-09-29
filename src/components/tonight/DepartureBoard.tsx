@@ -169,7 +169,7 @@ export function RecentChangeDetail({ data, now, forecast }: { data: NocturneData
   const moved = route.filter((s) => recent.diff.marks[s.id] && recent.diff.marks[s.id].kind !== "same");
   const reasons = recent.messages ? recent.messages.map(tm) : recent.lines;
   return (
-    <section className="mb-7 rounded-xl border border-lamp/20 bg-lamp/[0.03] px-4 py-3.5" aria-label={t("scene.recentChange")}>
+    <section className="mb-7 rounded-[4px] border border-lamp/20 bg-lamp/[0.03] px-4 py-3.5" aria-label={t("scene.recentChange")}>
       <p className="flex items-center justify-between font-mono text-[0.625rem] tracking-[0.22em] text-lamp/90">
         <span>{t("scene.recentChange").toUpperCase()}</span>
         <span className="tabular">{clock(recent.at)}</span>

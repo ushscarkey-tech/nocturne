@@ -58,7 +58,7 @@ export function TabBar() {
                   <span
                     className={`relative block rounded-full border transition-[width,height,background-color,border-color,box-shadow] duration-500 ${
                       active
-                        ? "h-2.5 w-2.5 border-lamp bg-lamp shadow-[0_0_12px_2px_rgba(224,176,104,0.45)]"
+                        ? "h-2.5 w-2.5 border-lamp bg-lamp shadow-[0_0_0_3px_rgba(224,176,104,0.16)]"
                         : "h-2 w-2 border-paper/45 bg-night-900 group-hover:border-paper/80"
                     }`}
                     aria-hidden
@@ -126,7 +126,7 @@ function RailNav({ current, onSettings }: { current: number; onSettings: boolean
                   <span
                     className={`block rounded-full border transition-[width,height,background-color,border-color,box-shadow] duration-500 ${
                       active
-                        ? "h-2.5 w-2.5 border-lamp bg-lamp shadow-[0_0_12px_2px_rgba(224,176,104,0.45)]"
+                        ? "h-2.5 w-2.5 border-lamp bg-lamp shadow-[0_0_0_3px_rgba(224,176,104,0.16)]"
                         : "h-2 w-2 border-paper/45 bg-night-900 group-hover:border-paper/80"
                     }`}
                   />
@@ -149,7 +149,7 @@ function RailNav({ current, onSettings }: { current: number; onSettings: boolean
       <button
         type="button"
         onClick={() => useQuickAdd.getState().show()}
-        className="flex h-10 w-fit items-center gap-2.5 rounded-full border border-rule bg-night-850/90 pl-3.5 pr-4 text-sm text-paper-dim transition-colors duration-500 hover:border-lamp/50 hover:text-paper"
+        className="flex h-10 w-fit items-center gap-2.5 rounded-[3px] border border-rule bg-night-850/90 pl-3.5 pr-4 text-sm text-paper-dim transition-colors duration-500 hover:border-lamp/50 hover:text-paper"
       >
         <Icon name="plus" size={15} />
         {t("tonight.addTask")}

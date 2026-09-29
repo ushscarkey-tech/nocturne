@@ -77,7 +77,7 @@ export function RouteStrip({
       <span className="absolute right-0 top-1/2 h-2.5 w-px -translate-y-1/2 bg-paper/40" />
       {activeId && (
         <span
-          className="absolute top-1/2 h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-lamp shadow-[0_0_10px_rgba(224,176,104,0.55)] transition-[left] duration-1000"
+          className="absolute top-1/2 h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-lamp shadow-[0_0_0_3px_rgba(224,176,104,0.16)] transition-[left] duration-1000"
           style={{ left: `${position * 100}%` }}
         />
       )}

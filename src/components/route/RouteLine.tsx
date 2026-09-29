@@ -111,7 +111,7 @@ export function RouteRow({
         <span
           className={`relative mt-[1.1rem] h-2.5 w-2.5 self-start rounded-full transition-colors duration-700 ${
             active
-              ? "bg-lamp shadow-[0_0_14px_2px_rgba(224,176,104,0.45)]"
+              ? "bg-lamp shadow-[0_0_0_3px_rgba(224,176,104,0.16)]"
               : done
                 ? "bg-haze"
                 : "bg-paper"

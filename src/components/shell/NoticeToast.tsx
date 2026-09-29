@@ -31,7 +31,7 @@ export function NoticeToast({ placement = "tabs" }: { placement?: "tabs" | "imme
         <div
           key={notice.id}
           role="status"
-          className="pointer-events-auto w-full max-w-md animate-rise rounded-2xl border border-rule bg-night-850/95 px-5 py-4 shadow-[0_20px_60px_-20px_rgba(0,0,0,0.8)] backdrop-blur"
+          className="pointer-events-auto w-full max-w-md animate-rise rounded-[4px] border border-rule bg-night-850/95 px-5 py-4 shadow-[0_20px_60px_-20px_rgba(0,0,0,0.8)] backdrop-blur"
         >
           <div className="flex items-start gap-3">
             <span

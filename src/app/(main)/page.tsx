@@ -88,7 +88,7 @@ export default function TonightPage() {
             type="button"
             onClick={() => useQuickAdd.getState().show()}
             aria-label={t("quickadd.open")}
-            className="flex h-11 w-11 items-center justify-center rounded-full text-mist transition-colors hover:text-paper lg:hidden"
+            className="flex h-11 w-11 items-center justify-center rounded-[3px] text-mist transition-colors hover:text-paper lg:hidden"
           >
             <Icon name="plus" size={19} />
           </button>
@@ -273,7 +273,7 @@ function Chip({ children, onClick, tone = "lamp" }: { children: ReactNode; onCli
     <button
       type="button"
       onClick={onClick}
-      className={`inline-flex min-h-9 items-center gap-2 rounded-full border bg-night-900/75 px-3.5 text-xs transition-colors ${
+      className={`inline-flex min-h-9 items-center gap-2 rounded-[3px] border bg-night-900/75 px-3.5 text-xs transition-colors ${
         tone === "signal" ? "border-signal/40 text-signal hover:border-signal/70" : "border-lamp/30 text-lamp/90 hover:border-lamp/60"
       }`}
     >

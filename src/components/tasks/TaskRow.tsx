@@ -51,10 +51,10 @@ export function TaskRow({ task, today, tonightMinutes }: { task: Task; today: st
           type="button"
           onClick={toggle}
           aria-label={done ? t("tasks.reopen", { task: task.title }) : t("tasks.mark", { task: task.title })}
-          className="-ml-2 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-haze transition-colors hover:text-paper"
+          className="-ml-2 flex h-11 w-11 shrink-0 items-center justify-center rounded-[3px] text-haze transition-colors hover:text-paper"
         >
           <span
-            className={`flex h-5 w-5 items-center justify-center rounded-full border transition-colors duration-500 ${
+            className={`flex h-5 w-5 items-center justify-center rounded-[3px] border transition-colors duration-500 ${
               done || leaving ? "border-moss-light bg-moss text-paper" : "border-haze"
             }`}
           >
@@ -64,7 +64,7 @@ export function TaskRow({ task, today, tonightMinutes }: { task: Task; today: st
       )}
       <Link
         href={taskHref(task.id)}
-        className={`group flex min-w-0 flex-1 items-center justify-between gap-4 rounded-xl py-4 pr-1 transition-colors duration-500 hover:bg-white/[0.02] ${
+        className={`group flex min-w-0 flex-1 items-center justify-between gap-4 rounded-[4px] py-4 pr-1 transition-colors duration-500 hover:bg-white/[0.02] ${
           canComplete || done ? "pl-1" : ""
         }`}
       >

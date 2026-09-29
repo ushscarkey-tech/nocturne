@@ -34,7 +34,7 @@ export function EstimateNote({ taskId }: { taskId: string }) {
   const c = calibrate(data, task, task.estimatedMinutes);
   if (!c) return null;
   return (
-    <div className="animate-rise rounded-xl border border-rule-soft px-4 py-3">
+    <div className="animate-rise rounded-[4px] border border-rule-soft px-4 py-3">
       <p className="text-sm text-paper-dim">
         {c.ratio > 1 ? t("quickadd.calibrationLonger", { task: c.example }) : t("quickadd.calibrationShorter", { task: c.example })}
       </p>

@@ -98,7 +98,7 @@ export default function ConnectPage() {
         ) : step.kind === "signin" ? (
           <div className="mt-6 animate-enter" style={{ animationDelay: "240ms" }}>
             <p className="text-sm leading-relaxed text-mist">{t("auth.connectSignIn")}</p>
-            <Link href={back} className="mt-8 flex min-h-14 w-full items-center justify-center rounded-full bg-paper text-night-950">
+            <Link href={back} className="mt-8 flex min-h-14 w-full items-center justify-center rounded-[3px] bg-paper text-night-950">
               {t("auth.signIn")}
             </Link>
           </div>

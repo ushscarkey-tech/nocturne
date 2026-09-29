@@ -410,36 +410,6 @@ export function Ticket({
           }}
           aria-hidden
         />
-        {stamp && (
-          <div
-            className={`pointer-events-none absolute bottom-[9%] mix-blend-multiply ${stampFresh ? "motion-safe-only animate-[stamp_700ms_cubic-bezier(0.2,0.9,0.3,1)_both]" : ""}`}
-            style={
-              {
-                right: `${variation.stampX}%`,
-                "--stamp-rot": `${variation.stampRot}deg`,
-                "--stamp-ink": variation.stampInk,
-                transform: `rotate(${variation.stampRot}deg)`,
-                opacity: variation.stampInk,
-              } as CSSProperties
-            }
-            aria-hidden
-          >
-            <svg viewBox="0 0 100 100" className={sm ? "h-[4.2em] w-[4.2em]" : "h-[5.4em] w-[5.4em]"} filter={`url(#${inkEdge})`}>
-              <g fill="none" stroke="#a3332a">
-                <circle cx="50" cy="50" r="46" strokeWidth="3.4" />
-                <circle cx="50" cy="50" r="40" strokeWidth="1.2" />
-                <path d="M16 41h68M16 63h68" strokeWidth="1.2" />
-              </g>
-              <g fill="#a3332a" textAnchor="middle" fontFamily="var(--font-mono)">
-                <text x="50" y="33" fontSize="8.5" letterSpacing="2.4">NOCTURNE</text>
-                <text x="50" y="58.5" fontSize={locale === "en" ? 10 : 15} fontWeight="700" letterSpacing={locale === "en" ? 1.2 : 3} fontFamily="var(--font-sans)">
-                  {ARRIVED[locale]}
-                </text>
-                <text x="50" y="76" fontSize="9.5" letterSpacing="1.2">{face.arrival}</text>
-              </g>
-            </svg>
-          </div>
-        )}
       </div>
 
       {/* Lower half: the stub, behind the perforation. */}
@@ -462,6 +432,37 @@ export function Ticket({
           />
         )}
       </div>
+      {/* The arrival stamp, across the perforation as a clerk would bring it down. */}
+      {stamp && (
+        <div
+          className={`pointer-events-none absolute z-10 mix-blend-multiply ${sm ? "bottom-[1.6em]" : "bottom-[2.4em]"} ${stampFresh ? "motion-safe-only animate-[stamp_700ms_cubic-bezier(0.2,0.9,0.3,1)_both]" : ""}`}
+          style={
+            {
+              right: `${variation.stampX}%`,
+              "--stamp-rot": `${variation.stampRot}deg`,
+              "--stamp-ink": variation.stampInk,
+              transform: `rotate(${variation.stampRot}deg)`,
+              opacity: variation.stampInk,
+            } as CSSProperties
+          }
+          aria-hidden
+        >
+          <svg viewBox="0 0 100 100" className={sm ? "h-[4.2em] w-[4.2em]" : "h-[5.4em] w-[5.4em]"} filter={`url(#${inkEdge})`}>
+            <g fill="none" stroke="#a3332a">
+              <circle cx="50" cy="50" r="46" strokeWidth="3.4" />
+              <circle cx="50" cy="50" r="40" strokeWidth="1.2" />
+              <path d="M16 41h68M16 63h68" strokeWidth="1.2" />
+            </g>
+            <g fill="#a3332a" textAnchor="middle" fontFamily="var(--font-mono)">
+              <text x="50" y="33" fontSize="8.5" letterSpacing="2.4">NOCTURNE</text>
+              <text x="50" y="58.5" fontSize={locale === "en" ? 10 : 15} fontWeight="700" letterSpacing={locale === "en" ? 1.2 : 3} fontFamily="var(--font-sans)">
+                {ARRIVED[locale]}
+              </text>
+              <text x="50" y="76" fontSize="9.5" letterSpacing="1.2">{face.arrival}</text>
+            </g>
+          </svg>
+        </div>
+      )}
     </article>
   );
 }

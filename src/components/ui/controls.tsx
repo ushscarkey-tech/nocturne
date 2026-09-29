@@ -34,7 +34,7 @@ export function FocusPicker({
             role="radio"
             aria-checked={checked}
             onClick={() => onChange(o.value)}
-            className={`group rounded-2xl border text-left transition-all duration-500 ease-[var(--ease-glide)] ${
+            className={`group rounded-[4px] border text-left transition-all duration-500 ease-[var(--ease-glide)] ${
               size === "lg" ? "px-4 py-5" : "px-3 py-3"
             } ${checked ? "border-lamp/60 bg-lamp/[0.06]" : "border-rule hover:border-mist/40"}`}
           >
@@ -203,7 +203,7 @@ export function MinutesInput({
       <button
         type="button"
         onClick={() => onChange(Math.max(min, value - step))}
-        className="h-9 w-9 rounded-full border border-rule text-mist transition-colors hover:text-paper"
+        className="h-9 w-9 rounded-[3px] border border-rule text-mist transition-colors hover:text-paper"
         aria-label={t("common.decrease", { label })}
       >
         −
@@ -214,7 +214,7 @@ export function MinutesInput({
       <button
         type="button"
         onClick={() => onChange(Math.min(max, value + step))}
-        className="h-9 w-9 rounded-full border border-rule text-mist transition-colors hover:text-paper"
+        className="h-9 w-9 rounded-[3px] border border-rule text-mist transition-colors hover:text-paper"
         aria-label={t("common.increase", { label })}
       >
         +
