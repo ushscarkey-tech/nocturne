@@ -102,6 +102,25 @@
     25% { transform: translateX(0.35px); }
     75% { transform: translateX(-0.35px); }
   }
+  /* The whole machine takes the jolt of each step. */
+  @keyframes thunk {
+    0%, 100% { transform: none; }
+    3% { transform: translate3d(0, 1.5px, 0); }
+    7% { transform: none; }
+    29% { transform: translate3d(0, 1.2px, 0); }
+    33% { transform: none; }
+    55% { transform: translate3d(0, 1.2px, 0); }
+    59% { transform: none; }
+    81% { transform: translate3d(0, 1.5px, 0); }
+    86% { transform: none; }
+  }
+  /* A rubber stamp comes down once. */
+  @keyframes stamp {
+    0% { opacity: 0; transform: scale(1.35) rotate(var(--stamp-rot)); }
+    55% { opacity: 0; transform: scale(1.12) rotate(var(--stamp-rot)); }
+    70% { opacity: 0.9; transform: scale(0.97) rotate(var(--stamp-rot)); }
+    100% { opacity: var(--stamp-ink); transform: scale(1) rotate(var(--stamp-rot)); }
+  }
   /* A ticket taken in hand, brought up to the eyes. */
   @keyframes lift {
     from { opacity: 0.4; transform: translateY(22vh) scale(0.78) rotate(-2deg); }
@@ -337,4 +356,19 @@ dialog[open]::backdrop {
   textarea {
     font-size: max(16px, 1em) !important;
   }
+}
+
+/* Used from inline styles (the ticket machine), so kept outside @theme where Tailwind would drop it. */
+/* A machine's feed rollers: the ticket comes out in heavy steps, not a glide. */
+@keyframes feed {
+  0% { transform: translate3d(0, -102%, 0); }
+  8% { transform: translate3d(0, -84%, 0); }
+  26% { transform: translate3d(0, -84%, 0); }
+  34% { transform: translate3d(0, -60%, 0); }
+  52% { transform: translate3d(0, -60%, 0); }
+  60% { transform: translate3d(0, -34%, 0); }
+  78% { transform: translate3d(0, -34%, 0); }
+  88% { transform: translate3d(0, -5%, 0); }
+  94% { transform: translate3d(0, -6.5%, 0); }
+  100% { transform: translate3d(0, -6%, 0); }
 }

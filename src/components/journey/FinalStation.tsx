@@ -215,6 +215,11 @@ function JourneyTicketPrinter({ data, journey, onClose }: { data: NocturneData; 
         haptic("settle");
         ambience.duck(0.4, 3);
       });
+      // The arrival stamp comes down on the fresh ticket (see the `stamp` keyframes).
+      at(700 + rows * 300 + 450 + 420, () => {
+        sfx.play("stamp", { volume: 0.9 });
+        haptic("press");
+      });
     }
     return () => list.forEach(clearTimeout);
   }, [reduced]);
@@ -256,22 +261,22 @@ function JourneyTicketPrinter({ data, journey, onClose }: { data: NocturneData; 
   return (
     <div className="fixed inset-0 z-40 flex flex-col items-center bg-night-950/85 px-6 pt-[max(1rem,env(safe-area-inset-top))] animate-fade" role="dialog" aria-label={t("scene.journeyRecord")}>
       <div className="flex w-full max-w-md justify-end">
-        <button type="button" onClick={onClose} className={`rounded-full p-2 text-mist hover:text-paper ${stage === "printing" || stage === "opening" ? "invisible" : ""}`} aria-label={t("shell.close")}>
+        <button type="button" onClick={onClose} className={`rounded-[3px] p-2 text-mist hover:text-paper ${stage === "printing" || stage === "opening" ? "invisible" : ""}`} aria-label={t("shell.close")}>
           <Icon name="close" size={18} />
         </button>
       </div>
       {/* A slim printer under the station clock. */}
-      <div className="mt-2 w-full max-w-[21rem] animate-rise rounded-2xl border border-white/[0.07] bg-[linear-gradient(180deg,#1c2128,#101418)] px-4 pb-3 pt-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_30px_60px_-30px_rgba(0,0,0,0.9)]">
-        <div className="flex items-center justify-between font-mono text-[0.5625rem] tracking-[0.3em] text-paper-dim/60">
+      <div className="mt-2 w-full max-w-[21rem] animate-rise overflow-hidden rounded-[7px] border border-[#877e69] bg-[linear-gradient(180deg,#d8cfb8,#bdb196)] px-4 pb-3 pt-0 shadow-[inset_0_1px_0_rgba(255,255,255,0.55),0_30px_60px_-30px_rgba(0,0,0,0.9)]">
+        <div className="-mx-4 flex items-center justify-between border-b-2 border-[#8c2f25] bg-[#1e2c44] px-4 py-2 font-mono text-[0.5625rem] tracking-[0.3em] text-[#d9dde4]">
           <span>NOCTURNE</span>
           <span className="flex items-center gap-1.5">
             {t("scene.journeyRecord")}
-            <span className={`h-1.5 w-1.5 rounded-full ${stage === "printing" ? "bg-lamp shadow-[0_0_6px_rgba(224,176,104,0.9)]" : "bg-[#3a3f44]"}`} aria-hidden />
+            <span className={`h-1.5 w-1.5 rounded-full ${stage === "printing" ? "bg-[#5fd37a] shadow-[0_0_6px_rgba(95,211,122,0.9)]" : "bg-[#3a3f44]"}`} aria-hidden />
           </span>
         </div>
-        <div className="relative mx-auto mt-3 h-2.5 w-[86%] rounded-full bg-black shadow-[inset_0_2px_4px_rgba(0,0,0,0.95),0_1px_0_rgba(255,255,255,0.07)]">
+        <div className="relative mx-auto mt-3 h-3 w-[86%] rounded-[2px] border border-[#7a715d] bg-[#0b0b0a] shadow-[inset_0_3px_4px_rgba(0,0,0,0.95),0_1px_0_rgba(255,255,255,0.5)]">
           <span
-            className={`absolute inset-x-2 -bottom-1 h-3 rounded-full bg-[radial-gradient(50%_100%_at_50%_0%,rgba(224,176,104,0.55),transparent)] blur-[3px] transition-opacity duration-700 ${stage === "printing" ? "opacity-100" : "opacity-0"}`}
+            className={`absolute inset-x-2 -bottom-1 h-3 bg-[radial-gradient(50%_100%_at_50%_0%,rgba(224,176,104,0.55),transparent)] blur-[3px] transition-opacity duration-700 ${stage === "printing" ? "opacity-100" : "opacity-0"}`}
             aria-hidden
           />
         </div>
@@ -301,7 +306,7 @@ function JourneyTicketPrinter({ data, journey, onClose }: { data: NocturneData; 
           {...pointer}
         >
           <div className={stage === "printing" ? "motion-safe-only animate-jitter" : ""}>
-            <Ticket face={face} style={journey.selectedCarriage} size="lg" printed={out ? undefined : printed} />
+            <Ticket face={face} style={journey.selectedCarriage} size="lg" printed={out ? undefined : printed} stamp={out} stampFresh />
           </div>
         </div>
       </div>

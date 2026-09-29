@@ -14,6 +14,7 @@ const scene: Partial<Record<keyof typeof source, string>> = {
   "scene.onBoardNow": "乗車中",
   "scene.returnToTrain": "列車に戻る",
   "scene.machine": "発券機",
+  "scene.ticketSlot": "きっぷ",
   "scene.nightService": "夜行便",
   "scene.stepRoute": "経路",
   "scene.stepFocus": "調子",

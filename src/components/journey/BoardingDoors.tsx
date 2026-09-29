@@ -361,7 +361,7 @@ export function BoardingDoors({
           transformOrigin: "50% 100%",
         }}
       >
-        <Ticket face={face} style={carriage} size="md" />
+        <Ticket face={face} style={carriage} size="md" punched={tapping || stage !== "waiting"} />
       </button>
       <p
         className={`absolute inset-x-0 bottom-[max(2.5rem,calc(env(safe-area-inset-bottom)+1.75rem))] text-center text-xs text-mist transition-opacity duration-500 ${stage === "waiting" ? "opacity-100" : "opacity-0"}`}

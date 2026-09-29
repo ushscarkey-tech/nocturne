@@ -14,6 +14,7 @@ const scene = {
   "scene.returnToTrain": "Return to the train",
   // Ticket machine
   "scene.machine": "Ticket machine",
+  "scene.ticketSlot": "TICKETS",
   "scene.nightService": "NIGHT SERVICE",
   "scene.stepRoute": "ROUTE",
   "scene.stepFocus": "FOCUS",

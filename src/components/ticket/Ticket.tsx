@@ -20,12 +20,14 @@ const BANDS: Record<CarriageId, { band: string; deep: string }> = {
 };
 
 /** Small secondary labels in the traveller's language (Japanese when reading in English). */
-type LabelId = "dep" | "arr" | "car" | "seat" | "platform" | "stops" | "focused" | "planned";
+type LabelId = "dep" | "arr" | "car" | "seat" | "platform" | "stops" | "focused" | "planned" | "train";
 const SECONDARY: Record<Exclude<Locale, "en">, Record<LabelId, string>> = {
-  ko: { dep: "출발", arr: "도착", car: "호차", seat: "좌석", platform: "승강장", stops: "정거장", focused: "집중", planned: "예정" },
-  ja: { dep: "出発", arr: "到着", car: "号車", seat: "座席", platform: "番線", stops: "駅数", focused: "集中", planned: "予定" },
-  zh: { dep: "出发", arr: "到达", car: "车厢", seat: "座位", platform: "站台", stops: "站数", focused: "专注", planned: "计划" },
+  ko: { dep: "출발", arr: "도착", car: "호차", seat: "좌석", platform: "승강장", stops: "정거장", focused: "집중", planned: "예정", train: "열차" },
+  ja: { dep: "出発", arr: "到着", car: "号車", seat: "座席", platform: "番線", stops: "駅数", focused: "集中", planned: "予定", train: "列車" },
+  zh: { dep: "出发", arr: "到达", car: "车厢", seat: "座位", platform: "站台", stops: "站数", focused: "专注", planned: "计划", train: "列车" },
 };
+/** The word on the arrival stamp, in the traveller's own language. */
+const ARRIVED: Record<Locale, string> = { en: "ARRIVED", ko: "도착", ja: "到着", zh: "到达" };
 
 const ENGLISH: Record<LabelId, string> = {
   dep: "DEP",
@@ -36,6 +38,7 @@ const ENGLISH: Record<LabelId, string> = {
   stops: "STOPS",
   focused: "FOCUSED",
   planned: "PLANNED",
+  train: "TRAIN",
 };
 
 /** Keyframes for the print-out and a shared class; React hoists and dedupes this by href. */
@@ -55,49 +58,6 @@ export { ticketRowCount };
 function hexToRgba(hex: string, alpha: number): string {
   const n = parseInt(hex.slice(1), 16);
   return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`;
-}
-
-/** Deterministic bars from the serial; rendered as plain SVG rects. */
-function barcodeBars(serial: string): { bars: [number, number][]; width: number } {
-  const rand = seeded(`bar:${serial}`);
-  const bars: [number, number][] = [];
-  let x = 0;
-  const push = (w: number, gap: number) => {
-    bars.push([x, w]);
-    x += w + gap;
-  };
-  push(1, 1);
-  push(1, 1);
-  for (let i = 0; i < 30; i++) push(1 + Math.floor(rand() * 3), 1 + Math.floor(rand() * 2));
-  push(1, 1);
-  push(2, 0);
-  return { bars, width: x };
-}
-
-/** A small QR-like block: three finder squares and deterministic modules. */
-function codeBlockPath(serial: string): string {
-  const n = 13;
-  const rand = seeded(`qr:${serial}`);
-  const inFinder = (x: number, y: number) => (x < 6 && y < 6) || (x > n - 7 && y < 6) || (x < 6 && y > n - 7);
-  let d = "";
-  const cell = (x: number, y: number) => (d += `M${x} ${y}h1v1h-1z`);
-  for (const [ox, oy] of [
-    [0, 0],
-    [n - 5, 0],
-    [0, n - 5],
-  ]) {
-    for (let i = 0; i < 5; i++) {
-      cell(ox + i, oy);
-      cell(ox + i, oy + 4);
-      if (i > 0 && i < 4) {
-        cell(ox, oy + i);
-        cell(ox + 4, oy + i);
-      }
-    }
-    cell(ox + 2, oy + 2);
-  }
-  for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) if (!inFinder(x, y) && rand() < 0.46) cell(x, y);
-  return d;
 }
 
 function paperColors(hueShift: number) {
@@ -125,12 +85,21 @@ export function Ticket({
   style,
   size = "lg",
   printed,
+  punched = false,
+  stamp = face.kind === "journey",
+  stampFresh = false,
   className = "",
 }: {
   face: TicketFace;
   style: CarriageId;
   size?: Size;
   printed?: number;
+  /** Clipped by the conductor at the carriage door. */
+  punched?: boolean;
+  /** The arrival stamp (journey tickets carry it by default). */
+  stamp?: boolean;
+  /** Stamp it now, with the stamp coming down, rather than showing it already there. */
+  stampFresh?: boolean;
   className?: string;
 }) {
   const { t, locale } = useI18n();
@@ -151,15 +120,18 @@ export function Ticket({
       streakX: 18 + rand() * 64,
       seed: 1 + Math.floor(rand() * 400),
       tilt: (rand() - 0.5) * 0.6,
+      // Where the stamp lands and how firmly: never quite the same twice.
+      stampRot: -18 + rand() * 12,
+      stampX: 6 + rand() * 10,
+      stampInk: 0.72 + rand() * 0.14,
     };
   }, [face.serialLong, face.hueShift]);
 
-  const bar = useMemo(() => barcodeBars(face.serialLong), [face.serialLong]);
-  const block = useMemo(() => (sm ? "" : codeBlockPath(face.serialLong)), [face.serialLong, sm]);
 
   const misregistration = `0.3px 0.15px 0 ${hexToRgba(band.band, 0.5)}`;
   const grain = `${uid}-grain`;
   const fibre = `${uid}-fibre`;
+  const inkEdge = `${uid}-ink`;
   const notch = "0.6em";
 
   const cssVars = {
@@ -326,30 +298,21 @@ export function Ticket({
       </div>
     ),
     code: (
-      <div className="flex items-end gap-[0.9em]">
-        <div className="min-w-0 flex-1">
-          <svg
-            viewBox={`0 0 ${bar.width} 10`}
-            preserveAspectRatio="none"
-            className={`block w-full ${sm ? "h-[1.6em]" : "h-[2.3em]"}`}
-            shapeRendering="crispEdges"
-            aria-hidden
-            style={{ opacity: variation.ink[9] }}
-          >
-            {bar.bars.map(([x, w]) => (
-              <rect key={x} x={x} y={0} width={w} height={10} fill={INK} />
-            ))}
-          </svg>
-          <p className="mt-[0.5em] flex justify-between text-[0.5em] leading-none tracking-[0.22em] opacity-75 tabular">
-            <span>{face.serialLong}</span>
-            {!sm && <span>ADULT · 1</span>}
-          </p>
+      <div>
+        <div className="flex items-end justify-between gap-[0.75em]">
+          <div>
+            {label("train")}
+            <p className="mt-[0.4em] text-[0.75em] font-medium leading-none tracking-[0.12em] tabular" style={{ opacity: variation.ink[9] }}>
+              {face.routeCode}
+            </p>
+          </div>
+          <p className="text-[0.5em] leading-none tracking-[0.22em] opacity-75 tabular">No. {face.serialLong}</p>
         </div>
-        {!sm && (
-          <svg viewBox="-1 -1 15 15" className="h-[2.9em] w-[2.9em] shrink-0" shapeRendering="crispEdges" aria-hidden>
-            <path d={block} fill={INK} opacity={0.9} />
-          </svg>
-        )}
+        {/* The magnetic strip the gates read, printed across the stub. */}
+        <div
+          className={`mt-[0.7em] ${sm ? "h-[0.7em]" : "h-[0.95em]"} -mx-[1.375em] bg-[linear-gradient(180deg,#4b3a2b,#3b2d21_60%,#47372a)] opacity-[0.88]`}
+          aria-hidden
+        />
       </div>
     ),
   };
@@ -416,6 +379,13 @@ export function Ticket({
           <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="3" seed={variation.seed} stitchTiles="stitch" />
           <feColorMatrix type="matrix" values="0 0 0 0 0.26  0 0 0 0 0.21  0 0 0 0 0.15  1.5 0 0 0 -0.6" />
         </filter>
+        <filter id={inkEdge} x="-5%" y="-5%" width="110%" height="110%">
+          <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed={variation.seed + 3} result="n" />
+          <feDisplacementMap in="SourceGraphic" in2="n" scale="1.6" result="d" />
+          <feTurbulence type="fractalNoise" baseFrequency="0.35" numOctaves="2" seed={variation.seed + 11} result="m" />
+          <feColorMatrix in="m" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 2.2 -0.55" result="mask" />
+          <feComposite in="d" in2="mask" operator="in" />
+        </filter>
         <filter id={fibre} x="0" y="0" width="100%" height="100%">
           <feTurbulence type="fractalNoise" baseFrequency="0.02 0.4" numOctaves="2" seed={variation.seed + 7} />
           <feColorMatrix type="matrix" values="0 0 0 0 0.42  0 0 0 0 0.35  0 0 0 0 0.24  2.6 0 0 0 -1.45" />
@@ -440,6 +410,36 @@ export function Ticket({
           }}
           aria-hidden
         />
+        {stamp && (
+          <div
+            className={`pointer-events-none absolute bottom-[9%] mix-blend-multiply ${stampFresh ? "motion-safe-only animate-[stamp_700ms_cubic-bezier(0.2,0.9,0.3,1)_both]" : ""}`}
+            style={
+              {
+                right: `${variation.stampX}%`,
+                "--stamp-rot": `${variation.stampRot}deg`,
+                "--stamp-ink": variation.stampInk,
+                transform: `rotate(${variation.stampRot}deg)`,
+                opacity: variation.stampInk,
+              } as CSSProperties
+            }
+            aria-hidden
+          >
+            <svg viewBox="0 0 100 100" className={sm ? "h-[4.2em] w-[4.2em]" : "h-[5.4em] w-[5.4em]"} filter={`url(#${inkEdge})`}>
+              <g fill="none" stroke="#a3332a">
+                <circle cx="50" cy="50" r="46" strokeWidth="3.4" />
+                <circle cx="50" cy="50" r="40" strokeWidth="1.2" />
+                <path d="M16 41h68M16 63h68" strokeWidth="1.2" />
+              </g>
+              <g fill="#a3332a" textAnchor="middle" fontFamily="var(--font-mono)">
+                <text x="50" y="33" fontSize="8.5" letterSpacing="2.4">NOCTURNE</text>
+                <text x="50" y="58.5" fontSize={locale === "en" ? 10 : 15} fontWeight="700" letterSpacing={locale === "en" ? 1.2 : 3} fontFamily="var(--font-sans)">
+                  {ARRIVED[locale]}
+                </text>
+                <text x="50" y="76" fontSize="9.5" letterSpacing="1.2">{face.arrival}</text>
+              </g>
+            </svg>
+          </div>
+        )}
       </div>
 
       {/* Lower half: the stub, behind the perforation. */}
@@ -453,6 +453,14 @@ export function Ticket({
         <div className={`relative ${sm ? "px-[1.15em] pb-[1em] pt-[0.95em]" : "px-[1.375em] pb-[1.2em] pt-[1.1em]"}`}>
           {rows.slice(split).map((id, i) => renderRow(id, split + i))}
         </div>
+        {/* The conductor's clip: a small hole right through the stub. */}
+        {punched && (
+          <span
+            className="absolute right-[12%] top-[0.9em] h-[0.62em] w-[0.7em] bg-[#07090c] shadow-[inset_0_0.08em_0.12em_rgba(0,0,0,0.9),0_0.05em_0_rgba(255,250,235,0.35)]"
+            style={{ borderRadius: "46% 54% 50% 50% / 55% 48% 52% 45%", clipPath: "polygon(0 18%, 50% 0, 100% 18%, 100% 100%, 0 100%)" }}
+            aria-hidden
+          />
+        )}
       </div>
     </article>
   );

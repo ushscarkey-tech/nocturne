@@ -15,6 +15,7 @@ import { loadMix } from "./useAmbience";
 export type SfxName =
   | "click"
   | "key"
+  | "clunk"
   | "print"
   | "printLong"
   | "paper"
@@ -237,6 +238,14 @@ const DESIGNS: Record<SfxName, (k: Kit, t: number) => number> = {
     burst(k, t, { type: "lowpass", freq: 600, peak: 0.35, decay: 0.02 });
     tone(k, t, { freq: jitter(220, 0.05), to: 160, peak: 0.08, attack: 0.002, decay: 0.035 });
     return 0.08;
+  },
+
+  /** The machine's feed rollers taking a step: a heavy clunk with a short whirr. */
+  clunk(k, t) {
+    burst(k, t, { type: "lowpass", freq: 520, peak: 0.7, decay: 0.035 });
+    burst(k, t, { freq: jitter(2000, 0.1), q: 1.4, peak: 0.12, decay: 0.012 });
+    tone(k, t, { freq: jitter(120, 0.06), to: 80, peak: 0.16, attack: 0.002, decay: 0.06 });
+    return 0.1;
   },
 
   print: (k, t) => printer(k, t, 1.1, 32),
