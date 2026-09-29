@@ -57,6 +57,10 @@ export function replan(data: NocturneData, reason: ReplanReason, now: Date, opts
   const journey = engine.journeyFor(data, serviceDate(now));
   if (journey?.phase === "final") return (reason === "task-change" && reopen(data, now, opts)) || { data, change: null };
   const startFrom = journey?.phase === "stop" && journey.stopEndsAt ? new Date(journey.stopEndsAt) : undefined;
+  // A focus given here ("How are you tonight?") is a fresh report; otherwise
+  // the evening's fatigue counts from the last one.
+  const lastMark = journey?.focusLog.at(-1)?.at;
+  const focusSince = opts.focus ? now : lastMark ? new Date(lastMark) : undefined;
   const result = planToday(
     {
       tasks: data.tasks,
@@ -73,9 +77,17 @@ export function replan(data: NocturneData, reason: ReplanReason, now: Date, opts
       reason,
       order: opts.order,
       startFrom,
+      focusSince,
     },
   );
-  const next = recordChange({ ...data, sessions: result.sessions }, result.change);
+  let next: NocturneData = { ...data, sessions: result.sessions };
+  // Mid-journey, the reported focus becomes the night's signal, so later
+  // re-plans (a task edit, a removed station) keep planning for it.
+  if (opts.focus && journey?.startedAt && journey.focus !== opts.focus) {
+    const updated = { ...journey, focus: opts.focus, focusLog: [...journey.focusLog, { at: iso(now), level: opts.focus }] };
+    next = { ...next, journeys: next.journeys.map((j) => (j.id === journey.id ? updated : j)) };
+  }
+  next = recordChange(next, result.change);
   return { data: next, change: result.change };
 }
 
@@ -97,7 +109,15 @@ export function ensureDay(data: NocturneData, now: Date): NocturneData {
   const hasToday = next.sessions.some((s) => s.date === today) || engine.journeyFor(next, today);
   if (!hasToday) {
     const planned = planToday(
-      { tasks: next.tasks, windows: next.windows, sessions: next.sessions, userId: next.profile.id, stops: stopsOf(next.profile) },
+      {
+        tasks: next.tasks,
+        windows: next.windows,
+        sessions: next.sessions,
+        userId: next.profile.id,
+        // The first route of the day follows the learned pattern too, not only re-plans.
+        focusProfile: schedulingProfile(next, now),
+        stops: stopsOf(next.profile),
+      },
       { now, focus: "steady", mode: "reoptimize", reason: "initial" },
     );
     next = { ...next, sessions: planned.sessions };

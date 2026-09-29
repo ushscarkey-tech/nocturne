@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { calibrate, focusProfile, isSimilar, schedulingProfile, similarityKey, suggestFeel } from "../learning";
+import { ensureDay } from "../ops";
 import { planToday } from "../planner";
 import { createEmptyData } from "../seed";
 import { routeOf } from "../sessions";
@@ -151,7 +152,8 @@ describe("focus pattern", () => {
 
   it("moves demanding work toward its good hours, and stops when switched off", () => {
     const h = history();
-    const hardToday = task({ title: "수학 문제집 5단원", difficulty: 5, interest: 3, importance: 3, estimatedMinutes: 50, remainingMinutes: 50, deadline: addDays(TODAY, 1) });
+    // Due a day later than the rest, so the general rules alone place it after them.
+    const hardToday = task({ title: "수학 문제집 5단원", difficulty: 5, interest: 3, importance: 3, estimatedMinutes: 100, remainingMinutes: 100, deadline: addDays(TODAY, 2) });
     const mid = task({ title: "화학 보고서", difficulty: 3, interest: 3, importance: 3, estimatedMinutes: 50, remainingMinutes: 50, deadline: addDays(TODAY, 1) });
     const light = task({ title: "독서", difficulty: 2, interest: 4, importance: 3, estimatedMinutes: 50, remainingMinutes: 50, deadline: addDays(TODAY, 1) });
     const withHistory = data([...h.tasks, hardToday, mid, light], h.sessions);
@@ -167,6 +169,20 @@ describe("focus pattern", () => {
     // With the switch off the planner is exactly the general one.
     const general = routeOf(planToday({ ...withHistory, userId: "u" }, { now, focus: "steady", mode: "reoptimize", reason: "optimize" }).sessions, TODAY);
     expect(off.map((s) => s.taskId)).toEqual(general.map((s) => s.taskId));
+  });
+
+  it("shapes the first route of the day too, not only later re-plans", () => {
+    const h = history();
+    const hard = task({ title: "수학 문제집 6단원", difficulty: 5, interest: 3, importance: 3, estimatedMinutes: 100, remainingMinutes: 100, deadline: addDays(TODAY, 2) });
+    const mid = task({ title: "화학 보고서", difficulty: 3, interest: 3, importance: 3, estimatedMinutes: 50, remainingMinutes: 50, deadline: addDays(TODAY, 1) });
+    const light = task({ title: "독서", difficulty: 2, interest: 4, importance: 3, estimatedMinutes: 50, remainingMinutes: 50, deadline: addDays(TODAY, 1) });
+    const d = data([...h.tasks, hard, mid, light], h.sessions);
+    const first = routeOf(ensureDay(d, now).sessions, TODAY);
+    const learned = routeOf(planToday({ ...d, userId: "u", focusProfile: schedulingProfile(d, now) }, { now, focus: "steady", mode: "reoptimize", reason: "initial" }).sessions, TODAY);
+    const general = routeOf(planToday({ ...d, userId: "u" }, { now, focus: "steady", mode: "reoptimize", reason: "initial" }).sessions, TODAY);
+    const startOf = (route: StudySession[]) => route.find((s) => s.taskId === hard.id)!.plannedStart;
+    expect(startOf(learned) < startOf(general)).toBe(true);
+    expect(startOf(first)).toBe(startOf(learned));
   });
 });
 

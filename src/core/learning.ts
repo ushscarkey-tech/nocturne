@@ -383,12 +383,20 @@ export function schedulingProfile(data: NocturneData, now: Date): FocusProfile |
 }
 
 /**
- * A small nudge (−0.3…+0.3) for placing a demanding task at `startMinute`,
- * based on how hard work has gone at that hour. Zero for easy work or thin data.
+ * Largest history nudge. The route weighs one importance step at 0.15 and
+ * work due tonight over tomorrow at 0.65, so what history says about an hour
+ * can break a near-tie but never outranks a more important task on its own.
+ */
+export const MAX_HISTORY_NUDGE = 0.12;
+
+/**
+ * A small nudge (±MAX_HISTORY_NUDGE) for placing a demanding task at
+ * `startMinute`, based on how hard work has gone at that hour. Zero for easy
+ * work or thin data.
  */
 export function historyNudge(profile: FocusProfile | null, task: Task, startMinute: number): number {
   if (!profile || task.difficulty < 4) return 0;
   const h = profile.hours.find((x) => x.hour === Math.floor(startMinute / 60));
   if (!h || h.hardSessions < MIN_BUCKET) return 0;
-  return Math.max(-0.3, Math.min(0.3, h.hardCompletion - profile.overallHardCompletion));
+  return Math.max(-MAX_HISTORY_NUDGE, Math.min(MAX_HISTORY_NUDGE, h.hardCompletion - profile.overallHardCompletion));
 }

@@ -72,6 +72,9 @@ function replan(
   opts: Omit<PlanTodayOptions, "focus"> & { focus?: FocusLevel },
   focusFallback: FocusLevel,
 ): { data: NocturneData; change: RouteChange | null } {
+  // A focus given here was just reported; otherwise fatigue counts from the last report.
+  const lastMark = journeyFor(data, serviceDate(opts.now))?.focusLog.at(-1)?.at;
+  const focusSince = opts.focusSince ?? (opts.focus ? opts.now : lastMark ? new Date(lastMark) : undefined);
   const result = planToday(
     {
       tasks: data.tasks,
@@ -81,7 +84,7 @@ function replan(
       focusProfile: schedulingProfile(data, opts.now),
       stops: stopsOf(data.profile),
     },
-    { ...opts, focus: opts.focus ?? focusFallback },
+    { ...opts, focus: opts.focus ?? focusFallback, focusSince },
   );
   return { data: { ...data, sessions: result.sessions }, change: result.change };
 }

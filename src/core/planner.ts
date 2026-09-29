@@ -48,6 +48,11 @@ export interface PlanTodayOptions {
    * in whatever tonight should hold.
    */
   scope?: "tonight" | "all";
+  /**
+   * When the traveller last reported their focus. Stations ridden since then
+   * count toward the evening's fatigue; omitted = every station ridden today.
+   */
+  focusSince?: Date;
 }
 
 export interface PlanTodayResult {
@@ -148,6 +153,15 @@ export function planToday(input: PlanTodayInput, opts: PlanTodayOptions): PlanTo
     [...todays].reverse().find((s) => s.status === "done" || s.status === "partial")?.taskId ??
     null;
 
+  // Fatigue carries over: a re-plan at 22:30 does not treat the traveller as fresh.
+  const since = opts.focusSince?.getTime() ?? -Infinity;
+  const ridden = todays.filter(
+    (s) =>
+      (s.status === "done" || s.status === "partial" || s.status === "active") &&
+      !!s.actualStart &&
+      new Date(s.actualStart).getTime() >= since,
+  ).length;
+
   let slots: Slot[];
   let overflow: Chunk[];
   let historyNote: Message | null = null;
@@ -204,7 +218,7 @@ export function planToday(input: PlanTodayInput, opts: PlanTodayOptions): PlanTo
       const t = tasksById.get(taskId);
       if (t) chunks.push(...chunksFor(t, minutes, focus));
     }
-    const ctx = { date: today, focus, tasks: tasksById, previousTaskId };
+    const ctx = { date: today, focus, tasks: tasksById, previousTaskId, startPosition: ridden };
     const profile = input.focusProfile ?? null;
     if (profile) {
       ({ slots, overflow } = packOptimized(chunks, free, { ...ctx, history: (t, m) => historyNudge(profile, t, m) }, minSessionFor, stops));

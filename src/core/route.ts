@@ -33,6 +33,12 @@ function canSplitAt(minutes: number, space: number, minSession: number): boolean
 }
 
 const FOCUS_CAPACITY: Record<FocusLevel, number> = { low: 0.2, steady: 0.55, sharp: 0.9 };
+/** How much capacity fades with each station ridden since focus was last reported. */
+const FOCUS_DRIFT = 0.05;
+
+function capacityAt(focus: FocusLevel, position: number): number {
+  return Math.max(0.1, FOCUS_CAPACITY[focus] - FOCUS_DRIFT * position);
+}
 
 /** How much willpower a task asks for, 0..1. Hard or avoided work is demanding. */
 export function demandOf(t: Task): number {
@@ -45,6 +51,11 @@ function urgencyOf(t: Task, date: DateKey): number {
   if (!t.deadline) return 0.05;
   const days = Math.max(0, diffDays(date, t.deadline));
   return 1 / (1 + days);
+}
+
+/** Work whose last day is `date` (or already overdue): it cannot wait for another night. */
+function dueBy(t: Task, date: DateKey): boolean {
+  return !t.recurrence && t.deadline !== null && t.deadline <= date;
 }
 
 /** Longest station for a task given tonight's focus: low focus means shorter, easier-to-start stations. */
@@ -82,17 +93,59 @@ export interface OrderContext {
   previousTaskId?: string | null;
   /** Learned nudge for placing a task at a given minute (0 when unknown). */
   history?: (task: Task, startMinute: number) => number;
+  /**
+   * Stations already ridden tonight since focus was last reported: the
+   * evening's fatigue carries into a re-plan instead of starting fresh.
+   */
+  startPosition?: number;
+}
+
+/**
+ * How far each chunk in the pool is from what the traveller can give if it
+ * goes next (0 = a perfect match).
+ *
+ * - Low focus looks at the next station only: begin with what is easy to start.
+ * - Steady or Sharp looks at the rest of the night as well. Focus only fades
+ *   from here, so the cost of going next includes the best order for the
+ *   rest (most demanding work first while capacity lasts). Demanding work
+ *   loses the most by waiting, so it goes while the traveller is fresh
+ *   instead of drifting to the end of the night.
+ */
+function fitCosts(pool: Chunk[], ctx: OrderContext, position: number): number[] {
+  const demand = pool.map((c) => {
+    const t = ctx.tasks.get(c.taskId);
+    return t ? demandOf(t) : 0;
+  });
+  const now = capacityAt(ctx.focus, position);
+  if (ctx.focus === "low") return demand.map((d) => Math.abs(d - now));
+  const order = demand.map((d, i) => ({ d, i })).sort((a, b) => b.d - a.d);
+  return demand.map((d, idx) => {
+    let cost = Math.abs(d - now);
+    let q = position + 1;
+    for (const x of order) {
+      if (x.i === idx) continue;
+      cost += Math.abs(x.d - capacityAt(ctx.focus, q++));
+    }
+    return cost;
+  });
 }
 
 /** Score a chunk for the next position in the route. Higher is better. */
-function scoreChunk(c: Chunk, position: number, prev: Chunk | null, ctx: OrderContext, startMinute: number): number {
+function scoreChunk(
+  c: Chunk,
+  position: number,
+  first: boolean,
+  prev: Chunk | null,
+  ctx: OrderContext,
+  startMinute: number,
+  fit: number,
+): number {
   const t = ctx.tasks.get(c.taskId);
   if (!t) return -Infinity;
-  // Reported focus applies now and drifts down gently through the evening.
-  const capacity = Math.max(0.1, FOCUS_CAPACITY[ctx.focus] - 0.05 * position);
   const demand = demandOf(t);
   const importance = (t.importance - 1) / 4;
-  let score = 1.3 * urgencyOf(t, ctx.date) + 0.6 * importance - 1.2 * Math.abs(demand - capacity);
+  // `fit`: how far the work is from the focus the traveller has left (see fitCosts).
+  let score = 1.3 * urgencyOf(t, ctx.date) + 0.6 * importance - 1.2 * fit;
   // Low focus: favour a low barrier to entry — short, easy, appealing.
   if (ctx.focus === "low") score += 0.35 * (1 - Math.min(1, c.minutes / 60)) + 0.25 * ((t.interest - 1) / 4);
   // Sharp focus is the time for hard or important work.
@@ -103,7 +156,7 @@ function scoreChunk(c: Chunk, position: number, prev: Chunk | null, ctx: OrderCo
   // What the traveller's own history says about this hour (small by design:
   // never outweighs deadlines, importance or how they feel right now).
   if (ctx.history) score += ctx.history(t, startMinute);
-  const prevTaskId = prev?.taskId ?? (position === 0 ? ctx.previousTaskId : null);
+  const prevTaskId = prev?.taskId ?? (first ? ctx.previousTaskId : null);
   if (prevTaskId === c.taskId) score -= 0.8;
   if (prev) {
     const pt = ctx.tasks.get(prev.taskId);
@@ -114,7 +167,8 @@ function scoreChunk(c: Chunk, position: number, prev: Chunk | null, ctx: OrderCo
 
 /**
  * Greedy, focus-aware packing. At every free position pick the best chunk
- * that fits; split splittable chunks to use the tail of a window.
+ * that fits; split splittable chunks to use the tail of a window. Work due
+ * tonight is never pushed out by work that could wait for another night.
  */
 export function packOptimized(
   chunks: Chunk[],
@@ -127,21 +181,42 @@ export function packOptimized(
   const slots: Slot[] = [];
   let prev: Chunk | null = null;
   let splitSeq = 0;
+  const offset = ctx.startPosition ?? 0;
+  const isDue = (c: Chunk) => {
+    const t = ctx.tasks.get(c.taskId);
+    return !!t && dueBy(t, ctx.date);
+  };
 
-  for (const iv of intervals) {
+  intervals.forEach((iv, ivIndex) => {
+    const later = intervals.slice(ivIndex + 1).reduce((sum, x) => sum + (x.end - x.start), 0);
     let cursor = iv.start;
     while (pool.length > 0) {
       const space = iv.end - cursor;
       if (space < 5) break;
+      const position = offset + slots.length;
+      const fit = fitCosts(pool, ctx, position);
+      // Room the work due tonight still needs, Station Stops included.
+      const dueNeed = pool.reduce((sum, c) => sum + (isDue(c) ? c.minutes + breakAfter(c.minutes, stops) : 0), 0);
+      const placeable = (c: Chunk) => {
+        const t = ctx.tasks.get(c.taskId);
+        return c.minutes <= space || (!!t?.splittable && canSplitAt(c.minutes, space, minSessionFor(c.taskId)));
+      };
+      // Low focus eases in with lighter work, but only among tonight's due
+      // stations: all of them come before work that could wait for another
+      // night (which may still fill a gap too small for any due station).
+      const dueFirst = ctx.focus === "low" && pool.some((c) => isDue(c) && placeable(c));
       let bestIdx = -1;
       let bestScore = -Infinity;
       let bestFits = false;
       pool.forEach((c, idx) => {
+        if (!placeable(c)) return;
         const fits = c.minutes <= space;
-        const t = ctx.tasks.get(c.taskId);
-        const canSplit = !!t?.splittable && canSplitAt(c.minutes, space, minSessionFor(c.taskId));
-        if (!fits && !canSplit) return;
-        const s = scoreChunk(c, slots.length, prev, ctx, cursor) + (fits ? 0.2 : 0);
+        if (dueFirst && !isDue(c)) return;
+        if (dueNeed > 0 && !isDue(c)) {
+          const used = fits ? c.minutes : Math.floor(space / 5) * 5;
+          if (space - used - breakAfter(used, stops) + later < dueNeed) return;
+        }
+        const s = scoreChunk(c, position, slots.length === 0, prev, ctx, cursor, fit[idx]) + (fits ? 0.2 : 0);
         if (s > bestScore) {
           bestScore = s;
           bestIdx = idx;
@@ -169,7 +244,7 @@ export function packOptimized(
       prev = placed;
       cursor += placed.minutes + breakAfter(placed.minutes, stops);
     }
-  }
+  });
   return { slots, overflow: pool };
 }
 
