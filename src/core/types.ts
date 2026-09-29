@@ -37,6 +37,8 @@ export interface Profile {
   useFocusHistory: boolean;
   /** Shorter Station Stops (5 min after a long station instead of 10), to fit more in. */
   shortStops: boolean;
+  /** What hour the window shows: the device's clock (default), or dusk to dawn across each ride. */
+  skyMode?: "local" | "journey";
 }
 
 export interface Task {

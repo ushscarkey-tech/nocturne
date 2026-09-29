@@ -3,6 +3,7 @@
 import dynamic from "next/dynamic";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import type { CarriageId } from "@/core/types";
+import type { RideLeg } from "@/components/scene/CabinScene3D";
 import { ambience } from "@/audio/useAmbience";
 import { usePrefersReducedMotion } from "@/lib/hooks";
 
@@ -14,6 +15,12 @@ interface NightSceneProps {
   stationName?: string;
   /** The end of the line: a longer platform with more lamps. */
   terminal?: boolean;
+  /** The station being ridden: the train keeps time with it. */
+  leg?: RideLeg | null;
+  /** One night, one line: seeds the country outside. */
+  seed?: number;
+  /** Which hour the window shows. */
+  sky?: "local" | "journey";
 }
 
 // three.js is fetched only when the carriage is actually shown.

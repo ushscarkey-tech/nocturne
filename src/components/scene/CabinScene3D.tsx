@@ -9,18 +9,32 @@ import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
 import { ShaderPass } from "three/examples/jsm/postprocessing/ShaderPass.js";
 import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
 import type { CarriageId } from "@/core/types";
-import { farLightsMaterial, fieldMaterial, trackGroundMaterial, tunnelWallMaterial } from "./cabin/shaders";
-import * as ct from "./cabin/textures";
+import { tunnelWallMaterial } from "./cabin/shaders";
 import { Curtain } from "./cabin/curtain";
 import { CABIN_TINT as TINT, CURTAIN_COLOR as CURTAIN, CURTAIN_REST, type ClothBacklight } from "./cabin/cloth";
 import { sceneKit } from "./cabin/kit";
 import { PT, buildPlatform } from "./cabin/platform";
 import { D, cabinLights, rideFov, roundedRect, windowDims, windowMaterials, windowParts } from "./cabin/window";
 import { SCENE_READY, describe, floatSupport, pickTarget, sceneLog, frameMeter } from "./gl";
-import { GradeShader, MAX_LIGHTS, hazeMaterial, rainMaterial, skyMaterial } from "./platform/shaders";
+import { GradeShader, MAX_LIGHTS, rainMaterial } from "./platform/shaders";
 import * as tx from "./platform/textures";
+import { atmosphere, atmosphereAt, forcedHour, hourFor, type SkyMode } from "./ride/atmosphere";
+import { skyDome } from "./ride/materials";
+import { stepTrain, trainState, timetable, type Leg, CRUISE } from "./ride/train";
+import { GROUND, buildWorld } from "./ride/world";
 
 export type CabinMode = "platform" | "night" | "tunnel" | "still";
+
+/** The station being ridden, for tying the train to the timer. */
+export interface RideLeg {
+  key: string;
+  /** Planned seconds for this station (grows when time is added). */
+  total: number;
+  /** Seconds ridden when `at` (ms, Date.now()) was measured, and whether the clock is running. */
+  elapsed: number;
+  at: number;
+  paused: boolean;
+}
 
 export interface CabinSceneProps {
   mode: CabinMode;
@@ -28,6 +42,12 @@ export interface CabinSceneProps {
   stationName?: string;
   /** The end of the line: a longer, brighter platform. */
   terminal?: boolean;
+  /** The station being ridden, if any (the train keeps time with it). */
+  leg?: RideLeg | null;
+  /** Seeds the country the line runs through (one night, one line). */
+  seed?: number;
+  /** Which hour the window shows: the clock's, or dusk to dawn across the ride. */
+  sky?: SkyMode;
   className?: string;
   /** Called if this device can't draw the scene; the caller shows the 2D one. */
   onFail?: () => void;
@@ -35,22 +55,15 @@ export interface CabinSceneProps {
   onCurtain?: (amount: number) => void;
 }
 
-// Metres, relative to your eyes. The train runs toward +x, so the world
-// slides toward -x past the window.
-const GROUND = -2.35; // ballast, just below rail level
-const CRUISE = 13;
-const TUNNEL_CRUISE = 15;
-const BRAKE = 1.4;
-const ACCEL = 0.7;
-const LAMP_EVERY = 25; // tunnel lamps
+const TUNNEL_EXPOSURE = 1.25;
 
 /** Steps down, one at a time, while frames keep arriving late: sharpness first, then glow, then frame rate. */
 const QUALITY = [
-  { dpr: 1.5, bloom: true, fps: 60 },
-  { dpr: 1.2, bloom: true, fps: 60 },
-  { dpr: 1, bloom: true, fps: 60 },
-  { dpr: 1, bloom: false, fps: 30 },
-  { dpr: 0.75, bloom: false, fps: 30 },
+  { dpr: 1.5, bloom: true, fps: 60, rain: 1 },
+  { dpr: 1.2, bloom: true, fps: 60, rain: 1 },
+  { dpr: 1, bloom: true, fps: 60, rain: 0.7 },
+  { dpr: 1, bloom: false, fps: 30, rain: 0.5 },
+  { dpr: 0.75, bloom: false, fps: 30, rain: 0.35 },
 ];
 
 const lin = (r: number, g: number, b: number) => new THREE.Color().setRGB(r, g, b);
@@ -58,31 +71,33 @@ const WHITE = new THREE.Color(1, 1, 1);
 /** A colour to work in, so the frame loop allocates nothing. */
 const scratch = new THREE.Color();
 
-/** Wrap x into [-span/2, span/2). */
-const wrap = (x: number, span: number) => ((((x + span / 2) % span) + span) % span) - span / 2;
-
+/** The line curves gently: how far the train's heading has turned at distance s (radians). */
+const heading = (s: number) => 0.014 * Math.sin(s / 1100 + 1.3) + 0.009 * Math.sin(s / 430 + 0.4) + 0.004 * Math.sin(s / 170);
 
 /**
- * The view from your seat on a late local train, in 3D: the window beside
- * you with its curtain and the seat in front, rain on the glass, and outside
- * dark fields, a road with a few lamps, houses, flats and hills, a tunnel
- * now and then, and platforms that slide in and come to rest.
+ * The view from your seat on an old express, in 3D: the window beside you
+ * with its curtain, and outside a line that runs through towns, works,
+ * rivers, fields, hills and tunnels, under the sky of the hour. The train
+ * keeps time with the station you're riding: it pulls away as the timer
+ * starts, stops when you pause, and brakes into the next platform as the
+ * timer ends.
  */
-export default function CabinScene3D({ mode, carriage, stationName = "", terminal = false, className = "", onFail, onCurtain }: CabinSceneProps) {
+export default function CabinScene3D({ mode, carriage, stationName = "", terminal = false, leg = null, seed = 1, sky = "local", className = "", onFail, onCurtain }: CabinSceneProps) {
   const mountRef = useRef<HTMLDivElement>(null);
-  const target = useRef({ mode, carriage, stationName, terminal });
+  const target = useRef({ mode, carriage, stationName, terminal, leg, sky });
   const failRef = useRef(onFail);
   const curtainRef = useRef(onCurtain);
+  const seedRef = useRef(seed);
   useEffect(() => {
     curtainRef.current = onCurtain;
   }, [onCurtain]);
   const pokeRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
-    target.current = { mode, carriage, stationName, terminal };
+    target.current = { mode, carriage, stationName, terminal, leg, sky };
     failRef.current = onFail;
     pokeRef.current?.();
-  }, [mode, carriage, stationName, terminal, onFail]);
+  }, [mode, carriage, stationName, terminal, leg, sky, onFail]);
 
   useEffect(() => {
     const mount = mountRef.current;
@@ -123,18 +138,18 @@ export default function CabinScene3D({ mode, carriage, stationName = "", termina
         return x;
       };
       const K = sceneKit(track);
-      const { lambert, basic, tex, kit, std, nv, put, mesh, box } = K;
+      const { kit, put } = K;
+      const atm = atmosphere();
 
       // Two scenes: the world outside, rendered to a texture the glass looks
       // through, and the carriage around you.
-      const horizon = lin(0.014, 0.02, 0.026);
       const outside = new THREE.Scene();
-      const fog = new THREE.FogExp2(lin(0.009, 0.013, 0.017), 0.0065);
+      const fog = new THREE.FogExp2(0x05070b, 0.0024);
       outside.fog = fog;
       const cabin = new THREE.Scene();
-      const camera = new THREE.PerspectiveCamera(55, 1, 0.03, 1400);
-      const outCam = new THREE.PerspectiveCamera(55, 1, 0.3, 1400);
-
+      const camera = new THREE.PerspectiveCamera(55, 1, 0.03, 60);
+      // Near enough for the platform edge, far enough for the mountains, and no further.
+      const outCam = new THREE.PerspectiveCamera(55, 1, 0.5, 3200);
 
       const fallbacks = new Map<THREE.Material, () => void>();
       const hide = (m: THREE.Material) => () =>
@@ -143,258 +158,36 @@ export default function CabinScene3D({ mode, carriage, stationName = "", termina
         });
 
       // ================================================================ OUTSIDE
-      const land = new THREE.Group(); // everything the tunnel hides
-      outside.add(land);
-
-      const sky = mesh(land, new THREE.SphereGeometry(900, 32, 16), track(skyMaterial({ horizon, zenith: lin(0.003, 0.005, 0.009), glow: lin(0.05, 0.036, 0.022) })));
-      sky.renderOrder = -1;
-      fallbacks.set(sky.material as THREE.Material, () => {
-        sky.material = basic({ color: horizon, side: THREE.BackSide, fog: false, depthWrite: false });
+      const skyMat = track(skyDome());
+      const skyMesh = new THREE.Mesh<THREE.BufferGeometry, THREE.Material>(track(new THREE.SphereGeometry(2400, 32, 16)), skyMat);
+      skyMesh.renderOrder = -10;
+      skyMesh.frustumCulled = false;
+      outside.add(skyMesh);
+      fallbacks.set(skyMat, () => {
+        skyMesh.material = track(new THREE.MeshBasicMaterial({ color: 0x0b0f14, side: THREE.BackSide, fog: false, depthTest: false }));
       });
 
-      // Hills, drawn so they tile: the ridge repeats every HILL_SPAN metres.
-      const HILL_SPAN = 600;
-      const hills: THREE.Mesh[] = [];
-      const hill = (z: number, color: THREE.Color, amp: number, seed: number) => {
-        const s = new THREE.Shape();
-        s.moveTo(-1000, -30);
-        for (let x = -1000; x <= 1600; x += 2) {
-          const k = (x / HILL_SPAN) * Math.PI * 2;
-          const ridge = 12 + amp * (Math.sin(k + seed) * 0.6 + Math.sin(k * 3 + seed * 2) * 0.28 + Math.sin(k * 7 + seed) * 0.12);
-          const i = ((Math.round(x / 2) % (HILL_SPAN / 2)) + HILL_SPAN / 2) % (HILL_SPAN / 2);
-          const n = Math.sin(i * 12.9898 + seed * 78.233) * 43758.5453;
-          const r = n - Math.floor(n);
-          s.lineTo(x, ridge + (r < 0.65 ? 0.6 + r * 2.4 : 0));
-        }
-        s.lineTo(1600, -30);
-        const m = mesh(land, new THREE.ShapeGeometry(s), basic({ color, fog: false }), 0, GROUND, z);
-        hills.push(m);
-      };
-      hill(-520, lin(0.009, 0.013, 0.017), 16, 3);
-      hill(-400, lin(0.005, 0.007, 0.009), 10, 7);
+      const sun = new THREE.DirectionalLight(0xffffff, 0);
+      outside.add(sun, sun.target);
+      const hemi = new THREE.HemisphereLight(0x223040, 0x080808, 1);
+      outside.add(hemi);
 
-      // Far lights: villages, a road on a hillside, one red light on a mast.
-      const FAR_SPAN = 1400;
-      const far = { pos: [] as number[], col: [] as number[], size: [] as number[], phase: [] as number[] };
-      {
-        const rnd = tx.seeded(401);
-        for (let i = 0; i < 150; i++) {
-          const z = -220 - rnd() * 150;
-          const cluster = Math.floor(rnd() * 9);
-          const x = -FAR_SPAN / 2 + ((cluster + rnd() * 0.35) / 9) * FAR_SPAN;
-          far.pos.push(x, GROUND + 0.5 + rnd() * (z < -300 ? 16 : 4), z);
-          const k = rnd();
-          const c = k < 0.7 ? [1, 0.6, 0.28] : k < 0.9 ? [0.95, 0.88, 0.75] : [0.55, 0.75, 1];
-          const b = 0.3 + rnd() * 1.1;
-          far.col.push(c[0] * b, c[1] * b, c[2] * b);
-          far.size.push(2.5 + rnd() * 5);
-          far.phase.push(rnd() * 2);
-        }
-        far.pos.push(-120, GROUND + 34, -470);
-        far.col.push(3, 0.25, 0.12);
-        far.size.push(6);
-        far.phase.push(-0.3);
-      }
-      const farGeo = track(new THREE.BufferGeometry());
-      farGeo.setAttribute("position", new THREE.Float32BufferAttribute(far.pos, 3));
-      farGeo.setAttribute("aColor", new THREE.Float32BufferAttribute(far.col, 3));
-      farGeo.setAttribute("aSize", new THREE.Float32BufferAttribute(far.size, 1));
-      farGeo.setAttribute("aPhase", new THREE.Float32BufferAttribute(far.phase, 1));
-      const farMat = track(farLightsMaterial(1, FAR_SPAN));
-      const farPoints = new THREE.Points(farGeo, farMat);
-      farPoints.frustumCulled = false;
-      land.add(farPoints);
-      fallbacks.set(farMat, hide(farMat));
-
-      /** Things that slide past and come round again, re-dressed each lap. */
-      interface Slot {
-        obj: THREE.Object3D;
-        base: number;
-        span: number;
-        last: number;
-        dress?: () => void;
-        lamp?: THREE.Object3D;
-      }
-      const slots: Slot[] = [];
-      const slot = (obj: THREE.Object3D, base: number, span: number, dress?: () => void) => {
-        const s: Slot = { obj, base, span, last: base, dress };
-        dress?.();
-        slots.push(s);
-        return s;
-      };
-      const chance = tx.seeded((Date.now() % 100000) + 11);
-
-      // Flats and a few tall blocks toward town.
-      const flatMats = Array.from({ length: 6 }, (_, i) => {
-        const cols = 6 + (i % 3) * 3;
-        const rows = 10 + ((i * 7) % 4) * 5;
-        return { mat: basic({ map: tex(ct.flats(cols, rows, 900 + i)), color: lin(1.6, 1.6, 1.6) }), cols, rows };
-      });
-      const flatSide = basic({ color: 0x000000 });
-      for (let i = 0; i < 7; i++) {
-        const g = new THREE.Group();
-        const b = mesh(g, new THREE.BoxGeometry(1, 1, 1), [flatSide, flatSide, flatSide, flatSide, flatMats[0].mat, flatSide]);
-        const red = mesh(g, new THREE.SphereGeometry(0.35, 8, 6), basic({ color: lin(3, 0.2, 0.1), fog: false }));
-        put(land, g, 0, 0, -150 - chance() * 60);
-        slot(g, -400 + i * (800 / 7), 800, () => {
-          const f = flatMats[Math.floor(chance() * flatMats.length)];
-          const w = f.cols * 2.6;
-          const h = f.rows * 2.8;
-          (b.material as THREE.Material[])[4] = f.mat;
-          b.scale.set(w, h, 10);
-          b.position.y = GROUND + h / 2;
-          red.position.set(0, GROUND + h + 0.6, 0);
-          red.visible = h > 40;
-          g.visible = chance() < 0.75;
-        });
-      }
-
-      // Cedars in dark clumps.
-      const cedarMat = basic({ alphaMap: tex(tx.treeline(77)), color: lin(0.004, 0.006, 0.006), transparent: true, alphaTest: 0.35 });
-      for (let i = 0; i < 6; i++) {
-        const t = mesh(land, new THREE.PlaneGeometry(60, 15), cedarMat, 0, 0, -80 - i * 9);
-        slot(t, -250 + i * (500 / 6), 500, () => {
-          const s = 0.6 + chance() * 0.8;
-          t.scale.set(s, s, 1);
-          t.position.y = GROUND + 7.5 * s - 1;
-          t.visible = chance() < 0.7;
-        });
-      }
-
-      // Fields, with flooded paddies holding the sky.
-      const fieldMat = track(fieldMaterial(fog));
-      const field = mesh(land, new THREE.PlaneGeometry(1400, 600), fieldMat, 0, GROUND - 0.05, -312);
-      field.rotation.x = -Math.PI / 2;
-      fallbacks.set(fieldMat, () => {
-        field.material = lambert({ color: 0x0c110d });
-      });
-
-      // A road beside the line, lamps along it, now and then a car.
-      const road = mesh(land, new THREE.PlaneGeometry(1400, 5), std({ color: 0x17191c, roughness: 0.75, normalMap: kit.relief("asphalt", [280, 1]), normalScale: nv(0.8) }, 0.5), 0, GROUND - 0.02, -24);
-      road.rotation.x = -Math.PI / 2;
-      const glowTex = tex(tx.softDot());
-      const poolMat = basic({ map: glowTex, color: lin(0.5, 0.33, 0.16), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false });
-      const lampHead = basic({ color: lin(4, 2.8, 1.6) });
-      const lampHaze = track(hazeMaterial(lin(1, 0.7, 0.42), 0.09));
-      fallbacks.set(lampHaze, hide(lampHaze));
-      const poleMat = lambert({ color: 0x1a1d1f });
-      const roadLamps: THREE.Object3D[] = [];
-      for (let i = 0; i < 7; i++) {
-        const g = new THREE.Group();
-        mesh(g, new THREE.CylinderGeometry(0.07, 0.09, 6.5, 8), poleMat, 0, GROUND + 3.25, 0);
-        box(g, 1.2, 0.08, 0.08, poleMat, 0, GROUND + 6.4, 0.55).rotation.y = Math.PI / 2;
-        const head = box(g, 0.5, 0.1, 0.25, lampHead, 0, GROUND + 6.35, 1.1);
-        head.rotation.y = Math.PI / 2;
-        const cone = new THREE.CylinderGeometry(0.2, 3, 6.3, 16, 1, true);
-        mesh(g, cone, lampHaze, 0, GROUND + 3.2, 1.1);
-        const pool = mesh(g, new THREE.PlaneGeometry(9, 9), poolMat, 0, GROUND + 0.02, 1.1);
-        pool.rotation.x = -Math.PI / 2;
-        put(land, g, 0, 0, -27.5);
-        roadLamps.push(g);
-        slot(g, -210 + i * 60, 420, () => {
-          g.visible = chance() < 0.8;
-        });
-      }
-      // The car: a small hatchback, its headlights and their pool, crossing the view.
-      const car = new THREE.Group();
-      // Paint that shows only where light finds it: under the road lamps it comes up.
-      const carPaint = lambert({ color: 0x3a4148, emissive: 0x14181d, emissiveIntensity: 1 });
-      const carGlass = lambert({ color: 0x0b0f14, emissive: 0x06080b });
-      const carTyre = lambert({ color: 0x07080a });
-      box(car, 4.2, 0.62, 1.74, carPaint, 0, GROUND + 0.62, 0);
-      box(car, 2.3, 0.56, 1.56, carPaint, -0.35, GROUND + 1.2, 0);
-      box(car, 2.18, 0.4, 1.6, carGlass, -0.35, GROUND + 1.21, 0);
-      box(car, 0.9, 0.05, 1.5, carPaint, -0.35, GROUND + 1.49, 0);
-      for (const wx of [-1.35, 1.35]) {
-        for (const wz of [-0.8, 0.8]) {
-          const wheel = mesh(car, new THREE.CylinderGeometry(0.32, 0.32, 0.22, 14), carTyre, wx, GROUND + 0.32, wz);
-          wheel.rotation.x = Math.PI / 2;
-        }
-      }
-      const carBeam = basic({ map: glowTex, color: lin(2.5, 2.3, 2), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false });
-      const tail = basic({ map: glowTex, color: lin(2.5, 0.3, 0.2), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false });
-      for (const dz of [-0.7, 0.7]) {
-        put(car, new THREE.Sprite(track(new THREE.SpriteMaterial({ map: glowTex, color: lin(2.6, 2.4, 2.1), blending: THREE.AdditiveBlending, depthWrite: false }))), 2.1, GROUND + 0.75, dz).scale.setScalar(0.9);
-        put(car, new THREE.Sprite(track(new THREE.SpriteMaterial({ map: glowTex, color: lin(2, 0.2, 0.12), blending: THREE.AdditiveBlending, depthWrite: false }))), -2.1, GROUND + 0.8, dz).scale.setScalar(0.5);
-      }
-      const carPool = mesh(car, new THREE.PlaneGeometry(14, 4), carBeam, 9, GROUND + 0.03, 0);
-      carPool.rotation.x = -Math.PI / 2;
-      mesh(car, new THREE.PlaneGeometry(2, 2), tail, -2.6, GROUND + 0.03, 0).rotation.x = -Math.PI / 2;
-      put(land, car, 0, 0, -23);
-      const carState = { x: 0, v: 0, wait: 6 + chance() * 10, on: false };
-      car.visible = false;
-
-      // Houses, a window or two still lit.
-      const houseShape = new THREE.Shape([new THREE.Vector2(-3, 0), new THREE.Vector2(3, 0), new THREE.Vector2(3, 3.2), new THREE.Vector2(0, 5.2), new THREE.Vector2(-3, 3.2)]);
-      const houseGeo = track(new THREE.ExtrudeGeometry(houseShape, { depth: 7, bevelEnabled: false }));
-      const houseMat = lambert({ color: 0x0e1110 });
-      const winMats = [basic({ color: lin(2.2, 1.35, 0.55) }), basic({ color: lin(1.8, 1.5, 1.0) }), basic({ color: lin(0.9, 1.1, 1.6) })];
-      const winGeo = track(new THREE.PlaneGeometry(1.1, 0.8));
-      for (let i = 0; i < 12; i++) {
-        const g = new THREE.Group();
-        put(g, new THREE.Mesh(houseGeo, houseMat), 0, GROUND, -3.5);
-        const wins = [0, 1, 2].map((k) => put(g, new THREE.Mesh(winGeo, winMats[0]), -1.8 + k * 1.8, GROUND + 1.7 + (k === 1 ? 0 : 0), 3.52));
-        put(land, g, 0, 0, 0);
-        slot(g, -180 + i * 30, 360, () => {
-          g.position.z = -34 - chance() * 55;
-          g.rotation.y = (chance() - 0.5) * 0.5;
-          g.scale.setScalar(0.8 + chance() * 0.5);
-          g.visible = chance() < 0.7;
-          wins.forEach((w) => {
-            w.visible = chance() < 0.35;
-            w.material = winMats[chance() < 0.75 ? 0 : chance() < 0.7 ? 1 : 2];
-          });
-        });
-      }
-
-      // Poles right by the line; some carry a lamp that sweeps through the carriage.
-      const nearLamps: THREE.Object3D[] = [];
-      for (let i = 0; i < 3; i++) {
-        const g = new THREE.Group();
-        mesh(g, new THREE.CylinderGeometry(0.11, 0.14, 8.5, 8), poleMat, 0, GROUND + 4.25, 0);
-        box(g, 0.1, 0.1, 1.8, poleMat, 0, GROUND + 7.8, 0);
-        const lampG = new THREE.Group();
-        box(lampG, 0.1, 0.1, 1.0, poleMat, 0, GROUND + 5.2, 0.5);
-        box(lampG, 0.35, 0.08, 0.2, lampHead, 0, GROUND + 5.15, 1.0);
-        mesh(lampG, new THREE.CylinderGeometry(0.15, 2.4, 5.1, 16, 1, true), lampHaze, 0, GROUND + 2.6, 1.0);
-        const pool = mesh(lampG, new THREE.PlaneGeometry(7, 7), poolMat, 0, GROUND + 0.03, 1.0);
-        pool.rotation.x = -Math.PI / 2;
-        g.add(lampG);
-        put(land, g, 0, 0, -8.5);
-        const s = slot(g, -90 + i * 60, 180, () => {
-          lampG.visible = chance() < 0.3;
-        });
-        s.lamp = lampG;
-        nearLamps.push(g);
-      }
-      // Wires between them (level; the sag is lost at speed).
-      const wireMat = track(new THREE.LineBasicMaterial({ color: lin(0.004, 0.005, 0.006) }));
-      for (const y of [GROUND + 7.7, GROUND + 7.2]) {
-        land.add(new THREE.Line(track(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(-400, y, -8.5), new THREE.Vector3(400, y, -8.5)])), wireMat));
-      }
-
-      // The ballast and the other track, right beside the train.
-      const groundMat = track(trackGroundMaterial(fog, tex(tx.gravel())));
-      (groundMat.uniforms.tGravel.value as THREE.Texture).wrapS = THREE.RepeatWrapping;
-      (groundMat.uniforms.tGravel.value as THREE.Texture).wrapT = THREE.RepeatWrapping;
-      const trackside = mesh(land, new THREE.PlaneGeometry(240, 12), groundMat, 0, GROUND, -7);
-      trackside.rotation.x = -Math.PI / 2;
-      fallbacks.set(groundMat, () => {
-        trackside.material = lambert({ color: 0x141412 });
-      });
-
-      outside.add(new THREE.HemisphereLight(lin(0.045, 0.06, 0.08), lin(0.008, 0.008, 0.008), 0.8));
+      const world = buildWorld(seedRef.current, track);
+      outside.add(world.root);
+      outside.add((world as unknown as { catenary: THREE.Object3D }).catenary);
 
       // ------------------------------------------------------------- tunnel
       const tunnelMat = track(tunnelWallMaterial(fog));
-      const tunnelWall = mesh(outside, new THREE.PlaneGeometry(160, 9), tunnelMat, 0, 0.6, -2.2);
+      const tunnelWall = new THREE.Mesh<THREE.BufferGeometry, THREE.Material>(track(new THREE.PlaneGeometry(400, 9)), tunnelMat);
+      tunnelWall.position.set(0, 0.6, -2.2);
       tunnelWall.visible = false;
+      outside.add(tunnelWall);
       fallbacks.set(tunnelMat, () => {
-        tunnelWall.material = lambert({ color: 0x0b0b0a });
+        tunnelWall.material = track(new THREE.MeshLambertMaterial({ color: 0x0b0b0a }));
       });
 
       // ----------------------------------------------------------- platform
-      // The same platform the walk onto the train crossed.
+      // The same platform the walk onto the train crossed; it's where the train stops.
       const platform = buildPlatform(K, target.current.stationName);
       const plat = platform.group;
       plat.visible = false;
@@ -425,16 +218,20 @@ export default function CabinScene3D({ mode, carriage, stationName = "", termina
       rain.frustumCulled = false;
       outside.add(rain);
       fallbacks.set(rainMat, hide(rainMat));
+      const lampScratch = Array.from({ length: MAX_LIGHTS }, () => new THREE.Vector4());
 
       // ================================================================= CABIN
       const tint = TINT[target.current.carriage].clone();
       const lights = cabinLights(tint);
       cabin.add(lights.group, lights.fill);
       const cabinLight = lights.main;
+      const reading = lights.reading;
       const sweep = lights.sweep;
+      // Daylight through the window, filling the carriage from above and in front.
+      const daylight = new THREE.HemisphereLight(0xffffff, 0x444444, 0);
+      cabin.add(daylight);
       // Lit from behind by whatever is outside the glass (set up with the post passes).
       const clothBack: ClothBacklight = { outside: null as unknown as THREE.Texture, res: new THREE.Vector2(1, 1), winMin: new THREE.Vector2(), winMax: new THREE.Vector2(), strength: 0.45 };
-      // The carriage: moulded panel, brushed aluminium, a woven curtain.
       const mats = windowMaterials(K, target.current.carriage, clothBack);
       const curtainMat = mats.cloth;
       const glassMat = mats.glass;
@@ -497,28 +294,38 @@ export default function CabinScene3D({ mode, carriage, stationName = "", termina
 
       // ============================================================== MOTION
       const start = target.current.mode;
+      const train = trainState();
+      // For checking the look: start further down the line (`?travel=12000`).
+      const jump = Number(new URLSearchParams(window.location.search).get("travel"));
+      if (Number.isFinite(jump) && jump > 0) train.s = jump;
+      // Arriving at the seat from the platform: the train is standing at it.
+      train.stopAt = start === "platform" || start === "still" ? 0 : null;
       const st = {
-        v: reduce ? 0 : start === "night" ? CRUISE : start === "tunnel" ? TUNNEL_CRUISE : 0,
-        travel: 0,
         time: 0,
-        tunnel: { on: start === "tunnel", from: -1e4, to: 1e4 },
-        plat: { on: start === "platform" || start === "still", x: 0, end: start === "still" || target.current.terminal },
-        jolt: 0,
-        joint: 0,
-        reflect: start === "tunnel" ? 0.14 : 0.08,
+        forced: { on: false, from: 0, to: Infinity },
+        reflect: 0.1,
+        tunnel: 0,
         // Already wet in the rain carriage: the glass you sat down at was.
         rain: target.current.carriage === "rain" ? 1 : 0,
         lastV: 0,
+        jolt: 0,
+        joint: 0,
         drawn: 0,
+        /** The platform shown: the one you're at, or the next as it comes. */
+        platAt: train.stopAt ?? -1e9,
+        hour: -1,
+        hourAt: -10,
       };
-      st.lastV = st.v;
-      // Starting at a platform, its light is already in the carriage (as it was as you sat down).
-      if (st.plat.on) sweep.intensity = lights.platformSpill();
-      if (st.plat.on) drawSign(target.current.stationName, st.plat.end);
+      const legView: Leg = { key: "", total: 1, paused: false, elapsed: () => 0 };
+      if (train.stopAt !== null) {
+        sweep.intensity = lights.platformSpill();
+        drawSign(target.current.stationName, start === "still" || target.current.terminal);
+      }
       let level = 0;
       let clockAt = 0;
       let halfW = 1;
       let builtFor = "";
+      let signFor = "";
 
       const layout = () => {
         const w = mount.clientWidth || 1;
@@ -534,7 +341,7 @@ export default function CabinScene3D({ mode, carriage, stationName = "", termina
         grade.uniforms.uRes.value.set(w * dpr, h * dpr);
         glassMat.uniforms.uRes.value.set(Math.round(w * dpr), Math.round(h * dpr));
         clothBack.res.set(Math.round(w * dpr), Math.round(h * dpr));
-        farMat.uniforms.uPixelRatio.value = dpr;
+        rainGeo.instanceCount = Math.round(RAIN * q.rain);
         const aspect = w / h;
         camera.aspect = outCam.aspect = aspect;
         camera.fov = outCam.fov = rideFov(aspect);
@@ -550,62 +357,100 @@ export default function CabinScene3D({ mode, carriage, stationName = "", termina
         if (reduce) draw();
       };
 
+      const applyAtmosphere = (progress: number) => {
+        const forced = forcedHour();
+        const hour = forced ?? hourFor(target.current.sky, new Date(), progress);
+        atmosphereAt(atm, hour);
+        const su = skyMat.uniforms;
+        su.uZenith.value.copy(atm.zenith);
+        su.uHorizon.value.copy(atm.horizon);
+        su.uGlow.value.copy(atm.glow);
+        su.uSun.value.copy(atm.sun);
+        su.uSunDir.value.copy(atm.sunDir);
+        su.uSunI.value = atm.sunI;
+        su.uNight.value = atm.night;
+        su.uClouds.value = atm.clouds;
+        fog.color.copy(atm.fog);
+        fog.density = atm.fogDensity;
+        sun.color.copy(atm.sun);
+        sun.intensity = atm.sunI;
+        sun.position.copy(atm.sunDir).multiplyScalar(500);
+        hemi.color.copy(atm.hemiSky);
+        hemi.groundColor.copy(atm.hemiGround);
+        hemi.intensity = atm.hemiI;
+      };
+
       const update = (dt: number) => {
-        const { mode: m, carriage: c, terminal: term } = target.current;
+        const { mode: m, carriage: c, terminal: term, leg: legIn } = target.current;
         st.time += dt;
         const moving = m === "night" || m === "tunnel";
-        const cruise = m === "tunnel" ? TUNNEL_CRUISE : CRUISE;
 
-        // A tunnel mouth arrives from ahead; leaving, its end does.
-        if (m === "tunnel" && !st.tunnel.on) st.tunnel = { on: true, from: reduce ? -1e4 : 40, to: 1e4 };
-        if (m !== "tunnel" && st.tunnel.on && st.tunnel.to > 1e3) st.tunnel.to = reduce ? -1e4 : 30;
+        // Keep time with the station being ridden.
+        let leg: Leg | null = null;
+        if (legIn && moving) {
+          legView.key = legIn.key;
+          legView.total = Math.max(1, legIn.total);
+          legView.paused = legIn.paused;
+          const at = legIn.at;
+          const base = legIn.elapsed;
+          legView.elapsed = legIn.paused ? () => base : () => base + (Date.now() - at) / 1000;
+          leg = legView;
+        }
+        if (reduce) {
+          // A still picture: no travel at all.
+          train.v = 0;
+        } else stepTrain(train, dt, leg, !moving);
+        const s = train.s;
 
-        // A platform comes in far enough ahead to brake for it.
-        if ((m === "platform" || m === "still") && !st.plat.on) {
-          const brake = (st.v * st.v) / (2 * BRAKE);
-          const clear = st.tunnel.on ? st.tunnel.to + half + 10 : 0;
-          st.plat = { on: true, x: reduce ? 0 : Math.max(brake, clear, 0), end: m === "still" || term };
-          drawSign(target.current.stationName, st.plat.end);
+        // The platform: the one you're standing at, or the next one as it comes into view.
+        if (train.stopAt !== null) st.platAt = train.stopAt;
+        else if (Number.isFinite(train.legEnd) && train.legEnd - s < half + 500) st.platAt = train.legEnd;
+        world.setStops(Number.isFinite(train.legEnd) && train.stopAt === null ? [train.legEnd] : [st.platAt], s);
+        const platX = st.platAt - s;
+        plat.visible = Math.abs(platX) < half + 420;
+        plat.position.x = platX;
+        const end = m === "still" || term;
+        const signKey = `${target.current.stationName}|${end}`;
+        if (plat.visible && signKey !== signFor) {
+          signFor = signKey;
+          drawSign(target.current.stationName, end);
         }
 
-        if (reduce) st.v = 0;
-        else if (st.plat.on && !moving) {
-          // Brake so the name board comes to rest at the window.
-          const x = Math.max(0, st.plat.x);
-          st.v = x < 0.02 ? 0 : Math.min(st.v + ACCEL * dt, Math.sqrt(2 * BRAKE * x));
-        } else {
-          st.v = Math.min(cruise, st.v + ACCEL * dt * (st.v < cruise ? 1 : -1));
-          if (Math.abs(st.v - cruise) < ACCEL * dt) st.v = cruise;
-        }
-        const dx = st.v * dt;
-        st.travel += dx;
-
-        if (st.tunnel.on) {
-          st.tunnel.from -= dx;
-          if (st.tunnel.to < 1e3) st.tunnel.to -= dx;
-          if (st.tunnel.to < -80) st.tunnel.on = false;
-        }
-        if (st.plat.on) {
-          st.plat.x = Math.max(moving ? -1e4 : 0, st.plat.x - dx);
-          if (reduce && !moving) st.plat.x = 0;
-          if (st.plat.x < -(half + 80) || (reduce && moving)) st.plat.on = false;
-        }
+        // A tunnel asked for (deep focus) runs from just ahead until it's let go.
+        if (m === "tunnel" && !st.forced.on) st.forced = { on: true, from: s + (reduce ? -2000 : 40), to: Infinity };
+        if (m !== "tunnel" && st.forced.on && st.forced.to === Infinity) st.forced.to = s + (reduce ? -2000 : 30);
+        if (st.forced.on && st.forced.to < s - 300) st.forced.on = false;
+        const routeTunnel = world.route.tunnelNear(s - 300, s + 300);
+        const tun = st.forced.on ? ([st.forced.from, st.forced.to] as const) : routeTunnel;
+        const vis = halfW * 3 + 20;
+        const tFrom = tun ? tun[0] - s : 1e5;
+        const tTo = tun ? tun[1] - s : 1e5;
+        const covered = !!tun && tFrom < -vis && tTo > vis;
+        tunnelWall.visible = !!tun && tFrom < 200 && tTo > -200;
+        tunnelMat.uniforms.uStart.value = tFrom;
+        tunnelMat.uniforms.uEnd.value = tTo;
+        tunnelMat.uniforms.uTravel.value = s;
+        tunnelMat.uniforms.uBlur.value = train.v / 30;
+        // How much of the view the tunnel fills, eased: the eye adjusts over a second or two.
+        const inside = !tun ? 0 : covered ? 1 : Math.max(0, Math.min(1, (Math.min(tTo, vis) - Math.max(tFrom, -vis)) / (2 * vis)));
+        st.tunnel += (inside - st.tunnel) * Math.min(1, dt * 1.2);
 
         // Rail joints: a small knock every 25 m.
-        const joint = Math.floor(st.travel / 25);
+        const joint = Math.floor(s / 25);
         let knock = 0;
         if (joint !== st.joint) {
           st.joint = joint;
-          st.jolt = Math.min(1, st.v / CRUISE);
+          st.jolt = Math.min(1, train.v / CRUISE);
           knock = st.jolt;
         }
         st.jolt *= Math.exp(-dt * 9);
 
         // The curtain feels the train: pulling away, braking, the joints, the roll.
-        const accel = dt > 0 ? (st.v - st.lastV) / dt : 0;
-        st.lastV = st.v;
+        const accel = dt > 0 ? (train.v - st.lastV) / dt : 0;
+        st.lastV = train.v;
+        const vr = train.v / CRUISE;
         if (curtain) {
-          curtain.update(dt, accel, knock, Math.sin(st.time * 0.9) * (st.v / CRUISE) + Math.sin(st.time * 2.3) * 0.3 * (st.v / CRUISE));
+          curtain.update(dt, accel, knock, Math.sin(st.time * 0.9) * vr + Math.sin(st.time * 2.3) * 0.3 * vr);
           const drawn = Math.max(0, (curtain.cover - CURTAIN_REST) / (1 - CURTAIN_REST));
           if (Math.abs(drawn - st.drawn) > 0.01) {
             st.drawn = drawn;
@@ -613,134 +458,102 @@ export default function CabinScene3D({ mode, carriage, stationName = "", termina
           }
         }
 
-        // ---- apply
-        const vis = halfW * 3 + 20;
-        const covered = st.tunnel.on && st.tunnel.from < -vis && st.tunnel.to > vis;
-        land.visible = !covered;
-        tunnelWall.visible = st.tunnel.on;
-        tunnelMat.uniforms.uStart.value = st.tunnel.from;
-        tunnelMat.uniforms.uEnd.value = st.tunnel.to;
-        tunnelMat.uniforms.uTravel.value = st.travel;
-        tunnelMat.uniforms.uBlur.value = st.v / 30;
-        plat.visible = st.plat.on;
-        plat.position.x = st.plat.x;
-
-        hills.forEach((h) => (h.position.x = -(st.travel % HILL_SPAN)));
-        farMat.uniforms.uTravel.value = st.travel;
-        farMat.uniforms.uTime.value = st.time;
-        fieldMat.uniforms.uTravel.value = st.travel;
-        // The road is one long plane; its surface slides with the distance travelled (5 m per tile).
-        const roadRelief = (road.material as THREE.MeshStandardMaterial).normalMap;
-        if (roadRelief) roadRelief.offset.x = (st.travel / 5) % 1;
-        groundMat.uniforms.uTravel.value = st.travel;
-        groundMat.uniforms.uBlur.value = st.v / 30;
-        groundMat.uniforms.uSpill.value.copy(TINT[c]).multiplyScalar(0.45);
-        const skyMat = sky.material as THREE.ShaderMaterial;
-        if (skyMat.uniforms) skyMat.uniforms.uTime.value = st.time;
-        for (const s of slots) {
-          const x = wrap(s.base - st.travel, s.span);
-          if (x > s.last + s.span / 2) s.dress?.();
-          s.last = x;
-          s.obj.position.x = x;
+        // ---- the hour
+        const progress = leg ? Math.min(1, leg.elapsed() / leg.total) : 0;
+        if (st.time - st.hourAt > 0.5 || st.hour < 0) {
+          st.hourAt = st.time;
+          applyAtmosphere(progress);
+          st.hour = atm.hour;
         }
+        skyMat.uniforms.uTime.value = st.time;
+        skyMat.uniforms.uDrift.value = s;
 
-        // The car on the road.
-        if (!carState.on) {
-          carState.wait -= dt;
-          if (carState.wait <= 0 && !reduce && land.visible) {
-            const dir = chance() < 0.5 ? 1 : -1;
-            carState.v = dir * (10 + chance() * 8);
-            const rel = carState.v - st.v;
-            carState.x = rel < 0 ? 140 : -140;
-            carState.on = true;
-            car.rotation.y = dir > 0 ? 0 : Math.PI;
-          }
-        } else {
-          carState.x += (carState.v - st.v) * dt;
-          if (Math.abs(carState.x) > 150) {
-            carState.on = false;
-            carState.wait = 10 + chance() * 30;
-          }
-        }
-        car.visible = carState.on;
-        car.position.x = carState.x;
-        if (carState.on) {
-          // Nearest lit road lamp: the body catches its light as it passes beneath.
-          let lit = 0;
-          for (const g of roadLamps) {
-            if (!g.visible) continue;
-            const d = g.position.x - carState.x;
-            lit = Math.max(lit, Math.exp(-(d * d) / 50));
-          }
-          carPaint.emissiveIntensity = 1 + lit * 5;
-        }
+        // ---- the world
+        world.root.visible = !covered;
+        skyMesh.visible = !covered;
+        world.update(s, atm, st.time, dt);
 
-        // Rain: outside only on the rain carriage; beads on the glass always a few.
+        // Rain: outside only on the rain carriage; on the glass too.
         const wet = c === "rain";
         st.rain += ((wet ? 1 : 0) - st.rain) * Math.min(1, dt * 0.5);
-        rain.visible = wet;
+        rain.visible = wet && !covered;
         rainMat.uniforms.uTime.value = st.time;
-        rainMat.uniforms.uTravel.value = st.travel;
-        rainMat.uniforms.uWind.value = -st.v / 8.5;
-        if (st.plat.on) {
-          coverMin.set(st.plat.x - half, -10, -6.4);
-          coverMax.set(st.plat.x + half, PT + 3.2, -1.7);
+        rainMat.uniforms.uTravel.value = s;
+        rainMat.uniforms.uWind.value = -train.v / 8.5;
+        if (plat.visible) {
+          coverMin.set(platX - half, -10, -6.4);
+          coverMax.set(platX + half, PT + 3.2, -1.7);
         } else {
           coverMin.set(1, 1, 1);
           coverMax.set(-1, -1, -1);
         }
-        // Rain catches the platform tubes and the road lamps.
+        // Rain catches the platform tubes and the lamps along the line.
         let li = 0;
-        if (st.plat.on) for (const l of platLights) if (li < MAX_LIGHTS) rainLights[li++].set(st.plat.x + l.position.x, l.position.y, l.position.z, 1.4);
-        for (const s of slots) if (s.lamp?.visible && s.obj.visible && li < MAX_LIGHTS) rainLights[li++].set(s.obj.position.x, GROUND + 5.1, -7.5, 3);
+        if (plat.visible) for (const l of platLights) if (li < MAX_LIGHTS && Math.abs(platX + l.position.x) < 40) rainLights[li++].set(platX + l.position.x, l.position.y, l.position.z, 1.4);
+        const nl = world.lampsNear(s, lampScratch);
+        for (let k = 0; k < nl && li < MAX_LIGHTS; k++) rainLights[li++].set(lampScratch[k].x, lampScratch[k].y, lampScratch[k].z, 2.4 * atm.night);
         while (li < MAX_LIGHTS) rainLights[li++].w = 0;
 
-        // What lights the carriage from outside: tunnel lamps, a pole lamp, the platform.
+        // What lights the carriage from outside: tunnel lamps, a lamp passing, the platform.
         let sweepI = 0;
-        if (st.tunnel.on) {
-          // Lamps sit where (x + travel) mod 25 = 12.5; take the nearest.
-          const lx = (((LAMP_EVERY / 2 - st.travel) % LAMP_EVERY) + LAMP_EVERY) % LAMP_EVERY;
-          const x = lx > LAMP_EVERY / 2 ? lx - LAMP_EVERY : lx;
-          if (x > st.tunnel.from && x < st.tunnel.to) {
+        if (tun && tFrom < 0 && tTo > 0) {
+          const EVERY = 25;
+          const lx = (((EVERY / 2 - s) % EVERY) + EVERY) % EVERY;
+          const x = lx > EVERY / 2 ? lx - EVERY : lx;
+          if (x > tFrom && x < tTo) {
             sweep.position.set(x, 0.6, -1.9);
             sweep.color.setRGB(1, 0.62, 0.3);
             sweepI = 3.2 * Math.exp(-(x * x) / 6);
           }
-        } else if (st.plat.on && Math.abs(st.plat.x) < half) {
+        } else if (plat.visible && Math.abs(platX) < half) {
           sweep.position.set(0, 1.2, -2.2);
           sweep.color.setRGB(1, 0.9, 0.75);
-          sweepI = 1.6;
+          sweepI = 1.6 * (0.3 + 0.7 * atm.night);
         } else {
-          for (const s of slots) {
-            if (!s.lamp?.visible || !s.obj.visible) continue;
-            const x = s.obj.position.x;
-            if (Math.abs(x) < 12) {
+          for (let k = 0; k < nl; k++) {
+            const x = lampScratch[k].x;
+            const i = 1.6 * Math.exp(-(x * x) / 40) * atm.night;
+            if (i > sweepI) {
               sweep.position.set(x, 1.6, -4);
               sweep.color.setRGB(1, 0.72, 0.42);
-              sweepI = Math.max(sweepI, 2.2 * Math.exp(-(x * x) / 10));
+              sweepI = i;
             }
           }
         }
         sweep.intensity += (sweepI - sweep.intensity) * Math.min(1, dt * 12);
 
-        // The carriage: its light, curtain colour, the glass.
+        // The carriage: its lamps (they matter less at noon), daylight, curtain colour, the glass.
+        const dark = Math.max(atm.cabin, st.tunnel);
         tint.lerp(TINT[c], Math.min(1, dt * 2));
         cabinLight.color.copy(tint);
+        cabinLight.intensity = 3.2 * (0.55 + 0.45 * dark);
+        reading.intensity = 0.9 * (0.4 + 0.6 * dark);
+        daylight.color.copy(atm.daylight).multiplyScalar(1 - st.tunnel);
+        daylight.groundColor.copy(atm.daylight).multiplyScalar(0.35 * (1 - st.tunnel));
+        daylight.intensity = 2.2;
         curtainMat.color.lerp(scratch.setHex(CURTAIN[c]), Math.min(1, dt * 2));
         curtainMat.sheenColor.copy(curtainMat.color).lerp(WHITE, 0.35);
-        const reflectGoal = st.tunnel.on && covered ? 0.14 : st.plat.on && Math.abs(st.plat.x) < half ? 0.04 : 0.08;
+        const atPlatform = plat.visible && Math.abs(platX) < half;
+        const reflectGoal = THREE.MathUtils.lerp(atPlatform ? Math.min(atm.reflect, 0.05) : atm.reflect, 0.16, st.tunnel);
         st.reflect += (reflectGoal - st.reflect) * Math.min(1, dt * 1.5);
         glassMat.uniforms.uReflect.value = st.reflect;
         glassMat.uniforms.uTint.value.copy(tint);
         // The page's clock, shared with the boarding view, so the drops carry straight on.
         glassMat.uniforms.uTime.value = performance.now() / 1000;
         glassMat.uniforms.uRain.value = st.rain;
-        glassMat.uniforms.uSlant.value = -Math.min(1.4, (st.v / CRUISE) * 1.2);
+        glassMat.uniforms.uSlant.value = -Math.min(1.4, vr * 1.2);
         grade.uniforms.uTime.value = st.time;
+        // The eye adjusts: bright days are exposed down, a tunnel back up.
+        renderer.toneMappingExposure = THREE.MathUtils.lerp(atm.exposure, TUNNEL_EXPOSURE, st.tunnel);
 
-        // You and the carriage ride together; the world outside sways.
-        outCam.position.set(0, -0.004 * st.jolt + Math.sin(st.time * 1.7) * 0.0015 * (st.v / CRUISE), 0);
-        outCam.rotation.set(Math.sin(st.time * 0.9) * 0.0012 * (st.v / CRUISE), 0, Math.sin(st.time * 0.6) * 0.0015 * (st.v / CRUISE));
+        // You and the carriage ride together; the world outside turns with the curves and sways.
+        const yaw = heading(s) - heading(s - 40);
+        outCam.position.set(
+          Math.sin(st.time * 0.37) * 0.004 * vr,
+          -0.004 * st.jolt + Math.sin(st.time * 1.7) * 0.0015 * vr + Math.sin(st.time * 0.53 + 1.1) * 0.002 * vr,
+          Math.sin(st.time * 0.29 + 0.5) * 0.006 * vr,
+        );
+        outCam.rotation.set(Math.sin(st.time * 0.9) * 0.0012 * vr, yaw * 1.4, Math.sin(st.time * 0.6) * 0.0015 * vr);
 
         if (st.time - clockAt > 1) {
           clockAt = st.time;
@@ -800,6 +613,7 @@ export default function CabinScene3D({ mode, carriage, stationName = "", termina
         if (document.hidden) return;
         if (now - fpsFrom > 2000) {
           log.set("fps", String(Math.round((frames * 1000) / (now - fpsFrom))));
+          log.set("travel", `${Math.round(train.s)} m · ${world.route.at(train.s).kind} · ${train.v.toFixed(1)} m/s · ${atm.hour.toFixed(2)} h`);
           frames = 0;
           fpsFrom = now;
         }
@@ -831,9 +645,9 @@ export default function CabinScene3D({ mode, carriage, stationName = "", termina
       const ro = new ResizeObserver(layout);
       ro.observe(mount);
       // Warm up: draw once with everything that only shows up later (the
-      // tunnel, a platform, cars, rain) so its shaders compile and textures
-      // upload now, not with a stall halfway through the ride. Only the
-      // second frame, drawn in the same task, ever reaches the screen.
+      // tunnel, a platform, rain) so its shaders compile and textures upload
+      // now, not with a stall halfway through the ride.
+      update(0.016);
       const hidden: THREE.Object3D[] = [];
       for (const s of [outside, cabin]) {
         s.traverse((o) => {
@@ -862,7 +676,7 @@ export default function CabinScene3D({ mode, carriage, stationName = "", termina
         }
       };
       void document.fonts?.ready.then(() => {
-        if (!broken && st.plat.on) drawSign(target.current.stationName, st.plat.end);
+        if (!broken && plat.visible) drawSign(target.current.stationName, target.current.mode === "still" || target.current.terminal);
       });
       const onVisibility = () => {
         last = performance.now();
@@ -932,6 +746,7 @@ export default function CabinScene3D({ mode, carriage, stationName = "", termina
       window.addEventListener("pointerup", onUp);
       window.addEventListener("pointercancel", onUp);
       window.addEventListener("click", onClick, true);
+      void timetable;
 
       return () => {
         gone = true;
@@ -947,6 +762,7 @@ export default function CabinScene3D({ mode, carriage, stationName = "", termina
         cursor("");
         curtainRef.current?.(0);
         interior.children.forEach((c) => (c as THREE.Mesh).geometry?.dispose());
+        world.dispose();
         disposables.forEach((d) => d.dispose());
         target3.dispose();
         log.dispose();

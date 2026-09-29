@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { PresetId } from "@/audio/engine";
 import { sfx, soundAllowed } from "@/audio/sfx";
 import { ambience, soundWanted, useAmbienceState, useScenePreset } from "@/audio/useAmbience";
@@ -54,6 +54,17 @@ export default function JourneyPage() {
   const phase: Phase = !started ? "boarding" : journey!.phase;
   const carriage = started ? journey!.selectedCarriage : (choice?.carriage ?? machineCarriage);
   const inTunnel = phase === "cabin" && tunnel && !!active?.resumedAt;
+
+  // The train keeps time with the station being ridden: pulls away as its timer runs,
+  // stands when it's paused, brakes into the next platform as it ends.
+  const leg = useMemo(() => {
+    if (!active || phase !== "cabin") return null;
+    // The clock as the session keeps it: seconds banked, plus time since it was last resumed.
+    const at = active.resumedAt ? Date.parse(active.resumedAt) : 0;
+    return { key: active.id, total: active.plannedMinutes * 60, elapsed: active.elapsedSeconds, at, paused: !active.resumedAt };
+  }, [active, phase]);
+  // One night, one line: the country outside is seeded by the date.
+  const lineSeed = useMemo(() => Array.from(today).reduce((h, ch) => Math.imul(h ^ ch.charCodeAt(0), 16777619) >>> 0, 2166136261), [today]);
 
   // Remember how we got here, so arrivals and departures can be staged.
   const [seen, setSeen] = useState<{ phase: Phase; arrival: { kind: Phase; at: number } | null; departure: number }>({
@@ -203,7 +214,7 @@ export default function JourneyPage() {
           </>
         )
       ) : atDoors && holdScene ? null : (
-        <NightScene mode={scene} carriage={carriage} stationName={boardName} terminal={phase === "final"} />
+        <NightScene mode={scene} carriage={carriage} stationName={boardName} terminal={phase === "final"} leg={leg} seed={lineSeed} sky={data.profile.skyMode ?? "local"} />
       )}
       <div key={phase} className="h-full animate-fade">
         {content}
