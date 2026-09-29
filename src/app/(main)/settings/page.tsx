@@ -17,6 +17,7 @@ import {
   requestNotifications,
 } from "@/lib/notify";
 import { loadSampleData, updateProfile } from "@/state/actions";
+import { startPresentation } from "@/state/presenter";
 import {
   MCP_URL,
   isCloudConfigured,
@@ -261,13 +262,20 @@ export default function SettingsPage() {
             {mode === "cloud" && MCP_URL && <ClaudeConnector />}
             <button
               type="button"
-              onClick={() => {
-                updateProfile({ onboardedAt: null });
-                router.push("/welcome");
-              }}
+              onClick={() => router.push("/intro")}
               className="mt-6 min-h-11 text-sm text-mist underline decoration-rule underline-offset-4 hover:text-paper"
             >
               {t("settings.guide")}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                startPresentation();
+                router.push("/");
+              }}
+              className="ml-6 mt-6 min-h-11 text-sm text-mist underline decoration-rule underline-offset-4 hover:text-paper"
+            >
+              {t("settings.presenterDemo")}
             </button>
             <button
               type="button"

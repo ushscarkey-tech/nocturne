@@ -5,6 +5,7 @@ import { useEffect, useRef, type ReactNode } from "react";
 import { journeyFor } from "@/core/journey";
 import { activeSession, remainingSeconds } from "@/core/sessions";
 import { serviceDate } from "@/core/time";
+import { introSeen } from "@/lib/intro";
 import { checkNotifications } from "@/lib/notify";
 import { arrive, depart, ensureToday } from "@/state/actions";
 import { bootstrap } from "@/state/session";
@@ -27,10 +28,10 @@ export function DataGate({ children, onboarding = false }: { children: ReactNode
     });
   }, [status, router]);
 
-  // Newcomers go through the welcome guide first.
+  // Newcomers see the intro deck first, then the welcome guide sets things up.
   const needsWelcome = status === "ready" && !onboarded && !onboarding;
   useEffect(() => {
-    if (needsWelcome) router.replace("/welcome");
+    if (needsWelcome) router.replace(introSeen() ? "/welcome" : "/intro");
   }, [needsWelcome, router]);
 
   if (status === "error") {

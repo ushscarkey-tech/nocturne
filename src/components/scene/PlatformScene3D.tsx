@@ -15,6 +15,7 @@ import { surfaceKit, withCavity } from "./surfaces";
 import { GradeShader, MAX_LIGHTS, bokehMaterial, hazeMaterial, rainMaterial, skyMaterial, wetFloor } from "./platform/shaders";
 import * as tx from "./platform/textures";
 import { atmosphere, atmosphereAt, forcedHour, hourFor, type SkyMode } from "./ride/atmosphere";
+import { SKY_EVENT } from "./ride/hour";
 
 export interface PlatformSceneProps {
   /** `final` turns half the lights off and lets the rain stop. */
@@ -610,6 +611,10 @@ export default function PlatformScene3D({ mood = "waiting", rain = true, station
       };
       applySky();
       let skyClock = 0;
+      // The presenter can change the hour: follow at once.
+      const onSky = () => applySky();
+      window.addEventListener(SKY_EVENT, onSky);
+      disposables.push({ dispose: () => window.removeEventListener(SKY_EVENT, onSky) });
 
       // ---------------------------------------------------------------- the rain
       // On its own layer, so the floor doesn't reflect it.

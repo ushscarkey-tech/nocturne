@@ -35,6 +35,7 @@ const settings = {
   "settings.resetDemo": "Clear this device",
   "settings.signIn": "Sign in",
   "settings.guide": "Show the introduction again",
+  "settings.presenterDemo": "Presenter demo",
   "settings.confirmReset": "Clear this device?",
   "settings.confirmSample": "Replace with sample data?",
   "settings.cantUndo": "This can't be undone",

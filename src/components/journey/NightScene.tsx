@@ -6,7 +6,7 @@ import type { CarriageId } from "@/core/types";
 import type { RideLeg } from "@/components/scene/CabinScene3D";
 import { ambience } from "@/audio/useAmbience";
 import { usePrefersReducedMotion } from "@/lib/hooks";
-import { daylightAt, forcedHour, hourFor } from "@/components/scene/ride/hour";
+import { SKY_EVENT, daylightAt, forcedHour, hourFor } from "@/components/scene/ride/hour";
 
 export type SceneMode = "platform" | "night" | "tunnel" | "still";
 
@@ -43,7 +43,11 @@ function hasWebGL2() {
 const noSubscribe = () => () => {};
 const everyMinute = (fn: () => void) => {
   const id = setInterval(fn, 60_000);
-  return () => clearInterval(id);
+  window.addEventListener(SKY_EVENT, fn);
+  return () => {
+    clearInterval(id);
+    window.removeEventListener(SKY_EVENT, fn);
+  };
 };
 
 /**

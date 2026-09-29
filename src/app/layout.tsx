@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { IBM_Plex_Mono, Instrument_Serif, Inter } from "next/font/google";
 import { LocaleSync } from "@/components/shell/LocaleSync";
 import { NativeBridge } from "@/components/shell/NativeBridge";
+import { PresenterPanel } from "@/components/demo/PresenterPanel";
 import { ServiceWorker } from "@/components/shell/ServiceWorker";
 import "./globals.css";
 
@@ -43,6 +44,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <ServiceWorker />
         <NativeBridge />
         {children}
+        <PresenterPanel />
       </body>
     </html>
   );

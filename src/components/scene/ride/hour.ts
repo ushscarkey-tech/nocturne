@@ -11,13 +11,39 @@ export function hourFor(mode: SkyMode, now: Date, progress = 0) {
   return now.getHours() + now.getMinutes() / 60 + now.getSeconds() / 3600;
 }
 
-/** A forced hour for checking the look (`?sky=6.2`), or null. */
+const OVERRIDE_KEY = "nocturne:sky-override";
+/** Fired on window when the presenter changes the hour, so scenes redraw their sky at once. */
+export const SKY_EVENT = "nocturne:sky-change";
+
+/**
+ * A forced hour: `?sky=6.2` in the address (for checking the look), or the one
+ * the presenter picked in demo mode (kept for the tab's session). Null: the real clock.
+ */
 export function forcedHour(): number | null {
   if (typeof window === "undefined") return null;
   const v = new URLSearchParams(window.location.search).get("sky");
-  if (v === null) return null;
-  const n = Number(v);
+  const n = Number(v ?? readOverride());
+  if (v === null && readOverride() === null) return null;
   return Number.isFinite(n) ? ((n % 24) + 24) % 24 : null;
+}
+
+function readOverride(): string | null {
+  try {
+    return window.sessionStorage.getItem(OVERRIDE_KEY);
+  } catch {
+    return null;
+  }
+}
+
+/** Presenter mode: show this hour everywhere (null goes back to the real clock). */
+export function setForcedHour(hour: number | null) {
+  try {
+    if (hour === null) window.sessionStorage.removeItem(OVERRIDE_KEY);
+    else window.sessionStorage.setItem(OVERRIDE_KEY, String(hour));
+  } catch {
+    /* storage unavailable */
+  }
+  window.dispatchEvent(new Event(SKY_EVENT));
 }
 
 /** How much daylight there is at an hour, 0 (night) to 1 (full day), on the same clock as the 3D sky. */

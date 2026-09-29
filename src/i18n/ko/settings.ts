@@ -37,6 +37,7 @@ const settings: Partial<Record<keyof typeof source, string>> = {
   "settings.resetDemo": "이 기기 기록 지우기",
   "settings.signIn": "로그인",
   "settings.guide": "소개 다시 보기",
+  "settings.presenterDemo": "발표용 데모 모드",
   "settings.confirmReset": "이 기기 기록을 지울까요?",
   "settings.confirmSample": "샘플 데이터로 바꿀까요?",
   "settings.cantUndo": "실행 취소할 수 없어요",

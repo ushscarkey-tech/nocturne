@@ -8,6 +8,7 @@ import { PROFILE_DEFAULTS, type NocturneData } from "@/core/types";
 import { cloudKind, getCloud, isCloudConfigured } from "@/data/cloud";
 import { LocalRepository } from "@/data/local";
 import { ensureToday } from "./actions";
+import { PRESENT_NAMESPACE, presentationData, presenting } from "./presenter";
 import { useStore } from "./store";
 
 const MODE_KEY = "nocturne:mode";
@@ -50,6 +51,19 @@ export function bootstrap(): Promise<BootResult> {
 async function doBootstrap(): Promise<BootResult> {
   const store = useStore.getState();
   try {
+    // Presenter demo mode: its own sample night, apart from the traveller's data.
+    if (presenting()) {
+      const repo = new LocalRepository(PRESENT_NAMESPACE);
+      store.begin("demo", repo);
+      let data = await repo.load();
+      if (!data) {
+        data = presentationData(new Date(), detectLocale());
+        await repo.replaceAll(data);
+      }
+      useStore.getState().ready(data);
+      ensureToday();
+      return "ready";
+    }
     const useCloud = isCloudConfigured && readMode() === "cloud";
     if (useCloud) {
       const cloud = await getCloud();

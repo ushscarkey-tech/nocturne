@@ -391,3 +391,64 @@ export function finishOnboarding() {
   commit({ ...data, profile: { ...data.profile, onboardedAt: new Date().toISOString() } });
   ensureToday();
 }
+
+// ---------------------------------------------------------------------------
+// Presenter demo levers (demo mode only; they act on the sample night)
+// ---------------------------------------------------------------------------
+
+/** Bring the station being ridden to its last few seconds, to show an arrival. */
+export function demoArriveSoon(secondsLeft = 8) {
+  const data = current();
+  const now = new Date();
+  const active = data.sessions.find((s) => s.status === "active");
+  if (!active) return;
+  const elapsed = Math.max(0, active.plannedMinutes * 60 - secondsLeft);
+  const next = { ...active, elapsedSeconds: elapsed, resumedAt: active.resumedAt ? iso(now) : null };
+  commit({ ...data, sessions: data.sessions.map((s) => (s.id === active.id ? next : s)) });
+}
+
+/** A task due tonight arrives: the route makes room for it. */
+export function demoUrgentTask(title: string) {
+  const today = serviceDate(new Date());
+  createTask({
+    title,
+    description: "",
+    deadline: today,
+    estimatedMinutes: 30,
+    interest: 2,
+    difficulty: 3,
+    importance: 5,
+    splittable: false,
+    minSessionMinutes: 30,
+    maxSessionMinutes: 30,
+    recurrence: null,
+    lineId: null,
+  });
+}
+
+/** More than the days can hold: the forecast turns red and offers a rescue plan. */
+export function demoOverload(titles: string[]) {
+  const now = new Date();
+  const tomorrow = serviceDate(new Date(now.getTime() + 24 * 3600_000));
+  let data = current();
+  let change: RouteChange | null = null;
+  for (const title of titles) {
+    const r = ops.addTask(data, {
+      title,
+      description: "",
+      deadline: tomorrow,
+      estimatedMinutes: 180,
+      interest: 3,
+      difficulty: 4,
+      importance: 4,
+      splittable: true,
+      minSessionMinutes: 25,
+      maxSessionMinutes: 60,
+      recurrence: null,
+      lineId: null,
+    }, now);
+    data = r.data;
+    change = r.change ?? change;
+  }
+  commit(data, change);
+}

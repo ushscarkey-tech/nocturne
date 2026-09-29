@@ -20,6 +20,7 @@ const settings: Partial<Record<keyof typeof source, string>> = {
   "settings.demoNote": "このブラウザのみに保存。",
   "settings.focusHistory": "スケジューリング用に集中の履歴を使用",
   "settings.guide": "紹介を再度見る",
+  "settings.presenterDemo": "発表用デモモード",
   "settings.language": "言語",
   "settings.learn": "セッションから学ぶ",
   "settings.learnHint": "このアカウントの旅のみを使用します。",

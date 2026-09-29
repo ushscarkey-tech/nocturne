@@ -31,6 +31,7 @@ const settings: Partial<Record<keyof typeof source, string>> = {
   "settings.resetDemo": "清除这台设备",
   "settings.signIn": "登录",
   "settings.guide": "再次显示介绍",
+  "settings.presenterDemo": "演示模式",
   "settings.confirmReset": "清除这台设备？",
   "settings.confirmSample": "替换为示例数据？",
   "settings.cantUndo": "无法撤销",
