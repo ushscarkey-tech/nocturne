@@ -104,13 +104,13 @@ export function Cabin({
       <header
         className={`absolute inset-x-0 top-[max(0.625rem,env(safe-area-inset-top))] flex justify-start px-4 sm:justify-center transition-opacity duration-[2000ms] ${chrome}`}
       >
-        <div className="flex h-8 max-w-full items-center gap-3 overflow-hidden rounded-[2px] border border-[#3b3f3c] bg-[#0b0d0f]/90 px-3 font-mono text-[0.6875rem] tracking-[0.14em] text-[#d9a45c] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+        <div className="flex h-8 max-w-[calc(100vw-8.5rem)] items-center gap-2.5 overflow-hidden rounded-[2px] sm:max-w-full sm:gap-3 border border-[#3b3f3c] bg-[#0b0d0f]/90 px-3 font-mono text-[0.6875rem] tracking-[0.14em] text-[#d9a45c] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
           <time className="tabular text-[#e8b872]">{clock(now)}</time>
           <span className="h-3 w-px bg-[#3b3f3c]" aria-hidden />
           <span className="truncate">→ {stationLabel}</span>
-          <span className="shrink-0 text-[#a5814c]">{t("journey.arrivesAt", { time: clock(active.plannedEnd) })}</span>
-          <span className="hidden h-3 w-px bg-[#3b3f3c] sm:block" aria-hidden />
-          <span className="hidden shrink-0 text-[#a5814c] sm:inline">{t("scene.carSeat", { car: journey.car, seat: journey.seat })}</span>
+          <span className="hidden shrink-0 text-[#a5814c] min-[420px]:inline">{t("journey.arrivesAt", { time: clock(active.plannedEnd) })}</span>
+          <span className="h-3 w-px bg-[#3b3f3c]" aria-hidden />
+          <span className="shrink-0 text-[#a5814c]">{t("scene.carSeat", { car: journey.car, seat: journey.seat })}</span>
         </div>
       </header>
 
@@ -181,23 +181,23 @@ export function Cabin({
           <CabinKey onClick={() => setSheet("more")}>{t("journey.moreTimeButton")}</CabinKey>
           <CabinKey onClick={() => lowFocus()}>{t("journey.lowFocusButton")}</CabinKey>
         </div>
-        <div className="mx-auto mt-1 flex max-w-[34rem] items-center justify-between">
-          <div className="flex gap-5 text-xs">
-            <button type="button" onClick={() => onTunnel(true)} className="min-h-9 text-haze hover:text-mist">
-              {t("journey.enterTunnel")}
-            </button>
-            <button type="button" onClick={() => setSheet("end")} className="min-h-9 text-haze hover:text-mist">
-              {t("journey.endTonightButton")}
-            </button>
-          </div>
-          <div className="flex items-center gap-1">
-            <SoundControl carriage={journey.selectedCarriage} />
-            <Link href="/" className="grid size-9 place-items-center rounded-[3px] text-mist hover:text-paper" aria-label={t("common.back")}>
-              <Icon name="close" size={16} />
-            </Link>
-          </div>
+        <div className="mx-auto mt-1 flex max-w-[34rem] items-center justify-center gap-6 text-xs">
+          <button type="button" onClick={() => onTunnel(true)} className="min-h-9 text-haze hover:text-mist">
+            {t("journey.enterTunnel")}
+          </button>
+          <button type="button" onClick={() => setSheet("end")} className="min-h-9 text-haze hover:text-mist">
+            {t("journey.endTonightButton")}
+          </button>
         </div>
       </footer>
+
+      {/* Top right corner: sound and the way out, out of the way of the keys. */}
+      <div className={`absolute right-3 top-[max(0.5rem,env(safe-area-inset-top))] flex items-center gap-1 transition-opacity duration-700 ${chrome}`}>
+        <SoundControl carriage={journey.selectedCarriage} />
+        <Link href="/" className="grid size-11 place-items-center rounded-[3px] border border-[#3b3f3c] bg-[#0e1216]/90 text-mist hover:text-paper" aria-label={t("common.back")}>
+          <Icon name="close" size={16} />
+        </Link>
+      </div>
 
       {/* As the doors lock, the cabin lights settle a shade warmer. */}
       <div

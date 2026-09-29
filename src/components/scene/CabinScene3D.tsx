@@ -262,7 +262,8 @@ export default function CabinScene3D({ mode, carriage, stationName = "", termina
         // The upper wall, with the window cut out of it; below the sill, the bay's wood panel.
         wallGeo = upperWall(d);
         put(interior, new THREE.Mesh(wallGeo, mats.wall), 0, 0, -D);
-        parts = windowParts(d, mats, { seat: true });
+        // On a phone held upright the top of the screen belongs to the info board and its keys: no plate there.
+        parts = windowParts(d, mats, { seat: camera.aspect >= 0.8 });
         interior.add(parts.group);
         glassMat.uniforms.uWin.value.set(d.w, d.h);
         curtainZ = parts.curtain.z;
