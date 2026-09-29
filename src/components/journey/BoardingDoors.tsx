@@ -10,7 +10,7 @@ import { Ticket } from "@/components/ticket/Ticket";
 import { FlipText } from "@/components/scene/FlipText";
 import { haptic } from "@/lib/haptics";
 import { usePrefersReducedMotion } from "@/lib/hooks";
-import { SCENE_READY } from "@/components/scene/gl";
+import { SCENE_READY } from "@/components/scene/events";
 
 // three.js loads only when someone is at the doors.
 const BoardingScene3D = dynamic(() => import("@/components/scene/BoardingScene3D"), { ssr: false, loading: () => null });

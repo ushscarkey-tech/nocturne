@@ -99,8 +99,7 @@ export function describe(renderer: THREE.WebGLRenderer, log: SceneLog) {
   log.set("webgl2", String(renderer.capabilities.isWebGL2 !== false));
 }
 
-/** Fired on window once a scene has drawn its first real frame (shaders compiled, textures up). */
-export const SCENE_READY = "nocturne:scene-ready";
+export { SCENE_READY } from "./events";
 
 /**
  * With the 3D debug log on (?debug3d=1), how long each frame's own work

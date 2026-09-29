@@ -146,19 +146,4 @@ export function atmosphereAt(out: Atmosphere, hour: number) {
   return out;
 }
 
-/** Which hour to show: the device's own clock, or a journey from dusk to dawn across the ride. */
-export type SkyMode = "local" | "journey";
-
-export function hourFor(mode: SkyMode, now: Date, progress = 0) {
-  if (mode === "journey") return (19 + Math.max(0, Math.min(1, progress)) * 11) % 24;
-  return now.getHours() + now.getMinutes() / 60 + now.getSeconds() / 3600;
-}
-
-/** A forced hour for checking the look (`?sky=6.2`), or null. */
-export function forcedHour(): number | null {
-  if (typeof window === "undefined") return null;
-  const v = new URLSearchParams(window.location.search).get("sky");
-  if (v === null) return null;
-  const n = Number(v);
-  return Number.isFinite(n) ? ((n % 24) + 24) % 24 : null;
-}
+export { forcedHour, hourFor, type SkyMode } from "./hour";

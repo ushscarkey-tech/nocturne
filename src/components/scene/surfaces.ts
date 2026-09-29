@@ -14,6 +14,8 @@ const BASE = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
 export function surfaceKit(track: <T extends { dispose(): void }>(x: T) => T) {
   const loader = new THREE.TextureLoader();
   const sources = new Map<Relief, THREE.Texture>();
+  /** Copies waiting for their image: flagged for upload only once it's there. */
+  const waiting = new Map<Relief, THREE.Texture[]>();
   const loading: Promise<unknown>[] = [];
 
   /** A tiling normal map; each call gets its own repeat but shares the image. */
@@ -23,13 +25,32 @@ export function surfaceKit(track: <T extends { dispose(): void }>(x: T) => T) {
       let done: () => void = () => {};
       loading.push(new Promise<void>((resolve) => (done = resolve)));
       // Until it arrives the surface would shade black, so a scene waits for `ready` before it shows.
-      src = track(loader.load(`${BASE}/textures/normals/${name}.webp`, () => done(), undefined, () => done()));
+      const key = name;
+      src = track(
+        loader.load(
+          `${BASE}/textures/normals/${name}.webp`,
+          () => {
+            for (const t of waiting.get(key) ?? []) t.needsUpdate = true;
+            waiting.delete(key);
+            done();
+          },
+          undefined,
+          () => done(),
+        ),
+      );
+      waiting.set(key, []);
       src.wrapS = src.wrapT = THREE.RepeatWrapping;
       src.colorSpace = THREE.NoColorSpace;
       src.anisotropy = 8;
       sources.set(name, src);
     }
     const t = track(src.clone());
+    // `clone` flags the copy for upload; with no image yet that only makes three.js complain every frame.
+    const pending = waiting.get(name);
+    if (pending) {
+      t.version = 0;
+      pending.push(t);
+    }
     t.repeat.set(...repeat);
     t.rotation = rotation;
     return t;

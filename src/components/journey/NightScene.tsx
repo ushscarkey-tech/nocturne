@@ -6,6 +6,7 @@ import type { CarriageId } from "@/core/types";
 import type { RideLeg } from "@/components/scene/CabinScene3D";
 import { ambience } from "@/audio/useAmbience";
 import { usePrefersReducedMotion } from "@/lib/hooks";
+import { daylightAt, forcedHour, hourFor } from "@/components/scene/ride/hour";
 
 export type SceneMode = "platform" | "night" | "tunnel" | "still";
 
@@ -40,6 +41,10 @@ function hasWebGL2() {
   return webgl2;
 }
 const noSubscribe = () => () => {};
+const everyMinute = (fn: () => void) => {
+  const id = setInterval(fn, 60_000);
+  return () => clearInterval(id);
+};
 
 /**
  * The window beside your seat. In 3D where the device can draw it; the
@@ -347,8 +352,11 @@ function reflectionPaths(w: number, h: number) {
  * (blocks of flats, a river, a mountain road, signals) so the window changes
  * every minute or two without ever asking to be watched.
  */
-function NightScene2D({ mode, carriage, stationName, terminal = false }: NightSceneProps) {
+function NightScene2D({ mode, carriage, stationName, terminal = false, sky = "local" }: NightSceneProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  // The painted window is a night view; by day a pale sky washes over it, on the same clock as the 3D one.
+  const daylight = useSyncExternalStore(everyMinute, () => daylightAt(forcedHour() ?? hourFor(sky, new Date(), 0)), () => 0);
+  const day = mode === "tunnel" ? 0 : daylight;
   const target = useRef({ mode, carriage, stationName, terminal });
   const reduced = usePrefersReducedMotion();
 
@@ -1361,6 +1369,10 @@ function NightScene2D({ mode, carriage, stationName, terminal = false }: NightSc
     <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden bg-night-950" aria-hidden>
       {/* Scenery, tunnel, and the carriage's own reflection in the glass. */}
       <canvas ref={canvasRef} className="absolute inset-0 h-full w-full" />
+      <div
+        className="absolute inset-0 bg-[linear-gradient(180deg,#a9bccb_0%,#c7c9c0_55%,#b9b09c_100%)] mix-blend-screen transition-opacity duration-[3000ms]"
+        style={{ opacity: day * 0.6 }}
+      />
       {/* A pleated curtain tied back at the window's edge. */}
       <div className="absolute inset-y-0 left-0 w-[5vw] min-w-5 max-w-11 bg-[repeating-linear-gradient(90deg,#141c18_0px,#1d2922_5px,#101612_9px)] opacity-90 shadow-[6px_0_18px_rgba(0,0,0,0.6)]">
         <div className="absolute inset-x-0 top-[44%] h-2 bg-[#2a2620] shadow-[0_1px_0_rgba(236,214,166,0.12)]" />
