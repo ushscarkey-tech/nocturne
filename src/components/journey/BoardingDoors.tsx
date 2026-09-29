@@ -47,6 +47,7 @@ export function BoardingDoors({
   departure,
   destination,
   stationName,
+  sky = "local",
   onOpen,
   onInside,
   onHoldScene,
@@ -58,6 +59,8 @@ export function BoardingDoors({
   destination: string;
   /** Where you board, on the name board across the platform. */
   stationName?: string;
+  /** The hour the sky keeps, as on the ride. */
+  sky?: "local" | "journey";
   /** The doors are open: board now. */
   onOpen: () => void;
   /** The view is inside the carriage. */
@@ -232,6 +235,7 @@ export function BoardingDoors({
             carriage={carriage}
             car={face.car}
             stationName={stationName}
+            sky={sky}
             onFail={() => setFailed3D(true)}
             onInside={sitDown}
             onReady={() => setReady3D(true)}

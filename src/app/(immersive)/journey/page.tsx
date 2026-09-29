@@ -209,7 +209,7 @@ export default function JourneyPage() {
         !(atDoors && doorsCovered) && (
           <>
             {/* Standing on the platform, at the ticket machine. */}
-            <PlatformScene className="fixed inset-0 -z-10" fade={false} mood="waiting" rain={carriage === "rain"} stationName={boardName} />
+            <PlatformScene className="fixed inset-0 -z-10" fade={false} mood="waiting" rain={carriage === "rain"} stationName={boardName} sky={data.profile.skyMode ?? "local"} />
             <div className="pointer-events-none fixed inset-0 -z-10 bg-[linear-gradient(180deg,rgba(4,6,10,0.55)_0%,rgba(4,6,10,0.78)_50%,rgba(4,6,10,0.94)_100%)]" />
           </>
         )
@@ -226,6 +226,7 @@ export default function JourneyPage() {
           departure={first ? clock(first.plannedStart) : "--:--"}
           destination={fmt.station(route[route.length - 1]?.stationName ?? "NOCTURNE")}
           stationName={boardName}
+          sky={data.profile.skyMode ?? "local"}
           onHoldScene={setHoldScene}
           onCovered={() => setDoorsCovered(true)}
           onOpen={() => {

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
+import { atmosphere, atmosphereAt, forcedHour, hourFor, type SkyMode } from "./ride/atmosphere";
 import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";
 import { FXAAPass } from "three/examples/jsm/postprocessing/FXAAPass.js";
 import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
@@ -29,6 +30,8 @@ export interface BoardingSceneProps {
   car: string;
   /** The station you board at, on its name board across the platform. */
   stationName?: string;
+  /** The hour the sky keeps, as on the ride. */
+  sky?: SkyMode;
   className?: string;
   /** This device can't draw it: the caller shows the 2D doors. */
   onFail?: () => void;
@@ -79,13 +82,15 @@ const MAIN_ONLY = 1;
  * and what you see then is what the ride begins with: the same platform,
  * window, curtain and light.
  */
-export default function BoardingScene3D({ stage, carriage, car, stationName = "", className = "", onFail, onInside, onReady, onReader }: BoardingSceneProps) {
+export default function BoardingScene3D({ stage, carriage, car, stationName = "", sky = "local", className = "", onFail, onInside, onReady, onReader }: BoardingSceneProps) {
   const mountRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef({ stage, at: 0 });
   const failRef = useRef(onFail);
   const insideRef = useRef(onInside);
   const readyRef = useRef(onReady);
   const readerRef = useRef(onReader);
+  // Read once, when the scene is built: the walk lasts seconds, the hour doesn't move.
+  const skyRef = useRef(sky);
 
   useEffect(() => {
     if (stageRef.current.stage !== stage) stageRef.current = { stage, at: performance.now() };
@@ -157,7 +162,15 @@ export default function BoardingScene3D({ stage, carriage, car, stationName = ""
       platRoot.add(platform.group);
       outside.add(platRoot);
       const platformLamp = platform.lights[0].intensity;
-      outside.add(new THREE.HemisphereLight(lin(0.045, 0.06, 0.08), lin(0.008, 0.008, 0.008), 0.8));
+      const outsideHemi = new THREE.HemisphereLight(lin(0.045, 0.06, 0.08), lin(0.008, 0.008, 0.008), 0.8);
+      outside.add(outsideHemi);
+      // The same hour as the ride that follows, so the view doesn't jump from night to day at the seat.
+      const atm = atmosphereAt(atmosphere(), forcedHour() ?? hourFor(skyRef.current, new Date(), 0));
+      const day = 1 - atm.night;
+      outsideHemi.color.lerp(atm.hemiSky, day);
+      outsideHemi.groundColor.lerp(atm.hemiGround, day);
+      outsideHemi.intensity = THREE.MathUtils.lerp(0.8, atm.hemiI * 0.55, day);
+      (outside.fog as THREE.FogExp2).color.lerp(atm.fog, day);
 
       // ================================================================= CARRIAGE
       // ShapeGeometry UVs are metres; the textures are placed in metres too.
@@ -359,7 +372,9 @@ export default function BoardingScene3D({ stage, carriage, car, stationName = ""
       const nightTex = track(new THREE.CanvasTexture(night));
       nightTex.colorSpace = THREE.SRGBColorSpace;
       // Its horizon a little below eye level for someone sitting down.
-      addTo(outside, new THREE.Mesh(track(new THREE.PlaneGeometry(40, 12)), track(new THREE.MeshBasicMaterial({ map: nightTex, fog: false }))), 0, 2.2, FAR - 9);
+      // By day, the painted night gives way to the plain sky over the far side.
+      const backdrop = day > 0.5 ? new THREE.MeshBasicMaterial({ color: atm.horizon.clone().lerp(atm.zenith, 0.3), fog: false }) : new THREE.MeshBasicMaterial({ map: nightTex, fog: false });
+      addTo(outside, new THREE.Mesh(track(new THREE.PlaneGeometry(40, 12)), track(backdrop)), 0, 2.2, FAR - 9);
 
       // The door leaves, in the pocket between the skins: a frame round a
       // tall window, so the lit vestibule shows through even when shut.

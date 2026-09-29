@@ -9,6 +9,8 @@ const settings = {
   "settings.carriage.moon": "Moon Car",
   "settings.autoTunnel": "Tunnel on its own",
   "settings.autoTunnelHint": "After a quiet minute of focus.",
+  "settings.skyJourney": "Window follows the journey",
+  "settings.skyJourneyHint": "Dusk to dawn over the night's route. Off: the sky outside is the sky at this hour.",
   "settings.reminders": "Departure reminders",
   "settings.remindersOn": "On. Change it in browser settings.",
   "settings.remindersHint": "Five minutes before departure.",

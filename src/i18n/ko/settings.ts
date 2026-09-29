@@ -11,6 +11,8 @@ const settings: Partial<Record<keyof typeof source, string>> = {
   "settings.carriage.moon": "달빛 객차",
   "settings.autoTunnel": "자동 터널 모드",
   "settings.autoTunnelHint": "조용히 집중한 후.",
+  "settings.skyJourney": "창밖 시간: 여정 따라",
+  "settings.skyJourneyHint": "노선을 따라 저녁에서 새벽으로. 끄면 지금 시각의 하늘.",
   "settings.reminders": "출발 알림",
   "settings.remindersOn": "켜짐. 브라우저 설정에서 변경하세요.",
   "settings.remindersHint": "출발 5분 전.",

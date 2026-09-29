@@ -14,6 +14,7 @@ import { complete, describe, floatSupport, isApple, pickTarget, sceneLog, frameM
 import { surfaceKit, withCavity } from "./surfaces";
 import { GradeShader, MAX_LIGHTS, bokehMaterial, hazeMaterial, rainMaterial, skyMaterial, wetFloor } from "./platform/shaders";
 import * as tx from "./platform/textures";
+import { atmosphere, atmosphereAt, forcedHour, hourFor, type SkyMode } from "./ride/atmosphere";
 
 export interface PlatformSceneProps {
   /** `final` turns half the lights off and lets the rain stop. */
@@ -21,6 +22,8 @@ export interface PlatformSceneProps {
   rain?: boolean;
   /** Printed on the hanging station sign. */
   stationName?: string;
+  /** The hour the sky keeps (see ride/atmosphere): now, or the journey's own clock. */
+  sky?: SkyMode;
   className?: string;
 }
 
@@ -64,11 +67,15 @@ const lin = (r: number, g: number, b: number) => new THREE.Color().setRGB(r, g, 
  * ~30fps, paused off-screen, one still frame for reduced motion, and it
  * steps its own quality down on slow devices.
  */
-export default function PlatformScene3D({ mood = "waiting", rain = true, stationName = "NOCTURNE", className = "" }: PlatformSceneProps) {
+export default function PlatformScene3D({ mood = "waiting", rain = true, stationName = "NOCTURNE", sky: skyMode = "local", className = "" }: PlatformSceneProps) {
   const mountRef = useRef<HTMLDivElement>(null);
   const moodRef = useRef(mood);
   const rainRef = useRef(rain);
   const nameRef = useRef(stationName);
+  const skyRef = useRef(skyMode);
+  useEffect(() => {
+    skyRef.current = skyMode;
+  }, [skyMode]);
   const apiRef = useRef<{ setName(name: string): void; poke(): void } | null>(null);
 
   useEffect(() => {
@@ -520,7 +527,9 @@ export default function PlatformScene3D({ mood = "waiting", rain = true, station
       add(new THREE.Sprite(signalGlow), -3.4, BED_Y + 4.05, -61.8).scale.setScalar(1.3);
 
       // ------------------------------------------------------------ sky and hills
-      const sky = mesh(new THREE.SphereGeometry(500, 32, 16), track(skyMaterial({ horizon, zenith: lin(0.003, 0.005, 0.009), glow: lin(0.05, 0.036, 0.022) })));
+      const zenith = lin(0.003, 0.005, 0.009);
+      const skyGlow = lin(0.05, 0.036, 0.022);
+      const sky = mesh(new THREE.SphereGeometry(500, 32, 16), track(skyMaterial({ horizon, zenith, glow: skyGlow })));
       sky.renderOrder = -1;
       fallbacks.set(sky.material as THREE.Material, () => {
         sky.material = basic({ color: horizon, side: THREE.BackSide, fog: false, depthWrite: false });
@@ -578,7 +587,28 @@ export default function PlatformScene3D({ mood = "waiting", rain = true, station
       fallbacks.set(farMat, hide(farMat));
       scene.add(new THREE.Points(farGeo, farMat));
 
-      scene.add(new THREE.HemisphereLight(lin(0.045, 0.06, 0.08), lin(0.008, 0.008, 0.008), 0.9));
+      const hemi = new THREE.HemisphereLight(lin(0.045, 0.06, 0.08), lin(0.008, 0.008, 0.008), 0.9);
+      scene.add(hemi);
+
+      // ------------------------------------------------------------ the hour
+      // The same sky as the ride: by day the opening is bright and the canopy
+      // shades the platform; at night it is the lamps' alone.
+      const atm = atmosphere();
+      const nightOf = { horizon: horizon.clone(), zenith: zenith.clone(), glow: skyGlow.clone(), fog: (scene.fog as THREE.FogExp2).color.clone(), sky: hemi.color.clone(), ground: hemi.groundColor.clone() };
+      const applySky = () => {
+        atmosphereAt(atm, forcedHour() ?? hourFor(skyRef.current, new Date(), 0));
+        const day = 1 - atm.night;
+        horizon.copy(nightOf.horizon).lerp(atm.horizon, day);
+        zenith.copy(nightOf.zenith).lerp(atm.zenith, day);
+        skyGlow.copy(nightOf.glow).lerp(atm.glow, day);
+        (scene.fog as THREE.FogExp2).color.copy(nightOf.fog).lerp(atm.fog, day);
+        hemi.color.copy(nightOf.sky).lerp(atm.hemiSky, day);
+        hemi.groundColor.copy(nightOf.ground).lerp(atm.hemiGround, day);
+        hemi.intensity = THREE.MathUtils.lerp(0.9, atm.hemiI * 0.55, day);
+        renderer.toneMappingExposure = THREE.MathUtils.lerp(1, 0.8, day);
+      };
+      applySky();
+      let skyClock = 0;
 
       // ---------------------------------------------------------------- the rain
       // On its own layer, so the floor doesn't reflect it.
@@ -691,6 +721,12 @@ export default function PlatformScene3D({ mood = "waiting", rain = true, station
       if (skyMat.uniforms) skyMat.uniforms.uTime.value = time;
         farMat.uniforms.uTime.value = time;
         grade.uniforms.uTime.value = time;
+        // The hour moves slowly: a look every twenty seconds is plenty.
+        skyClock += step;
+        if (skyClock > 20) {
+          skyClock = 0;
+          applySky();
+        }
 
         // One tube hums and, now and then, stutters.
         if (!final && flicker <= 0 && Math.random() < step * 0.03) flicker = 0.5 + Math.random() * 0.4;

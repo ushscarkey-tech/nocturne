@@ -353,7 +353,7 @@ export function TicketMachine({
           </div>
         </div>
         <p
-          className={`pointer-events-none absolute inset-x-0 bottom-1 text-center text-xs text-mist transition-opacity duration-700 ${emerged ? "opacity-100" : "opacity-0"}`}
+          className={`pointer-events-none absolute inset-x-0 bottom-1 text-center text-xs text-mist transition-opacity duration-700 [@media(max-height:940px)]:hidden ${emerged ? "opacity-100" : "opacity-0"}`}
           aria-hidden={!emerged}
         >
           <span className="motion-safe-only inline-block animate-hint">↓</span> {t("scene.takeTicketHint")}

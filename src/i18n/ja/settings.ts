@@ -5,6 +5,8 @@ const settings: Partial<Record<keyof typeof source, string>> = {
   "settings.adjust": "より良い時間推定を提案",
   "settings.autoTunnel": "自動トンネル",
   "settings.autoTunnelHint": "静かな集中の1分後。",
+  "settings.skyJourney": "窓の外は旅程に合わせる",
+  "settings.skyJourneyHint": "路線に沿って夕暮れから夜明けへ。オフ：今の時刻の空。",
   "settings.cantUndo": "これは元に戻せません",
   "settings.carriage": "デフォルト車両",
   "settings.carriage.moon": "月の車両",

@@ -11,6 +11,8 @@ const settings: Partial<Record<keyof typeof source, string>> = {
   "settings.carriage.moon": "月光车厢",
   "settings.autoTunnel": "自动进隧道",
   "settings.autoTunnelHint": "安静专注一分钟后。",
+  "settings.skyJourney": "窗外时间随旅程",
+  "settings.skyJourneyHint": "沿线路从黄昏到黎明。关闭：此刻的天空。",
   "settings.reminders": "发车提醒",
   "settings.remindersOn": "已开。在浏览器设置里改。",
   "settings.remindersHint": "发车前五分钟。",

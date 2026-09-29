@@ -140,6 +140,12 @@ export default function SettingsPage() {
               label={t("settings.autoTunnel")}
               description={t("settings.autoTunnelHint")}
             />
+            <Toggle
+              checked={p.skyMode === "journey"}
+              onChange={(v) => updateProfile({ skyMode: v ? "journey" : "local" })}
+              label={t("settings.skyJourney")}
+              description={t("settings.skyJourneyHint")}
+            />
             {supported && (
               <Toggle
                 checked={granted || notifyOn}
