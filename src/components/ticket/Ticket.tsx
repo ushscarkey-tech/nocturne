@@ -435,6 +435,7 @@ export function Ticket({
       {/* The arrival stamp, across the perforation as a clerk would bring it down. */}
       {stamp && (
         <div
+          data-ticket-stamp
           className={`pointer-events-none absolute z-10 mix-blend-multiply ${sm ? "bottom-[1.6em]" : "bottom-[2.4em]"} ${stampFresh ? "motion-safe-only animate-[stamp_700ms_cubic-bezier(0.2,0.9,0.3,1)_both]" : ""}`}
           style={
             {

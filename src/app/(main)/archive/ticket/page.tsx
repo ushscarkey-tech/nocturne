@@ -38,12 +38,23 @@ const UNFOLD = `
   35% { opacity: 1; }
   to { transform: none; opacity: 1; }
 }
+/* The arrival stamp comes down once the ticket lies open, not before. */
+.nocturne-unfold [data-ticket-stamp] {
+  animation: nocturne-unfold-stamp 650ms cubic-bezier(0.2, 0.9, 0.3, 1) 1650ms both;
+}
+@keyframes nocturne-unfold-stamp {
+  0% { opacity: 0; transform: scale(1.35) rotate(var(--stamp-rot)); }
+  55% { opacity: 0; transform: scale(1.12) rotate(var(--stamp-rot)); }
+  70% { opacity: 0.9; transform: scale(0.97) rotate(var(--stamp-rot)); }
+  100% { opacity: var(--stamp-ink); transform: scale(1) rotate(var(--stamp-rot)); }
+}
 @keyframes nocturne-unfold-fade {
   from { opacity: 0; }
   to { opacity: 1; }
 }
 @media (prefers-reduced-motion: reduce) {
   .nocturne-unfold [data-ticket-part] { animation: nocturne-unfold-fade 500ms ease both; }
+  .nocturne-unfold [data-ticket-stamp] { animation: nocturne-unfold-fade 400ms ease 500ms both; }
 }
 `;
 

@@ -17,10 +17,10 @@ const REVEAL_MS = 7000;
 const TUNNEL_AFTER_MS = 75_000;
 
 /**
- * The focus scene: mostly window. The carriage's info board above it, a
- * plate on the sill under the glass with the station, the task and the time
- * left, and stop/go at the foot; the rest of the controls on request.
- * In the Tunnel only the plate remains.
+ * The focus scene: mostly window. The carriage's info board above it, the
+ * task and the time left large on the glass, the leg's progress on a slim
+ * plate under it, and the four keys at the foot. In the Tunnel only the
+ * task and its time remain.
  */
 export function Cabin({
   data,
@@ -114,41 +114,45 @@ export function Cabin({
         </div>
       </header>
 
-      {/* Under the glass, on the sill: the plate with the station, the task and the time. */}
-      <section
-        className={`absolute left-1/2 w-[min(calc(100vw-2rem),34rem)] -translate-x-1/2 transition-opacity duration-[2500ms] ${departing ? "opacity-0" : tunnel ? "opacity-80 delay-[1200ms]" : "opacity-100"}`}
-        style={{ top: `min(calc(${(glass.bottom * 100).toFixed(2)}% + 0.75rem), calc(100% - 11.5rem))` }}
-        aria-label={task?.title}
+      {/* On the window: where you're going, the task, and the time left, large. */}
+      <main
+        className={`absolute inset-x-0 flex -translate-y-1/2 justify-center px-6 text-center transition-opacity duration-[2500ms] ${departing ? "opacity-0" : tunnel ? "opacity-75 delay-[1200ms]" : "opacity-100"}`}
+        style={{ top: `${(((glass.top + glass.bottom) / 2) * 100).toFixed(2)}%` }}
       >
-        <div className="relative rounded-[2px] border border-[#50554f] bg-[#11171e] px-4 pb-3 pt-2.5 shadow-[0_6px_18px_-8px_rgba(0,0,0,0.8),inset_0_1px_0_rgba(255,255,255,0.05)] sm:px-5">
-          {/* Four rivets. */}
-          {["left-1.5 top-1.5", "right-1.5 top-1.5", "left-1.5 bottom-1.5", "right-1.5 bottom-1.5"].map((pos) => (
-            <span key={pos} className={`absolute ${pos} size-[3px] rounded-full bg-[#7d807a]`} aria-hidden />
-          ))}
-          <div className="flex items-end justify-between gap-4">
-            <div className="min-w-0 pb-1">
-              <p className="font-mono text-[0.625rem] tracking-[0.22em] text-[#b58f5a]">
-                {paused ? t("journey.standing").toUpperCase() : `→ ${stationLabel}`}
-              </p>
-              <h1 className="mt-1 truncate text-[0.9375rem] leading-snug text-paper-dim sm:text-base">{task?.title ?? "—"}</h1>
-            </div>
-            <p
-              className={`shrink-0 font-mono text-[2.5rem] font-light leading-none tracking-tight tabular sm:text-[2.75rem] ${paused ? "text-mist" : "text-paper"}`}
-              role="timer"
-              aria-live="off"
-              aria-label={t("journey.countdownRemaining", { countdown: formatCountdown(remaining) })}
-            >
-              {formatCountdown(remaining)}
-            </p>
-          </div>
-          {/* The leg: how far along, a tick every quarter. */}
-          <div className="relative mt-2.5 h-[3px] bg-[#232b33]" role="progressbar" aria-label={t("journey.routeProgress")} aria-valuenow={Math.round(fraction * 100)} aria-valuemin={0} aria-valuemax={100}>
+        <div className="relative isolate">
+          {/* A soft pool of shade so the words stay readable over a lit platform or a bright sky. */}
+          <div className="pointer-events-none absolute -inset-x-20 -inset-y-12 -z-10 bg-[radial-gradient(closest-side,rgba(5,7,10,0.55),rgba(5,7,10,0.25)_60%,transparent)]" aria-hidden />
+          <p className={`font-mono text-[0.6875rem] tracking-[0.3em] text-paper-dim/75 transition-opacity duration-[2000ms] [text-shadow:0_1px_8px_rgba(0,0,0,0.8)] ${tunnel ? "opacity-0" : ""}`}>
+            {paused ? t("journey.standing").toUpperCase() : `→ ${stationLabel}`}
+          </p>
+          <h1 className="mt-2.5 line-clamp-2 max-w-lg break-words font-display text-[1.75rem] leading-tight [text-shadow:0_2px_24px_rgba(0,0,0,0.75)] sm:text-4xl">
+            {task?.title ?? "—"}
+          </h1>
+          <p
+            className={`mt-4 font-mono text-[4rem] font-extralight leading-none tracking-tight tabular [text-shadow:0_2px_30px_rgba(0,0,0,0.75)] sm:text-[5.5rem] ${paused ? "text-mist" : "text-paper"}`}
+            role="timer"
+            aria-live="off"
+            aria-label={t("journey.countdownRemaining", { countdown: formatCountdown(remaining) })}
+          >
+            {formatCountdown(remaining)}
+          </p>
+        </div>
+      </main>
+
+      {/* Under the glass: the leg so far and the next stop, on a slim plate. */}
+      <section
+        className={`absolute left-1/2 w-[min(calc(100vw-2rem),30rem)] -translate-x-1/2 transition-opacity duration-[1500ms] ${chrome}`}
+        style={{ top: `min(calc(${(glass.bottom * 100).toFixed(2)}% + 0.75rem), calc(100% - 10.5rem))` }}
+        aria-label={t("journey.routeProgress")}
+      >
+        <div className="rounded-[2px] border border-[#3b3f3c] bg-[#0e1318]/90 px-3.5 py-2.5">
+          <div className="relative h-[3px] bg-[#232b33]" role="progressbar" aria-label={t("journey.routeProgress")} aria-valuenow={Math.round(fraction * 100)} aria-valuemin={0} aria-valuemax={100}>
             <div className="absolute inset-y-0 left-0 bg-[#b58f5a] transition-[width] duration-1000 ease-linear" style={{ width: `${fraction * 100}%` }} />
             {[0.25, 0.5, 0.75].map((q) => (
               <span key={q} className="absolute -top-[2px] h-[7px] w-px bg-[#4a525a]" style={{ left: `${q * 100}%` }} aria-hidden />
             ))}
           </div>
-          <p className={`mt-2 flex justify-between gap-3 font-mono text-[0.625rem] tracking-[0.12em] text-haze transition-opacity duration-1000 ${tunnel ? "opacity-0" : ""}`}>
+          <p className="mt-2 flex justify-between gap-3 font-mono text-[0.625rem] tracking-[0.12em] text-haze">
             <span className="truncate">
               {next ? `${t("scene.nextStop")} · ${nextTask?.title ?? ""} · ${fmt.duration(next.plannedMinutes)}` : t("scene.lastStop")}
             </span>
@@ -157,37 +161,41 @@ export function Cabin({
         </div>
       </section>
 
-      {/* At the foot of the screen: stop and go, and the rest on request. */}
-      <footer className={`absolute inset-x-0 bottom-[max(1rem,env(safe-area-inset-bottom))] px-4 transition-opacity duration-700 ${chrome}`}>
+      {/* At the foot of the screen: the four keys, always there; quieter until you reach for them. */}
+      <footer className={`absolute inset-x-0 bottom-[max(0.75rem,env(safe-area-inset-bottom))] px-4 transition-opacity duration-700 ${chrome}`}>
         <div
-          className={`mx-auto mb-2 grid max-w-[34rem] grid-cols-3 gap-1.5 transition-all duration-500 ease-[var(--ease-glide)] sm:grid-cols-5 ${showControls ? "translate-y-0 opacity-100" : "pointer-events-none translate-y-2 opacity-0"}`}
-          aria-hidden={!showControls}
+          className={`mx-auto grid max-w-[34rem] grid-cols-4 gap-1.5 transition-opacity duration-500 ${showControls || paused ? "opacity-100" : "opacity-60 hover:opacity-100 focus-within:opacity-100"}`}
           aria-label={t("scene.controls")}
           role="group"
         >
-          <CabinKey onClick={() => setSheet("more")} tabIndex={showControls ? 0 : -1}>{t("journey.moreTimeButton")}</CabinKey>
-          <CabinKey onClick={() => setSheet("early")} tabIndex={showControls ? 0 : -1}>{t("journey.finishEarlyButton")}</CabinKey>
-          <CabinKey onClick={() => lowFocus()} tabIndex={showControls ? 0 : -1}>{t("journey.lowFocusButton")}</CabinKey>
-          <CabinKey onClick={() => onTunnel(true)} tabIndex={showControls ? 0 : -1}>{t("journey.enterTunnel")}</CabinKey>
-          <CabinKey onClick={() => setSheet("end")} tabIndex={showControls ? 0 : -1} className="col-span-2 sm:col-span-1">{t("journey.endTonightButton")}</CabinKey>
-        </div>
-        <div className="mx-auto flex max-w-[34rem] items-center gap-1.5">
           {paused ? (
-            <CabinKey strong onClick={() => resume()} className="flex-1">
+            <CabinKey strong onClick={() => resume()}>
               <Icon name="play" size={13} /> {t("journey.goTrain")}
             </CabinKey>
           ) : (
-            <CabinKey onClick={() => { pause(); reveal(); }} className="flex-1">
-              <Icon name="pause" size={13} /> {t("journey.stopTrain")}
+            <CabinKey onClick={() => { pause(); reveal(); }}>
+              <Icon name="pause" size={13} /> {t("journey.pauseButton")}
             </CabinKey>
           )}
-          <CabinKey onClick={() => (showControls ? setRevealed(false) : reveal())} aria-expanded={showControls} className="w-24">
-            {t("journey.moreControls")}
-          </CabinKey>
-          <SoundControl carriage={journey.selectedCarriage} />
-          <Link href="/" className="grid size-11 place-items-center rounded-[3px] border border-[#3b3f3c] bg-[#0e1216]/90 text-mist hover:text-paper" aria-label={t("common.back")}>
-            <Icon name="close" size={16} />
-          </Link>
+          <CabinKey onClick={() => setSheet("early")}>{t("journey.finishEarlyButton")}</CabinKey>
+          <CabinKey onClick={() => setSheet("more")}>{t("journey.moreTimeButton")}</CabinKey>
+          <CabinKey onClick={() => lowFocus()}>{t("journey.lowFocusButton")}</CabinKey>
+        </div>
+        <div className="mx-auto mt-1 flex max-w-[34rem] items-center justify-between">
+          <div className="flex gap-5 text-xs">
+            <button type="button" onClick={() => onTunnel(true)} className="min-h-9 text-haze hover:text-mist">
+              {t("journey.enterTunnel")}
+            </button>
+            <button type="button" onClick={() => setSheet("end")} className="min-h-9 text-haze hover:text-mist">
+              {t("journey.endTonightButton")}
+            </button>
+          </div>
+          <div className="flex items-center gap-1">
+            <SoundControl carriage={journey.selectedCarriage} />
+            <Link href="/" className="grid size-9 place-items-center rounded-[3px] text-mist hover:text-paper" aria-label={t("common.back")}>
+              <Icon name="close" size={16} />
+            </Link>
+          </div>
         </div>
       </footer>
 
@@ -247,7 +255,7 @@ function CabinKey({ strong = false, className = "", ...rest }: React.ButtonHTMLA
   return (
     <button
       type="button"
-      className={`inline-flex h-11 items-center justify-center gap-2 whitespace-nowrap rounded-[3px] border px-3 font-mono text-[0.75rem] tracking-[0.12em] transition-colors duration-300 active:translate-y-px ${
+      className={`inline-flex h-11 min-w-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-[3px] border px-1.5 font-mono text-[0.75rem] tracking-[0.02em] sm:gap-2 sm:px-3 sm:tracking-[0.1em] transition-colors duration-300 active:translate-y-px ${
         strong ? "border-[#c9b48c] bg-[#e4d6b8] text-[#1b1a16] hover:bg-[#efe3c8]" : "border-[#3b3f3c] bg-[#0e1216]/90 text-paper-dim hover:border-[#6a6e68] hover:text-paper"
       } ${className}`}
       {...rest}
