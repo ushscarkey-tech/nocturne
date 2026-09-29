@@ -53,5 +53,7 @@ export function windowOnScreen(width: number, height: number) {
     right: 0.5 + s.w / 2 / s.halfW / 2,
     top: 0.5 - (s.cy + s.h / 2) / s.halfH / 2,
     bottom: 0.5 - (s.cy - s.h / 2) / s.halfH / 2,
+    /** The top of the sill under the frame (see window.ts: sillTopOf). */
+    sill: 0.5 - (s.cy - s.h / 2 - 0.05) / s.halfH / 2,
   };
 }

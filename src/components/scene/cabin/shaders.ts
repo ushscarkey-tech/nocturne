@@ -128,14 +128,16 @@ void main() {
   vec2 offset = vec2(0.0);
   float c = 0.0;
   if (uRain > 0.01) {
-    float l0 = smoothstep(-0.5, 1.0, uRain) * 2.0;
-    float l1 = smoothstep(0.25, 0.75, uRain);
-    float l2 = smoothstep(0.0, 0.5, uRain);
+    // A light rain at most: beads and a few runners, never a downpour.
+    float r = uRain * 0.6;
+    float l0 = smoothstep(-0.5, 1.0, r) * 2.0;
+    float l1 = smoothstep(0.25, 0.75, r);
+    float l2 = smoothstep(0.0, 0.5, r);
     c = drops(uv, t, l0, l1, l2);
     vec2 e = vec2(0.0015, 0.0);
     float cx = drops(uv + e, t, l0, l1, l2);
     float cy = drops(uv + e.yx, t, l0, l1, l2);
-    offset = vec2(cx - c, cy - c) * 0.55;
+    offset = vec2(cx - c, cy - c) * 0.3;
   }
   vec3 col = texture2D(tOutside, screen + offset).rgb;
   // Drops gather the carriage light at their edges.

@@ -26,7 +26,7 @@ export function SoundControl({ carriage }: { carriage: CarriageId }) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className={`rounded-full p-2 transition-colors ${enabled ? "text-paper-dim hover:text-paper" : "text-haze hover:text-mist"}`}
+        className={`grid size-11 place-items-center rounded-[3px] border border-[#3b3f3c] bg-[#0e1216]/90 transition-colors ${enabled ? "text-paper-dim hover:text-paper" : "text-haze hover:text-mist"}`}
         aria-label={enabled ? t("journey.soundSettings") : t("journey.soundIsOff")}
       >
         <Icon name="sound" size={18} />

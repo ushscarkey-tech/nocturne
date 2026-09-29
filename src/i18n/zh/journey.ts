@@ -117,6 +117,12 @@ const journey: Partial<Record<keyof typeof source, string>> = {
   "journey.arrivedAt": "到达 · {station}",
   "journey.extendStop": "+5 分钟",
   "journey.durationLeft": "{duration} 剩余",
+  /* Cabin controls */
+  "journey.stopTrain": "停车",
+  "journey.goTrain": "发车",
+  "journey.moreControls": "更多",
+  "journey.standing": "停车中",
+  "journey.arrivesAt": "{time} 到达",
 };
 
 export default journey;

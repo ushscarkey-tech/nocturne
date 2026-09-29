@@ -43,8 +43,8 @@ const journey: Partial<Record<keyof typeof source, string>> = {
   "journey.endJourney": "여행 끝내기",
   "journey.finalStationAhead": "종착역이 다가와요",
   "journey.pauseButton": "일시중지",
-  "journey.finishEarlyButton": "일찍 끝내기",
-  "journey.moreTimeButton": "시간 더",
+  "journey.finishEarlyButton": "일찍 도착",
+  "journey.moreTimeButton": "시간 연장",
   "journey.lowFocusButton": "집중 흐림",
   "journey.enterTunnel": "터널 진입",
   "journey.trainLeavesShortly": "곧 기차가 떠나요",
@@ -108,7 +108,7 @@ const journey: Partial<Record<keyof typeof source, string>> = {
   "journey.boardingStep4": "탑승",
   "journey.stepIndicator": "{total}단계 중 {n}단계: {step}",
   "journey.stationsAndArriving": "{remaining} 정거장 · 약 {arrival} 도착",
-  "journey.endTonightButton": "오늘 밤 마치기",
+  "journey.endTonightButton": "운행 종료",
   "journey.routeProgress": "노선 진행",
   "journey.paused": "일시중지됨",
   "journey.countdownRemaining": "{countdown} 남음",
@@ -117,6 +117,12 @@ const journey: Partial<Record<keyof typeof source, string>> = {
   "journey.arrivedAt": "도착 · {station}",
   "journey.extendStop": "+5분",
   "journey.durationLeft": "{duration} 남음",
+  /* Cabin controls */
+  "journey.stopTrain": "정차",
+  "journey.goTrain": "출발",
+  "journey.moreControls": "더 보기",
+  "journey.standing": "정차 중",
+  "journey.arrivesAt": "{time} 도착",
 };
 
 export default journey;

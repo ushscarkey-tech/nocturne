@@ -130,6 +130,12 @@ const journey = {
   "journey.noStationsLeft": "No stations left tonight.",
   "journey.reviewTasks": "Review tasks",
   "journey.serviceTime": "Service Time",
+  /* Cabin controls */
+  "journey.stopTrain": "Stop",
+  "journey.goTrain": "Depart",
+  "journey.moreControls": "More",
+  "journey.standing": "Standing",
+  "journey.arrivesAt": "arr. {time}",
 } as const;
 
 export default journey;

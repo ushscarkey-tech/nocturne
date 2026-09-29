@@ -21,6 +21,8 @@ interface NightSceneProps {
   seed?: number;
   /** Which hour the window shows. */
   sky?: "local" | "journey";
+  /** The car and seat, for the plate by the window. */
+  seat?: string;
 }
 
 // three.js is fetched only when the carriage is actually shown.
@@ -56,8 +58,6 @@ export function NightScene(props: NightSceneProps) {
         // Drawing the curtain muffles the rain and rails outside.
         onCurtain={ambience.setCurtain}
       />
-      {/* A soft scrim keeps the centre readable. */}
-      <div className="absolute inset-0 bg-[radial-gradient(62%_40%_at_50%_46%,rgba(4,6,10,0.5),transparent_78%)]" />
     </div>
   );
 }
@@ -1361,8 +1361,6 @@ function NightScene2D({ mode, carriage, stationName, terminal = false }: NightSc
     <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden bg-night-950" aria-hidden>
       {/* Scenery, tunnel, and the carriage's own reflection in the glass. */}
       <canvas ref={canvasRef} className="absolute inset-0 h-full w-full" />
-      {/* A soft scrim keeps the centre readable. */}
-      <div className="absolute inset-0 bg-[radial-gradient(62%_40%_at_50%_46%,rgba(4,6,10,0.62),transparent_78%)]" />
       {/* A pleated curtain tied back at the window's edge. */}
       <div className="absolute inset-y-0 left-0 w-[5vw] min-w-5 max-w-11 bg-[repeating-linear-gradient(90deg,#141c18_0px,#1d2922_5px,#101612_9px)] opacity-90 shadow-[6px_0_18px_rgba(0,0,0,0.6)]">
         <div className="absolute inset-x-0 top-[44%] h-2 bg-[#2a2620] shadow-[0_1px_0_rgba(236,214,166,0.12)]" />

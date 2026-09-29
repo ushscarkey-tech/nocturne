@@ -199,7 +199,9 @@ export function windowParts(d: WindowDims, mats: PartsMats, opts: { seat?: boole
 
   if (opts.seat) {
     // The brass plate over the window's right corner, under the rail: car and seat.
-    add(new THREE.BoxGeometry(0.11, 0.041, 0.004), mats.brass, w / 2 - 0.1, cy + h / 2 + 0.072, -D + 0.002);
+    // (On a phone held upright the glass runs off the screen: keep the plate on it.)
+    const viewRight = (-left * D) / (D - 0.05);
+    add(new THREE.BoxGeometry(0.11, 0.041, 0.004), mats.brass, Math.min(w / 2 - 0.1, viewRight - 0.07), cy + h / 2 + 0.072, -D + 0.002);
   }
 
   const curtain: Omit<CurtainOptions, "cover"> = {

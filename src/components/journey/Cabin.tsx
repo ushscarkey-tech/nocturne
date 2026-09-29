@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { elapsedSeconds, remainingSeconds, routeOf } from "@/core/sessions";
 import { clock, formatCountdown } from "@/core/time";
 import type { Journey, NocturneData, StudySession } from "@/core/types";
@@ -9,18 +9,18 @@ import { useI18n } from "@/i18n";
 import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
 import { Sheet } from "@/components/ui/Sheet";
-import { RouteStrip } from "@/components/scene/RouteStrip";
+import { windowOnScreen } from "@/components/scene/cabin/layout";
 import { endJourney, finishEarly, lowFocus, needMoreTime, pause, resume } from "@/state/actions";
 import { SoundControl } from "./SoundControl";
-import { useSignal } from "./SignalChange";
 
 const REVEAL_MS = 7000;
 const TUNNEL_AFTER_MS = 75_000;
 
 /**
- * The focus scene: mostly window. A car and seat label, the task, the time
- * left and a thin transit line; controls surface on tap and fade again.
- * In the Tunnel only the task and its time remain.
+ * The focus scene: mostly window. The carriage's info board above it, a
+ * plate on the sill under the glass with the station, the task and the time
+ * left, and stop/go at the foot; the rest of the controls on request.
+ * In the Tunnel only the plate remains.
  */
 export function Cabin({
   data,
@@ -42,11 +42,9 @@ export function Cabin({
 }) {
   const { t, fmt } = useI18n();
   const [revealed, setRevealed] = useState(false);
-  const [hintVisible, setHintVisible] = useState(true);
   const [sheet, setSheet] = useState<null | "early" | "more" | "end">(null);
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastInteraction = useRef(0);
-  const changing = useSignal((s) => s.changing);
 
   const task = data.tasks.find((x) => x.id === active.taskId);
   const route = routeOf(data.sessions, journey.date);
@@ -66,11 +64,6 @@ export function Cabin({
     if (hideTimer.current) clearTimeout(hideTimer.current);
     hideTimer.current = setTimeout(() => setRevealed(false), REVEAL_MS);
   }, [tunnel, onTunnel, departing]);
-
-  useEffect(() => {
-    const timer = setTimeout(() => setHintVisible(false), departing ? 14_000 : 8000);
-    return () => clearTimeout(timer);
-  }, [departing]);
 
   // Any key reveals controls.
   useEffect(() => {
@@ -93,116 +86,110 @@ export function Cabin({
     if (tunnel && remaining < 120) onTunnel(false);
   }, [now, data.profile.autoTunnel, paused, sheet, tunnel, remaining, revealed, onTunnel, departing]);
 
-  const showControls = (revealed || paused || !!sheet) && !tunnel && !departing;
-  // Chrome (labels, line, next stop) fades for the Tunnel and while pulling out.
-  const chrome = tunnel || departing ? "opacity-0" : "opacity-100";
+  const showControls = (revealed || !!sheet) && !tunnel && !departing;
+  // Chrome (the info bar, the controls) goes for the Tunnel and while pulling out.
+  const chrome = tunnel || departing ? "pointer-events-none opacity-0" : "opacity-100";
+  const glass = useWindowOnScreen();
+  const stationLabel = fmt.station(active.stationName);
 
   return (
     <div
-      className="relative h-dvh overflow-hidden px-6 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-[max(0.75rem,env(safe-area-inset-top))]"
+      className="relative h-dvh overflow-hidden"
       onClick={(e) => {
         if ((e.target as HTMLElement).closest("button,a,input,dialog")) return;
         reveal();
       }}
     >
-      <div className="motion-safe-only flex h-full animate-drift flex-col">
-        <header className="flex h-11 items-center justify-between">
-          <p className={`font-mono text-[0.625rem] tracking-[0.3em] text-paper-dim/55 transition-opacity duration-[2000ms] ${chrome}`}>
-            {t("scene.carSeat", { car: journey.car, seat: journey.seat })}
-          </p>
-          <div className={`flex items-center gap-1 transition-opacity duration-700 ${showControls ? "opacity-100" : "pointer-events-none opacity-0"}`}>
-            <time className="mr-1 font-mono text-xs tracking-widest text-mist tabular">{clock(now)}</time>
-            <SoundControl carriage={journey.selectedCarriage} />
-            <Link href="/" className="rounded-full p-2 text-mist hover:text-paper" aria-label={t("common.back")} tabIndex={showControls ? 0 : -1}>
-              <Icon name="close" size={18} />
-            </Link>
-          </div>
-        </header>
-        <ExitSign className={`mt-1 self-end transition-opacity duration-[2000ms] ${departing ? "opacity-0" : "opacity-100"}`} />
+      {/* Over the window: the carriage's own info board, amber on black. */}
+      <header
+        className={`absolute inset-x-0 top-[max(0.625rem,env(safe-area-inset-top))] flex justify-start px-4 sm:justify-center transition-opacity duration-[2000ms] ${chrome}`}
+      >
+        <div className="flex h-8 max-w-full items-center gap-3 overflow-hidden rounded-[2px] border border-[#3b3f3c] bg-[#0b0d0f]/90 px-3 font-mono text-[0.6875rem] tracking-[0.14em] text-[#d9a45c] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+          <time className="tabular text-[#e8b872]">{clock(now)}</time>
+          <span className="h-3 w-px bg-[#3b3f3c]" aria-hidden />
+          <span className="truncate">→ {stationLabel}</span>
+          <span className="shrink-0 text-[#a5814c]">{t("journey.arrivesAt", { time: clock(active.plannedEnd) })}</span>
+          <span className="hidden h-3 w-px bg-[#3b3f3c] sm:block" aria-hidden />
+          <span className="hidden shrink-0 text-[#a5814c] sm:inline">{t("scene.carSeat", { car: journey.car, seat: journey.seat })}</span>
+        </div>
+      </header>
 
-        <main className="flex flex-1 flex-col items-center justify-center text-center">
-          <div className={`relative isolate transition-opacity duration-[2500ms] ${departing ? "opacity-0" : tunnel ? "opacity-75 delay-[1200ms]" : "opacity-100"}`}>
-            {/* A soft pool of shade so the words stay readable over a lit platform. */}
-            <div className="pointer-events-none absolute -inset-x-24 -inset-y-16 -z-10 bg-[radial-gradient(closest-side,rgba(5,7,10,0.68),rgba(5,7,10,0.35)_55%,transparent)]" aria-hidden />
-            <p className={`eyebrow text-paper-dim/70 transition-opacity duration-[2000ms] ${chrome}`}>→ {fmt.station(active.stationName)}</p>
-            <h1 className="mt-3 line-clamp-3 max-w-lg break-words font-display text-[1.9rem] leading-tight [text-shadow:0_2px_24px_rgba(0,0,0,0.7)] sm:text-4xl">
-              {task?.title ?? "—"}
-            </h1>
+      {/* Under the glass, on the sill: the plate with the station, the task and the time. */}
+      <section
+        className={`absolute left-1/2 w-[min(calc(100vw-2rem),34rem)] -translate-x-1/2 transition-opacity duration-[2500ms] ${departing ? "opacity-0" : tunnel ? "opacity-80 delay-[1200ms]" : "opacity-100"}`}
+        style={{ top: `min(calc(${(glass.bottom * 100).toFixed(2)}% + 0.75rem), calc(100% - 11.5rem))` }}
+        aria-label={task?.title}
+      >
+        <div className="relative rounded-[2px] border border-[#50554f] bg-[#11171e] px-4 pb-3 pt-2.5 shadow-[0_6px_18px_-8px_rgba(0,0,0,0.8),inset_0_1px_0_rgba(255,255,255,0.05)] sm:px-5">
+          {/* Four rivets. */}
+          {["left-1.5 top-1.5", "right-1.5 top-1.5", "left-1.5 bottom-1.5", "right-1.5 bottom-1.5"].map((pos) => (
+            <span key={pos} className={`absolute ${pos} size-[3px] rounded-full bg-[#7d807a]`} aria-hidden />
+          ))}
+          <div className="flex items-end justify-between gap-4">
+            <div className="min-w-0 pb-1">
+              <p className="font-mono text-[0.625rem] tracking-[0.22em] text-[#b58f5a]">
+                {paused ? t("journey.standing").toUpperCase() : `→ ${stationLabel}`}
+              </p>
+              <h1 className="mt-1 truncate text-[0.9375rem] leading-snug text-paper-dim sm:text-base">{task?.title ?? "—"}</h1>
+            </div>
             <p
-              className={`mt-6 font-mono text-[4rem] font-extralight leading-none tracking-tight tabular [text-shadow:0_2px_30px_rgba(0,0,0,0.7)] sm:text-[5.5rem] ${paused ? "text-mist" : "text-paper"}`}
+              className={`shrink-0 font-mono text-[2.5rem] font-light leading-none tracking-tight tabular sm:text-[2.75rem] ${paused ? "text-mist" : "text-paper"}`}
               role="timer"
               aria-live="off"
               aria-label={t("journey.countdownRemaining", { countdown: formatCountdown(remaining) })}
             >
               {formatCountdown(remaining)}
             </p>
-            {paused && <p className="eyebrow mt-4 animate-breathe">{t("journey.paused")}</p>}
           </div>
-        </main>
+          {/* The leg: how far along, a tick every quarter. */}
+          <div className="relative mt-2.5 h-[3px] bg-[#232b33]" role="progressbar" aria-label={t("journey.routeProgress")} aria-valuenow={Math.round(fraction * 100)} aria-valuemin={0} aria-valuemax={100}>
+            <div className="absolute inset-y-0 left-0 bg-[#b58f5a] transition-[width] duration-1000 ease-linear" style={{ width: `${fraction * 100}%` }} />
+            {[0.25, 0.5, 0.75].map((q) => (
+              <span key={q} className="absolute -top-[2px] h-[7px] w-px bg-[#4a525a]" style={{ left: `${q * 100}%` }} aria-hidden />
+            ))}
+          </div>
+          <p className={`mt-2 flex justify-between gap-3 font-mono text-[0.625rem] tracking-[0.12em] text-haze transition-opacity duration-1000 ${tunnel ? "opacity-0" : ""}`}>
+            <span className="truncate">
+              {next ? `${t("scene.nextStop")} · ${nextTask?.title ?? ""} · ${fmt.duration(next.plannedMinutes)}` : t("scene.lastStop")}
+            </span>
+            <span className="shrink-0 tabular">{arrival ? clock(arrival) : ""}</span>
+          </p>
+        </div>
+      </section>
 
-        <footer className="relative h-[9.75rem] sm:h-[8.75rem]">
-          {/* Where the train is: next stop and the line. */}
-          <div
-            className={`absolute inset-x-0 bottom-2 mx-auto max-w-sm text-center transition-opacity duration-[1500ms] ${showControls ? "opacity-0" : chrome}`}
-            aria-hidden={showControls || tunnel}
-          >
-            <p className="truncate text-sm text-mist">
-              {next ? (
-                <>
-                  <span className="font-mono text-[0.625rem] tracking-[0.2em] text-haze">{t("scene.nextStop").toUpperCase()}</span>
-                  <span className="px-2 text-haze">·</span>
-                  <span className="text-paper-dim">{nextTask?.title}</span>
-                  <span className="text-haze"> · {fmt.duration(next.plannedMinutes)}</span>
-                </>
-              ) : (
-                t("scene.lastStop")
-              )}
-            </p>
-            <RouteStrip route={route} activeId={active.id} fraction={fraction} changing={changing} label={t("journey.routeProgress")} className="mt-4" />
-            <p className="mt-2 flex justify-between font-mono text-[0.625rem] tracking-[0.14em] text-haze">
-              <span>{clock(active.plannedEnd)} {fmt.station(active.stationName)}</span>
-              <span>{arrival ? clock(arrival) : ""}</span>
-            </p>
-          </div>
-
-          {/* Controls, on tap. */}
-          <div
-            className={`absolute inset-x-0 bottom-0 transition-all duration-700 ease-[var(--ease-glide)] ${showControls ? "translate-y-0 opacity-100" : "pointer-events-none translate-y-3 opacity-0"}`}
-            aria-hidden={!showControls}
-            aria-label={t("scene.controls")}
-            role="group"
-          >
-            <div className="mx-auto grid max-w-md grid-cols-2 gap-2 sm:grid-cols-4">
-              {paused ? (
-                <Button variant="primary" size="sm" className="h-11 whitespace-nowrap" onClick={() => resume()} tabIndex={showControls ? 0 : -1}>
-                  <Icon name="play" size={14} /> {t("common.continue")}
-                </Button>
-              ) : (
-                <Button variant="secondary" size="sm" className="h-11 whitespace-nowrap bg-night-950/70" onClick={() => { pause(); reveal(); }} tabIndex={showControls ? 0 : -1}>
-                  <Icon name="pause" size={14} /> {t("journey.pauseButton")}
-                </Button>
-              )}
-              <Button variant="secondary" size="sm" className="h-11 whitespace-nowrap bg-night-950/70" onClick={() => setSheet("early")} tabIndex={showControls ? 0 : -1}>
-                {t("journey.finishEarlyButton")}
-              </Button>
-              <Button variant="secondary" size="sm" className="h-11 whitespace-nowrap bg-night-950/70" onClick={() => setSheet("more")} tabIndex={showControls ? 0 : -1}>
-                {t("journey.moreTimeButton")}
-              </Button>
-              <Button variant="secondary" size="sm" className="h-11 whitespace-nowrap bg-night-950/70" onClick={() => lowFocus()} tabIndex={showControls ? 0 : -1}>
-                {t("journey.lowFocusButton")}
-              </Button>
-            </div>
-            <div className="mt-3 flex justify-center gap-6 text-xs">
-              <button type="button" onClick={() => onTunnel(true)} className="min-h-9 text-haze hover:text-mist" tabIndex={showControls ? 0 : -1}>
-                {t("journey.enterTunnel")}
-              </button>
-              <button type="button" onClick={() => setSheet("end")} className="min-h-9 text-haze hover:text-mist" tabIndex={showControls ? 0 : -1}>
-                {t("journey.endTonightButton")}
-              </button>
-            </div>
-          </div>
-        </footer>
-      </div>
+      {/* At the foot of the screen: stop and go, and the rest on request. */}
+      <footer className={`absolute inset-x-0 bottom-[max(1rem,env(safe-area-inset-bottom))] px-4 transition-opacity duration-700 ${chrome}`}>
+        <div
+          className={`mx-auto mb-2 grid max-w-[34rem] grid-cols-3 gap-1.5 transition-all duration-500 ease-[var(--ease-glide)] sm:grid-cols-5 ${showControls ? "translate-y-0 opacity-100" : "pointer-events-none translate-y-2 opacity-0"}`}
+          aria-hidden={!showControls}
+          aria-label={t("scene.controls")}
+          role="group"
+        >
+          <CabinKey onClick={() => setSheet("more")} tabIndex={showControls ? 0 : -1}>{t("journey.moreTimeButton")}</CabinKey>
+          <CabinKey onClick={() => setSheet("early")} tabIndex={showControls ? 0 : -1}>{t("journey.finishEarlyButton")}</CabinKey>
+          <CabinKey onClick={() => lowFocus()} tabIndex={showControls ? 0 : -1}>{t("journey.lowFocusButton")}</CabinKey>
+          <CabinKey onClick={() => onTunnel(true)} tabIndex={showControls ? 0 : -1}>{t("journey.enterTunnel")}</CabinKey>
+          <CabinKey onClick={() => setSheet("end")} tabIndex={showControls ? 0 : -1} className="col-span-2 sm:col-span-1">{t("journey.endTonightButton")}</CabinKey>
+        </div>
+        <div className="mx-auto flex max-w-[34rem] items-center gap-1.5">
+          {paused ? (
+            <CabinKey strong onClick={() => resume()} className="flex-1">
+              <Icon name="play" size={13} /> {t("journey.goTrain")}
+            </CabinKey>
+          ) : (
+            <CabinKey onClick={() => { pause(); reveal(); }} className="flex-1">
+              <Icon name="pause" size={13} /> {t("journey.stopTrain")}
+            </CabinKey>
+          )}
+          <CabinKey onClick={() => (showControls ? setRevealed(false) : reveal())} aria-expanded={showControls} className="w-24">
+            {t("journey.moreControls")}
+          </CabinKey>
+          <SoundControl carriage={journey.selectedCarriage} />
+          <Link href="/" className="grid size-11 place-items-center rounded-[3px] border border-[#3b3f3c] bg-[#0e1216]/90 text-mist hover:text-paper" aria-label={t("common.back")}>
+            <Icon name="close" size={16} />
+          </Link>
+        </div>
+      </footer>
 
       {/* As the doors lock, the cabin lights settle a shade warmer. */}
       <div
@@ -213,16 +200,9 @@ export function Cabin({
       {/* Pulling out of the platform. */}
       <p
         aria-live="polite"
-        className={`pointer-events-none absolute inset-x-0 top-[42%] text-center font-mono text-[0.6875rem] tracking-[0.4em] text-paper-dim/70 transition-opacity duration-[1500ms] ${departing ? "opacity-100" : "opacity-0"}`}
+        className={`pointer-events-none absolute inset-x-0 top-[42%] text-center font-mono text-[0.6875rem] tracking-[0.4em] text-paper-dim/80 [text-shadow:0_1px_8px_rgba(0,0,0,0.8)] transition-opacity duration-[1500ms] ${departing ? "opacity-100" : "opacity-0"}`}
       >
         {departing ? t("scene.departing").toUpperCase() : ""}
-      </p>
-      <p
-        className={`pointer-events-none absolute inset-x-0 bottom-[max(0.5rem,env(safe-area-inset-bottom))] text-center text-[0.6875rem] tracking-widest text-haze/60 transition-opacity duration-[1500ms] ${
-          hintVisible && !showControls && !tunnel && !departing ? "opacity-100 delay-[2500ms]" : "opacity-0"
-        }`}
-      >
-        {t("journey.tapForControls")}
       </p>
 
       <Sheet open={sheet === "early"} onClose={() => setSheet(null)} title={t("journey.finishedEarly")} eyebrow={task?.title}>
@@ -262,13 +242,28 @@ export function Cabin({
   );
 }
 
-/** The small green exit sign above the carriage door, as every train has. */
-function ExitSign({ className = "" }: { className?: string }) {
+/** A carriage control: a square-cornered key, dark enamel with a metal edge. */
+function CabinKey({ strong = false, className = "", ...rest }: React.ButtonHTMLAttributes<HTMLButtonElement> & { strong?: boolean }) {
   return (
-    <svg width="26" height="13" viewBox="0 0 26 13" className={`opacity-40 ${className}`} aria-hidden>
-      <rect width="26" height="13" rx="1.5" fill="#1f5a40" />
-      <rect x="2" y="2" width="7" height="9" rx="0.5" fill="none" stroke="#cfe8d9" strokeWidth="1" />
-      <path d="M12 6.5h10M19 3.8l3 2.7-3 2.7" fill="none" stroke="#cfe8d9" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
+    <button
+      type="button"
+      className={`inline-flex h-11 items-center justify-center gap-2 whitespace-nowrap rounded-[3px] border px-3 font-mono text-[0.75rem] tracking-[0.12em] transition-colors duration-300 active:translate-y-px ${
+        strong ? "border-[#c9b48c] bg-[#e4d6b8] text-[#1b1a16] hover:bg-[#efe3c8]" : "border-[#3b3f3c] bg-[#0e1216]/90 text-paper-dim hover:border-[#6a6e68] hover:text-paper"
+      } ${className}`}
+      {...rest}
+    />
   );
+}
+
+const onResize = (fn: () => void) => {
+  window.addEventListener("resize", fn);
+  return () => window.removeEventListener("resize", fn);
+};
+const viewKey = () => `${window.innerWidth}x${window.innerHeight}`;
+
+/** Where the 3D window's glass sits on this screen, so the plate goes just under it. */
+function useWindowOnScreen() {
+  const key = useSyncExternalStore(onResize, viewKey, () => "1280x800");
+  const [w, h] = key.split("x").map(Number);
+  return windowOnScreen(w, h);
 }

@@ -117,6 +117,12 @@ const journey: Partial<Record<keyof typeof source, string>> = {
   "journey.whereWouldYouSit": "どこに座りますか?",
   "journey.wholeTaskComplete": "タスク全体が完了",
   "journey.yesComplete": "はい、完了",
+  /* Cabin controls */
+  "journey.stopTrain": "停車",
+  "journey.goTrain": "発車",
+  "journey.moreControls": "その他",
+  "journey.standing": "停車中",
+  "journey.arrivesAt": "{time} 着",
 };
 
 export default journey;

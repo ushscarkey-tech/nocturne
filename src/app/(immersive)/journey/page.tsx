@@ -214,7 +214,7 @@ export default function JourneyPage() {
           </>
         )
       ) : atDoors && holdScene ? null : (
-        <NightScene mode={scene} carriage={carriage} stationName={boardName} terminal={phase === "final"} leg={leg} seed={lineSeed} sky={data.profile.skyMode ?? "local"} />
+        <NightScene mode={scene} carriage={carriage} stationName={boardName} terminal={phase === "final"} leg={leg} seed={lineSeed} sky={data.profile.skyMode ?? "local"} seat={journey ? `CAR ${String(journey.car).padStart(2, "0")} · ${journey.seat}` : undefined} />
       )}
       <div key={phase} className="h-full animate-fade">
         {content}
